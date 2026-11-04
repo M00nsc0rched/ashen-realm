@@ -8,18 +8,23 @@ using AshenRealm.Player;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 namespace AshenRealm.EditorTools
 {
     /// <summary>
-    /// Ashen Realm > Capture Preview Shots: renders the generated scene from fixed vantage points into
-    /// PNGs under Screenshots/ (project root). Works in batch mode, so visual changes can be reviewed
-    /// without entering Play mode. Shots show the edit-mode state (rest poses, all HUD groups visible).
+    /// Ashen Realm > Capture Preview Shots: renders the generated scene from fixed vantage points into PNGs under
+    /// Screenshots/ (project root), emulating the runtime pixel pipeline: low-resolution render, the composite
+    /// shader's posterise + Bayer dither, nearest-neighbour upscale and (optionally) the HUD on top.
+    /// Works in batch mode. Shots show the edit-mode state (rest poses, all HUD groups visible).
     /// </summary>
     public static class PreviewCapture
     {
         public const string OutputFolder = "Screenshots";
+        const int LowHeight = 360;
+        const int Scale = 3;
 
         [MenuItem("Ashen Realm/Capture Preview Shots", priority = 21)]
         public static void CaptureFromMenu()
@@ -29,7 +34,7 @@ namespace AshenRealm.EditorTools
             EditorUtility.RevealInFinder(folder);
         }
 
-        public static string Capture(int width = 1600, int height = 900)
+        public static string Capture()
         {
             var scene = EditorSceneManager.OpenScene(GeneratedAssets.ScenePath, OpenSceneMode.Single);
             var roots = scene.GetRootGameObjects();
@@ -42,9 +47,12 @@ namespace AshenRealm.EditorTools
             var weapons = Find<FirstPersonWeaponAnimator>();
             var knight = Find<CursedKnightAI>();
             var chest = Find<TreasureChest>();
-            var canvas = roots.Select(r => r.GetComponent<Canvas>()).FirstOrDefault(c => c != null);
+            var hud = roots.Select(r => r.GetComponent<Canvas>()).FirstOrDefault(c => c != null && c.name == "HUD");
+            var composite = AssetDatabase.LoadAssetAtPath<Material>(GeneratedAssets.MaterialFolder + "/M_PixelComposite.mat");
 
             Directory.CreateDirectory(OutputFolder);
+            // The first render after opening a scene in batch mode can miss lighting setup; render once and discard.
+            RenderCamera(camera, 64, 36, false);
             Transform camTransform = camera.transform;
             Vector3 originalPos = camTransform.position;
             Quaternion originalRot = camTransform.rotation;
@@ -54,12 +62,11 @@ namespace AshenRealm.EditorTools
                 if (weapons != null) weapons.gameObject.SetActive(showWeapons);
                 camTransform.position = position;
                 camTransform.rotation = Quaternion.LookRotation(lookAt - position);
-                Render(camera, canvas, showHud, width, height, Path.Combine(OutputFolder, name + ".png"));
+                Save(camera, showHud ? hud : null, composite, Path.Combine(OutputFolder, name + ".png"));
             }
 
-            // First-person view from the spawn with weapons and HUD.
-            Render(camera, canvas, true, width, height, Path.Combine(OutputFolder, "01_spawn_first_person.png"));
-            Shot("02_road_to_ruins", Ground(out _, 0f, -4f) + Vector3.up * 1.7f, Ground(out _, 0f, 32f) + Vector3.up * 3f, false, false);
+            Save(camera, hud, composite, Path.Combine(OutputFolder, "01_spawn_first_person.png"));
+            Shot("02_road_to_ruins", Ground(0f, -4f) + Vector3.up * 1.7f, Ground(0f, 32f) + Vector3.up * 3f, false, false);
             if (knight != null)
             {
                 Transform k = knight.transform;
@@ -70,10 +77,12 @@ namespace AshenRealm.EditorTools
                 Transform c = chest.transform;
                 Shot("04_chest_altar", c.position + c.rotation * new Vector3(0.6f, 1.7f, -2.6f), c.position + Vector3.up * 0.5f, true, true);
             }
-            Shot("05_graveyard", Ground(out _, -24f, -13f) + Vector3.up * 2f, Ground(out _, -32f, -6f) + Vector3.up * 0.5f, false, false);
-            Shot("06_camp", Ground(out _, 19f, -47f) + Vector3.up * 1.8f, Ground(out _, 26f, -42f) + Vector3.up * 0.6f, false, false);
+            Shot("05_graveyard", Ground(-24f, -13f) + Vector3.up * 1.8f, Ground(-32f, -6f) + Vector3.up * 0.8f, true, false);
+            Shot("06_camp", Ground(19f, -47f) + Vector3.up * 1.8f, Ground(26f, -42f) + Vector3.up * 0.6f, false, false);
             Shot("07_overview", new Vector3(70f, 55f, -110f), new Vector3(0f, 0f, 10f), false, false);
-            Shot("08_ruins_interior", Ground(out _, -5f, 23f) + Vector3.up * 1.7f, Ground(out _, 2f, 42f) + Vector3.up * 1.5f, false, false);
+            Shot("08_ruins_interior", Ground(-5f, 23f) + Vector3.up * 1.7f, Ground(2f, 42f) + Vector3.up * 1.5f, false, false);
+            Shot("09_hamlet", Ground(14f, -15f) + Vector3.up * 1.7f, Ground(36f, -14f) + Vector3.up * 2.5f, true, false);
+            Shot("10_windmill_fields", Ground(34f, -30f) + Vector3.up * 1.7f, Ground(54f, 8f) + Vector3.up * 5f, false, false);
 
             camTransform.SetPositionAndRotation(originalPos, originalRot);
             if (weapons != null) weapons.gameObject.SetActive(true);
@@ -81,55 +90,125 @@ namespace AshenRealm.EditorTools
             return Path.GetFullPath(OutputFolder);
         }
 
-        static Vector3 Ground(out bool hit, float x, float z)
+        static Vector3 Ground(float x, float z)
         {
-            hit = Physics.Raycast(new Vector3(x, 300f, z), Vector3.down, out RaycastHit info, 600f, ~0, QueryTriggerInteraction.Ignore);
-            return hit ? info.point : new Vector3(x, 0f, z);
+            return Physics.Raycast(new Vector3(x, 300f, z), Vector3.down, out RaycastHit info, 600f, ~0, QueryTriggerInteraction.Ignore)
+                ? info.point
+                : new Vector3(x, 0f, z);
         }
 
-        static void Render(Camera camera, Canvas canvas, bool withHud, int width, int height, string path)
+        static void Save(Camera camera, Canvas hud, Material composite, string path)
         {
-            var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
-            RenderMode originalMode = canvas != null ? canvas.renderMode : RenderMode.ScreenSpaceOverlay;
+            int lowWidth = Mathf.RoundToInt(LowHeight * 16f / 9f);
+            Color[] world = RenderCamera(camera, lowWidth, LowHeight, false);
+            Posterise(world, lowWidth, LowHeight, composite);
+
+            int width = lowWidth * Scale, height = LowHeight * Scale;
+            var output = new Color[width * height];
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                output[y * width + x] = world[(y / Scale) * lowWidth + x / Scale];
+
+            if (hud != null) OverlayHud(hud, output, width, height);
+
+            var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+            image.SetPixels(output);
+            image.Apply();
+            File.WriteAllBytes(path, image.EncodeToPNG());
+            Object.DestroyImmediate(image);
+        }
+
+        /// <summary>Renders a camera into a temporary target and returns display-space pixels.</summary>
+        static Color[] RenderCamera(Camera camera, int width, int height, bool transparent)
+        {
+            var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            rt.filterMode = FilterMode.Point;
+            var previousTarget = camera.targetTexture;
             try
             {
-                if (canvas != null && withHud)
-                {
-                    // Overlay canvases never reach a camera target, so composite through the camera for the shot.
-                    canvas.renderMode = RenderMode.ScreenSpaceCamera;
-                    canvas.worldCamera = camera;
-                    canvas.planeDistance = 0.2f;
-                    var scaler = canvas.GetComponent<CanvasScaler>();
-                    typeof(CanvasScaler).GetMethod("Handle", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(scaler, null);
-                    Canvas.ForceUpdateCanvases();
-                }
-                else if (canvas != null)
-                {
-                    canvas.enabled = false;
-                }
-
                 camera.targetTexture = rt;
                 camera.Render();
-
                 var previous = RenderTexture.active;
                 RenderTexture.active = rt;
-                var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+                var image = new Texture2D(width, height, transparent ? TextureFormat.RGBA32 : TextureFormat.RGB24, false);
                 image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
                 image.Apply();
                 RenderTexture.active = previous;
-                File.WriteAllBytes(path, image.EncodeToPNG());
+                Color[] pixels = image.GetPixels();
                 Object.DestroyImmediate(image);
+                return pixels;
             }
             finally
             {
-                camera.targetTexture = null;
+                camera.targetTexture = previousTarget;
                 RenderTexture.ReleaseTemporary(rt);
-                if (canvas != null)
+            }
+        }
+
+        /// <summary>CPU copy of AshenRealm/PixelComposite (pixels are already in display space).</summary>
+        static void Posterise(Color[] pixels, int width, int height, Material composite)
+        {
+            float levels = composite != null ? composite.GetFloat("_Levels") : 18f;
+            float dither = composite != null ? composite.GetFloat("_Dither") : 0.55f;
+            float saturation = composite != null ? composite.GetFloat("_Saturation") : 1.1f;
+            float contrast = composite != null ? composite.GetFloat("_Contrast") : 1.04f;
+            int[] bayer = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
+                Color c = pixels[y * width + x];
+                float luma = c.r * 0.299f + c.g * 0.587f + c.b * 0.114f;
+                float threshold = (bayer[(y % 4) * 4 + x % 4] / 16f - 0.5f) * dither;
+                float Channel(float v)
                 {
-                    canvas.renderMode = originalMode;
-                    canvas.worldCamera = null;
-                    canvas.enabled = true;
+                    v = luma + (v - luma) * saturation;
+                    v = (v - 0.5f) * contrast + 0.5f;
+                    return Mathf.Floor(Mathf.Clamp01(v) * levels + 0.5f + threshold) / levels;
                 }
+                pixels[y * width + x] = new Color(Channel(c.r), Channel(c.g), Channel(c.b), 1f);
+            }
+        }
+
+        /// <summary>Renders the HUD canvas through a temporary UI camera and alpha-blends it over the image.</summary>
+        static void OverlayHud(Canvas canvas, Color[] output, int width, int height)
+        {
+            var cameraGo = new GameObject("Preview UI Camera");
+            var uiCamera = cameraGo.AddComponent<Camera>();
+            uiCamera.cullingMask = 1 << 5;
+            uiCamera.clearFlags = CameraClearFlags.SolidColor;
+            uiCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            uiCamera.orthographic = true;
+            uiCamera.GetUniversalAdditionalCameraData().renderPostProcessing = false;
+            RenderMode originalMode = canvas.renderMode;
+            try
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = uiCamera;
+                canvas.planeDistance = 1f;
+                uiCamera.nearClipPlane = 0.1f;
+                uiCamera.farClipPlane = 10f;
+                var scaler = canvas.GetComponent<CanvasScaler>();
+                var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+                uiCamera.targetTexture = rt;
+                typeof(CanvasScaler).GetMethod("Handle", BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(scaler, null);
+                Canvas.ForceUpdateCanvases();
+                uiCamera.targetTexture = null;
+                RenderTexture.ReleaseTemporary(rt);
+
+                Color[] ui = RenderCamera(uiCamera, width, height, true);
+                for (int i = 0; i < output.Length; i++)
+                {
+                    Color u = ui[i];
+                    float a = Mathf.Sqrt(Mathf.Clamp01(u.a));
+                    Color o = output[i];
+                    output[i] = new Color(Mathf.Clamp01(u.r + o.r * (1f - a)), Mathf.Clamp01(u.g + o.g * (1f - a)), Mathf.Clamp01(u.b + o.b * (1f - a)), 1f);
+                }
+            }
+            finally
+            {
+                canvas.renderMode = originalMode;
+                canvas.worldCamera = null;
+                Object.DestroyImmediate(cameraGo);
             }
         }
     }

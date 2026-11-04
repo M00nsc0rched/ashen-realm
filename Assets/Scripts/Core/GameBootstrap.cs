@@ -16,6 +16,10 @@ namespace AshenRealm.Core
 
         void Awake()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // Browsers pace frames with requestAnimationFrame; a fixed target would stutter.
+            Application.targetFrameRate = -1;
+#else
             if (Application.isMobilePlatform)
             {
                 QualitySettings.vSyncCount = 0;
@@ -25,16 +29,18 @@ namespace AshenRealm.Core
             {
                 Application.targetFrameRate = desktopTargetFrameRate;
             }
+#endif
 
             if (preventScreenSleep)
                 Screen.sleepTimeout = SleepTimeout.NeverSleep;
 
+#if UNITY_IOS || UNITY_ANDROID
             Screen.autorotateToPortrait = false;
             Screen.autorotateToPortraitUpsideDown = false;
             Screen.autorotateToLandscapeLeft = true;
             Screen.autorotateToLandscapeRight = true;
-            if (Application.isMobilePlatform)
-                Screen.orientation = ScreenOrientation.AutoRotation;
+            Screen.orientation = ScreenOrientation.AutoRotation;
+#endif
         }
     }
 }

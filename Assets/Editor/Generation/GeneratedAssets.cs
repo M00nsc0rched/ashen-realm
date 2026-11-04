@@ -17,7 +17,24 @@ namespace AshenRealm.EditorTools
         public const string MaterialFolder = "Assets/Materials";
         public const string PrefabFolder = "Assets/Prefabs";
         public const string SettingsFolder = "Assets/Settings";
-        public const string PalettePath = TextureFolder + "/T_Palette.png";
+        public const string DetailArrayPath = TextureFolder + "/T_DetailArray.asset";
+        public const string SkyPath = TextureFolder + "/T_PaintedSky.png";
+
+        /// <summary>Saves a generated texture array, replacing the contents of an existing asset to keep its GUID.</summary>
+        public static Texture2DArray SaveTextureArray(Texture2DArray array, string path)
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<Texture2DArray>(path);
+            if (existing == null)
+            {
+                AssetDatabase.CreateAsset(array, path);
+                return array;
+            }
+            EditorUtility.CopySerialized(array, existing);
+            existing.name = Path.GetFileNameWithoutExtension(path);
+            EditorUtility.SetDirty(existing);
+            Object.DestroyImmediate(array);
+            return existing;
+        }
 
         static readonly HashSet<string> meshesWritten = new HashSet<string>();
 
@@ -58,7 +75,13 @@ namespace AshenRealm.EditorTools
             existing.indexFormat = mesh.indexFormat;
             existing.SetVertices(mesh.vertices);
             existing.SetNormals(mesh.normals);
-            existing.SetUVs(0, mesh.uv);
+            existing.SetColors(mesh.colors);
+            var uvs = new List<Vector4>();
+            for (int channel = 0; channel < 2; channel++)
+            {
+                mesh.GetUVs(channel, uvs);
+                existing.SetUVs(channel, uvs);
+            }
             existing.subMeshCount = mesh.subMeshCount;
             for (int i = 0; i < mesh.subMeshCount; i++)
                 existing.SetTriangles(mesh.GetTriangles(i), i, true);
@@ -101,7 +124,8 @@ namespace AshenRealm.EditorTools
         }
 
         /// <summary>Writes a texture to PNG and imports it with the given settings. Returns the imported asset.</summary>
-        public static T WriteTexture<T>(Texture2D texture, string path, bool asSprite, FilterMode filter, bool srgb = true) where T : Object
+        public static T WriteTexture<T>(Texture2D texture, string path, bool asSprite, FilterMode filter, bool srgb = true,
+            TextureWrapMode wrapU = TextureWrapMode.Clamp) where T : Object
         {
             File.WriteAllBytes(path, texture.EncodeToPNG());
             Object.DestroyImmediate(texture);
@@ -115,6 +139,7 @@ namespace AshenRealm.EditorTools
             importer.mipmapEnabled = false;
             importer.filterMode = filter;
             importer.wrapMode = TextureWrapMode.Clamp;
+            importer.wrapModeU = wrapU;
             importer.npotScale = TextureImporterNPOTScale.None;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.isReadable = false;

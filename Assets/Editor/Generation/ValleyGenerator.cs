@@ -39,10 +39,11 @@ namespace AshenRealm.EditorTools
         static readonly Vector2 CampCenter = new Vector2(26f, -42f);
         static readonly Vector2 GraveyardCenter = new Vector2(-32f, -6f);
         static readonly Vector2 SpawnCenter = new Vector2(0f, -86f);
+        static readonly Vector2 HamletCenter = new Vector2(34f, -14f);
+        static readonly Vector2 WindmillCenter = new Vector2(54f, 8f);
 
         readonly Material worldMaterial;
-        readonly Material metalMaterial;
-        readonly Material fireMaterial;
+        readonly Material foliageMaterial;
         readonly System.Random rng = new System.Random(Seed);
 
         readonly List<Vector2[]> paths = new List<Vector2[]>();
@@ -54,16 +55,18 @@ namespace AshenRealm.EditorTools
         float[,] heights;
         float cellSize;
         Transform root, colliderRoot;
-        MeshBuilder[,] decorChunks, foliageChunks;
-        MeshBuilder[] pineVariants;
+        MeshBuilder[,] decorChunks, treeChunks, foliageChunks;
+        (MeshBuilder solid, MeshBuilder cutout)[] pineVariants;
+        (MeshBuilder solid, MeshBuilder cutout)[] autumnVariants;
         MeshBuilder[] rockVariants;
         Mesh[] rockMeshes;
 
-        public ValleyGenerator(Material world, Material metal, Material fire)
+        /// <param name="world">Opaque PixelLit material for all solid geometry.</param>
+        /// <param name="foliage">Alpha-clipped, two-sided, wind-swayed PixelLit material for cards.</param>
+        public ValleyGenerator(Material world, Material foliage)
         {
             worldMaterial = world;
-            metalMaterial = metal;
-            fireMaterial = fire;
+            foliageMaterial = foliage;
         }
 
         public ValleyLayout Generate()
@@ -82,11 +85,13 @@ namespace AshenRealm.EditorTools
             BuildTerrain();
 
             decorChunks = new MeshBuilder[ChunkGrid, ChunkGrid];
+            treeChunks = new MeshBuilder[ChunkGrid, ChunkGrid];
             foliageChunks = new MeshBuilder[ChunkGrid, ChunkGrid];
             for (int x = 0; x < ChunkGrid; x++)
             for (int z = 0; z < ChunkGrid; z++)
             {
                 decorChunks[x, z] = new MeshBuilder();
+                treeChunks[x, z] = new MeshBuilder();
                 foliageChunks[x, z] = new MeshBuilder();
             }
             BuildVariants();
@@ -95,6 +100,8 @@ namespace AshenRealm.EditorTools
             BuildRuins(layout);
             BuildGraveyard();
             BuildCamp();
+            BuildHamlet();
+            BuildPuddles();
             BuildFences();
             ScatterTrees();
             ScatterRocks();
@@ -133,6 +140,8 @@ namespace AshenRealm.EditorTools
             }));
             paths.Add(CatmullRom(new[] { new Vector2(2f, -38f), new Vector2(12f, -41f), new Vector2(21f, -42f), new Vector2(25f, -42f) }));
             paths.Add(CatmullRom(new[] { new Vector2(-5f, -20f), new Vector2(-16f, -14f), new Vector2(-26f, -8f), new Vector2(-31f, -6f) }));
+            paths.Add(CatmullRom(new[] { new Vector2(-4f, -12f), new Vector2(8f, -15f), new Vector2(20f, -13f), new Vector2(30f, -14f), HamletCenter }));
+            paths.Add(CatmullRom(new[] { HamletCenter, new Vector2(42f, -6f), new Vector2(48f, 2f), new Vector2(52f, 6f) }));
         }
 
         static Vector2[] CatmullRom(Vector2[] points)
@@ -177,12 +186,27 @@ namespace AshenRealm.EditorTools
             flats.Add((CampCenter, 8f, 6f, BaseHeight(CampCenter.x, CampCenter.y)));
             flats.Add((GraveyardCenter, 9f, 6f, BaseHeight(GraveyardCenter.x, GraveyardCenter.y)));
             flats.Add((SpawnCenter, 5f, 5f, BaseHeight(SpawnCenter.x, SpawnCenter.y)));
+            flats.Add((HamletCenter, 14f, 8f, BaseHeight(HamletCenter.x, HamletCenter.y)));
+            flats.Add((WindmillCenter, 4f, 9f, BaseHeight(WindmillCenter.x, WindmillCenter.y) + 1.8f));
 
             clearings.Add((RuinsCenter, 19f));
             clearings.Add((new Vector2(0f, 10f), 10f));   // knight patrol ground
             clearings.Add((CampCenter, 10f));
             clearings.Add((GraveyardCenter, 10f));
             clearings.Add((SpawnCenter, 7f));
+            clearings.Add((HamletCenter, 17f));
+            clearings.Add((WindmillCenter, 7f));
+        }
+
+        /// <summary>Trampled ground in the hamlet square.</summary>
+        float YardMask(float x, float z) => 1f - SmoothStep(5f, 9f, Vector2.Distance(new Vector2(x, z), HamletCenter));
+
+        /// <summary>Golden wheat fields east of the hamlet (0 outside).</summary>
+        static float FieldMask(float x, float z)
+        {
+            bool fieldA = x > 40f && x < 62f && z > -36f && z < -22f;
+            bool fieldB = x > 44f && x < 64f && z > -10f && z < 0f;
+            return fieldA || fieldB ? 1f : 0f;
         }
 
         float BaseHeight(float x, float z)
@@ -255,21 +279,81 @@ namespace AshenRealm.EditorTools
             return patch < 0.36f ? Pal.GrassOlive : patch > 0.64f ? Pal.GrassDry : Pal.GrassGold;
         }
 
+        /// <summary>
+        /// Smooth-shaded terrain. Per grid vertex: normal from the height gradient, grass/dirt/rock tint and blend
+        /// weights. Each triangle picks one texture pair (grass→dirt or grass→rock) and blends it per vertex.
+        /// </summary>
         void BuildTerrain()
         {
+            int n = Cells + 1;
+            var normal = new Vector3[n, n];
+            var tint = new Color[n, n];
+            var dirtWeight = new float[n, n];
+            var rockWeight = new float[n, n];
+            for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+            {
+                float x = -TerrainHalf + i * cellSize, z = -TerrainHalf + j * cellSize;
+                float hl = heights[Mathf.Max(i - 1, 0), j], hr = heights[Mathf.Min(i + 1, Cells), j];
+                float hd = heights[i, Mathf.Max(j - 1, 0)], hu = heights[i, Mathf.Min(j + 1, Cells)];
+                Vector3 nrm = new Vector3(hl - hr, 2f * cellSize, hd - hu).normalized;
+                normal[i, j] = nrm;
+
+                float slope = 1f - nrm.y;
+                float rockNoise = Mathf.PerlinNoise(x * 0.08f + noiseA.y, z * 0.08f + noiseB.x);
+                float rock = Mathf.Max(SmoothStep(0.2f, 0.38f, slope), heights[i, j] > 16f ? SmoothStep(0.45f, 0.65f, rockNoise) : 0f);
+                float dirt = Mathf.Max(PathMask(x, z), YardMask(x, z) * 0.9f) * (1f - rock);
+                rockWeight[i, j] = rock;
+                dirtWeight[i, j] = dirt;
+
+                float olive = SmoothStep(0.55f, 0.75f, 1f - Mathf.PerlinNoise(x * 0.045f + noiseB.y, z * 0.045f + noiseA.x));
+                float dry = SmoothStep(0.55f, 0.75f, Mathf.PerlinNoise(x * 0.045f + noiseB.y, z * 0.045f + noiseA.x));
+                Color grass = Color.Lerp(Color.Lerp(Palette.Linear(Pal.GrassGold, 0.5f), Palette.Linear(Pal.GrassOlive, 0.5f), olive),
+                    Palette.Linear(Pal.GrassDry, 0.5f), dry);
+                grass *= 0.92f + Mathf.PerlinNoise(x * 0.2f + noiseC.x, z * 0.2f) * 0.16f;
+                Color dirtColor = Palette.Linear(Pal.Dirt, 0.45f + rockNoise * 0.1f);
+                Color rockColor = Palette.Linear(rockNoise < 0.4f ? Pal.RockDark : rockNoise > 0.62f ? Pal.RockWarm : Pal.Rock, 0.5f);
+                Color c = Color.Lerp(Color.Lerp(grass, dirtColor, dirt), rockColor, rock);
+                c.a = 1f;
+                tint[i, j] = c;
+            }
+
             var b = new MeshBuilder();
+            var p = new Vector3[3];
+            var nn = new Vector3[3];
+            var cc = new Color[3];
+            var uv = new Vector4[3];
+            void Tri(int ia, int ja, int ib, int jb, int ic, int jc)
+            {
+                int[] ii = { ia, ib, ic }, jj = { ja, jb, jc };
+                float maxRock = 0f, maxDirt = 0f;
+                for (int k = 0; k < 3; k++)
+                {
+                    maxRock = Mathf.Max(maxRock, rockWeight[ii[k], jj[k]]);
+                    maxDirt = Mathf.Max(maxDirt, dirtWeight[ii[k], jj[k]]);
+                }
+                bool useRock = maxRock > maxDirt;
+                TexLayer second = useRock ? TexLayer.Rock : TexLayer.Dirt;
+                for (int k = 0; k < 3; k++)
+                {
+                    int i = ii[k], j = jj[k];
+                    float x = -TerrainHalf + i * cellSize, z = -TerrainHalf + j * cellSize;
+                    p[k] = new Vector3(x, heights[i, j], z);
+                    nn[k] = normal[i, j];
+                    Color c = tint[i, j];
+                    c.a = useRock ? rockWeight[i, j] : dirtWeight[i, j];
+                    cc[k] = c;
+                    uv[k] = new Vector4(x / 2.5f, z / 2.5f, (int)TexLayer.Grass, (int)second);
+                }
+                b.RawTriangle(p, nn, cc, uv, Vector4.zero);
+            }
+
             for (int i = 0; i < Cells; i++)
             for (int j = 0; j < Cells; j++)
             {
-                float x0 = -TerrainHalf + i * cellSize, z0 = -TerrainHalf + j * cellSize;
-                var v00 = new Vector3(x0, heights[i, j], z0);
-                var v10 = new Vector3(x0 + cellSize, heights[i + 1, j], z0);
-                var v01 = new Vector3(x0, heights[i, j + 1], z0 + cellSize);
-                var v11 = new Vector3(x0 + cellSize, heights[i + 1, j + 1], z0 + cellSize);
-                PaintTerrainTriangle(b, v00, v01, v11);
-                b.Triangle(v00, v01, v11, Vector3.up);
-                PaintTerrainTriangle(b, v00, v11, v10);
-                b.Triangle(v00, v11, v10, Vector3.up);
+                // Same diagonal split as SurfaceHeight(): (00, 01, 11) and (00, 11, 10), clockwise from above.
+                Tri(i, j, i, j + 1, i + 1, j + 1);
+                Tri(i, j, i + 1, j + 1, i + 1, j);
             }
 
             Mesh mesh = GeneratedAssets.SaveMesh(b, "Terrain");
@@ -282,42 +366,22 @@ namespace AshenRealm.EditorTools
             go.AddComponent<MeshCollider>().sharedMesh = mesh;
         }
 
-        void PaintTerrainTriangle(MeshBuilder b, Vector3 a, Vector3 c1, Vector3 c2)
-        {
-            Vector3 center = (a + c1 + c2) / 3f;
-            Vector3 n = Vector3.Cross(c1 - a, c2 - a).normalized;
-            if (n.y < 0f) n = -n;
-            float slope = 1f - n.y;
-            float pathMask = PathMask(center.x, center.z);
-            float jitter = R(-0.08f, 0.08f);
-            float rockNoise = Mathf.PerlinNoise(center.x * 0.08f + noiseA.y, center.z * 0.08f + noiseB.x);
-
-            if (slope > 0.3f || (center.y > 16f && rockNoise > 0.55f))
-            {
-                Pal rock = rockNoise < 0.4f ? Pal.RockDark : rockNoise > 0.62f ? Pal.RockWarm : Pal.Rock;
-                b.SetColor(rock, 0.42f + jitter * 1.5f + n.y * 0.1f);
-            }
-            else if (pathMask > 0.5f)
-            {
-                b.SetColor(pathMask > 0.9f && R(0f, 1f) < 0.3f ? Pal.DirtDark : Pal.Dirt, 0.45f + jitter);
-            }
-            else
-            {
-                Pal grass = pathMask > 0.2f ? Pal.GrassDry : GrassFamily(center.x, center.z);
-                float heightTint = Mathf.Clamp(center.y * 0.006f, -0.05f, 0.08f);
-                b.SetColor(grass, 0.42f + jitter + heightTint - pathMask * 0.15f);
-            }
-        }
-
         // ---- Variants & chunks ---------------------------------------------------------------------
 
         void BuildVariants()
         {
-            pineVariants = new MeshBuilder[4];
+            pineVariants = new (MeshBuilder, MeshBuilder)[5];
             for (int i = 0; i < pineVariants.Length; i++)
             {
-                pineVariants[i] = new MeshBuilder();
-                PropMeshes.Pine(pineVariants[i], rng, 7f + i * 2f);
+                pineVariants[i] = (new MeshBuilder(), new MeshBuilder());
+                PropMeshes.Pine(pineVariants[i].solid, pineVariants[i].cutout, rng, 7f + i * 1.8f);
+            }
+            Pal[] autumn = { Pal.LeafGold, Pal.LeafOrange, Pal.LeafGold };
+            autumnVariants = new (MeshBuilder, MeshBuilder)[3];
+            for (int i = 0; i < autumnVariants.Length; i++)
+            {
+                autumnVariants[i] = (new MeshBuilder(), new MeshBuilder());
+                PropMeshes.AutumnTree(autumnVariants[i].solid, autumnVariants[i].cutout, rng, 6f + i * 1.3f, autumn[i]);
             }
 
             rockVariants = new MeshBuilder[6];
@@ -333,6 +397,15 @@ namespace AshenRealm.EditorTools
 
         MeshBuilder DecorChunk(float x, float z) => decorChunks[ChunkIndex(x), ChunkIndex(z)];
         MeshBuilder FoliageChunk(float x, float z) => foliageChunks[ChunkIndex(x), ChunkIndex(z)];
+        MeshBuilder TreeChunk(float x, float z) => treeChunks[ChunkIndex(x), ChunkIndex(z)];
+
+        /// <summary>Places a two-part tree variant: solid parts into the decor chunk, cards into the tree-foliage chunk.</summary>
+        void PlaceTree((MeshBuilder solid, MeshBuilder cutout) variant, Vector3 position, Quaternion rotation, float scale)
+        {
+            var m = Matrix4x4.TRS(position, rotation, Vector3.one * scale);
+            DecorChunk(position.x, position.z).Append(variant.solid, m);
+            TreeChunk(position.x, position.z).Append(variant.cutout, m);
+        }
 
         static int ChunkIndex(float v) => Mathf.Clamp(Mathf.FloorToInt((v + TerrainHalf) / (TerrainHalf * 2f / ChunkGrid)), 0, ChunkGrid - 1);
 
@@ -341,12 +414,13 @@ namespace AshenRealm.EditorTools
             for (int x = 0; x < ChunkGrid; x++)
             for (int z = 0; z < ChunkGrid; z++)
             {
-                CreateChunkObject(decorChunks[x, z], $"Decor_{x}_{z}", ShadowCastingMode.On);
-                CreateChunkObject(foliageChunks[x, z], $"Foliage_{x}_{z}", ShadowCastingMode.Off);
+                CreateChunkObject(decorChunks[x, z], $"Decor_{x}_{z}", worldMaterial, ShadowCastingMode.On);
+                CreateChunkObject(treeChunks[x, z], $"Trees_{x}_{z}", foliageMaterial, ShadowCastingMode.On);
+                CreateChunkObject(foliageChunks[x, z], $"Foliage_{x}_{z}", foliageMaterial, ShadowCastingMode.Off);
             }
         }
 
-        void CreateChunkObject(MeshBuilder builder, string name, ShadowCastingMode shadows)
+        void CreateChunkObject(MeshBuilder builder, string name, Material material, ShadowCastingMode shadows)
         {
             if (builder.TriangleCount == 0) return;
             Mesh mesh = GeneratedAssets.SaveMesh(builder, name);
@@ -354,7 +428,7 @@ namespace AshenRealm.EditorTools
             go.transform.SetParent(root, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var renderer = go.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = worldMaterial;
+            renderer.sharedMaterial = material;
             renderer.shadowCastingMode = shadows;
         }
 
@@ -552,7 +626,7 @@ namespace AshenRealm.EditorTools
                     continue;
                 }
 
-                float scale = R(1.05f, 1.35f);
+                float scale = R(2.1f, 3.0f);   // giant ancient blades
                 var rotation = Quaternion.Euler(R(-18f, 18f), R(0f, 360f), R(-14f, 14f)) * Quaternion.Euler(180f, 0f, 0f);
                 var position = new Vector3(x, y + 0.75f * scale, z);
                 chunk.Append(R(0f, 1f) < 0.5f ? swordBuilder : rustyBuilder, Matrix4x4.TRS(position, rotation, Vector3.one * scale));
@@ -569,10 +643,10 @@ namespace AshenRealm.EditorTools
             var loreBuilder = new MeshBuilder();
             PropMeshes.Sword(loreBuilder, Pal.Steel, 0.6f);
             Mesh loreMesh = GeneratedAssets.SaveMesh(loreBuilder, "LoreSword");
-            Vector3 lorePos = Ground(GraveyardCenter.x, GraveyardCenter.y) + Vector3.up * 1.05f;
-            var lore = CreateMeshObject("Oathbreaker's Blade", loreMesh, metalMaterial, lorePos,
+            Vector3 lorePos = Ground(GraveyardCenter.x, GraveyardCenter.y) + Vector3.up * 2.75f;
+            var lore = CreateMeshObject("Oathbreaker's Blade", loreMesh, worldMaterial, lorePos,
                 Quaternion.Euler(8f, 30f, 6f) * Quaternion.Euler(180f, 0f, 0f), root);
-            lore.transform.localScale = Vector3.one * 1.6f;
+            lore.transform.localScale = Vector3.one * 3.6f;
             var loreCollider = lore.AddComponent<BoxCollider>();
             loreCollider.center = new Vector3(0f, 0.35f, 0f);
             loreCollider.size = new Vector3(0.3f, 1.3f, 0.12f);
@@ -621,7 +695,7 @@ namespace AshenRealm.EditorTools
             var flameBuilder = new MeshBuilder();
             PropMeshes.Flames(flameBuilder, rng);
             Mesh flames = GeneratedAssets.SaveMesh(flameBuilder, "CampfireFlames");
-            var flameObject = CreateMeshObject("Campfire", flames, fireMaterial, fire, Quaternion.identity, root, false);
+            var flameObject = CreateMeshObject("Campfire", flames, worldMaterial, fire, Quaternion.identity, root, false);
             var lightObject = new GameObject("Fire Light");
             lightObject.transform.SetParent(flameObject.transform, false);
             lightObject.transform.localPosition = new Vector3(0f, 1.0f, 0f);
@@ -710,7 +784,10 @@ namespace AshenRealm.EditorTools
                 float scale = R(0.8f, 1.3f);
                 Vector3 position = new Vector3(x, SurfaceHeight(x, z) - 0.15f, z);
                 var rotation = Quaternion.Euler(R(-3f, 3f), R(0f, 360f), R(-3f, 3f));
-                DecorChunk(x, z).Append(pineVariants[rng.Next(pineVariants.Length)], Matrix4x4.TRS(position, rotation, Vector3.one * scale));
+                // Golden broadleaf trees mix in near the hamlet and in the mid valley, pines dominate the rim.
+                bool autumn = d < 80f && (Vector2.Distance(new Vector2(x, z), HamletCenter) < 45f || R(0f, 1f) < 0.18f);
+                var variant = autumn ? autumnVariants[rng.Next(autumnVariants.Length)] : pineVariants[rng.Next(pineVariants.Length)];
+                PlaceTree(variant, position, rotation, scale);
 
                 if (d < WallHalf + 3f)
                 {
@@ -780,39 +857,188 @@ namespace AshenRealm.EditorTools
             mc.convex = true;
         }
 
+        bool BlockedForFoliage(float x, float z)
+        {
+            if (Mathf.Abs(x) < 9f && z > 19f && z < 45.5f) return true;                       // ruins interior
+            if (Vector2.Distance(new Vector2(x, z), HamletCenter) < 8f) return true;           // hamlet square
+            foreach (var house in houseFootprints)
+                if (Vector2.Distance(new Vector2(x, z), house) < 5.5f) return true;
+            return Vector2.Distance(new Vector2(x, z), WindmillCenter) < 3f;
+        }
+
         void ScatterFoliage()
         {
-            int tufts = 0;
-            for (int attempt = 0; attempt < 16000 && tufts < 6500; attempt++)
+            int clumps = 0;
+            for (int attempt = 0; attempt < 20000 && clumps < 7500; attempt++)
             {
                 float x = R(-110f, 110f), z = R(-110f, 110f);
-                if (PathMask(x, z) > 0.3f) continue;
-                if (Mathf.Abs(x) < 9f && z > 19f && z < 45.5f) continue; // ruins interior
+                if (PathMask(x, z) > 0.3f || BlockedForFoliage(x, z) || FieldMask(x, z) > 0f) continue;
                 if (SurfaceNormal(x, z).y < 0.86f) continue;
                 float density = 0.3f + 0.7f * Mathf.PerlinNoise(x * 0.07f + noiseC.x, z * 0.07f + noiseA.y);
                 if (R(0f, 1f) > density) continue;
 
                 var chunk = FoliageChunk(x, z);
-                chunk.Push(new Vector3(x, SurfaceHeight(x, z) - 0.03f, z), Quaternion.Euler(0f, R(0f, 360f), 0f), Vector3.one * R(0.8f, 1.5f));
-                PropMeshes.GrassTuft(chunk, rng, GrassFamily(x, z));
+                chunk.Push(new Vector3(x, SurfaceHeight(x, z) - 0.03f, z), Quaternion.identity, Vector3.one * R(0.8f, 1.4f));
+                PropMeshes.GrassClump(chunk, rng, GrassFamily(x, z));
                 chunk.Pop();
-                tufts++;
+                clumps++;
             }
 
-            Pal[] petals = { Pal.FlowerRed, Pal.FlowerWhite, Pal.FlowerViolet, Pal.FlowerYellow };
+            // Flower patches across the valley, and a dense meadow around the sword graveyard.
             int flowers = 0;
-            for (int attempt = 0; attempt < 6000 && flowers < 650; attempt++)
+            for (int attempt = 0; attempt < 14000 && flowers < 2600; attempt++)
             {
-                float x = R(-100f, 100f), z = R(-100f, 100f);
-                if (Mathf.PerlinNoise(x * 0.09f + noiseA.y, z * 0.09f + noiseC.x) < 0.6f) continue;
-                if (PathMask(x, z) > 0.2f || SurfaceNormal(x, z).y < 0.88f) continue;
-                if (Mathf.Abs(x) < 9f && z > 19f && z < 45.5f) continue;
-                int colorIndex = Mathf.Clamp(Mathf.FloorToInt(Mathf.PerlinNoise(x * 0.02f + 40f, z * 0.02f + 70f) * 4f), 0, 3);
+                bool meadow = attempt % 2 == 0;
+                float x, z;
+                if (meadow)
+                {
+                    float a = R(0f, Mathf.PI * 2f), r = Mathf.Sqrt(R(0f, 1f)) * 17f;
+                    x = GraveyardCenter.x + Mathf.Cos(a) * r;
+                    z = GraveyardCenter.y + Mathf.Sin(a) * r;
+                }
+                else
+                {
+                    x = R(-100f, 100f);
+                    z = R(-100f, 100f);
+                    if (Mathf.PerlinNoise(x * 0.09f + noiseA.y, z * 0.09f + noiseC.x) < 0.58f) continue;
+                }
+                if (PathMask(x, z) > 0.2f || BlockedForFoliage(x, z) || FieldMask(x, z) > 0f || SurfaceNormal(x, z).y < 0.88f) continue;
                 var chunk = FoliageChunk(x, z);
-                chunk.Push(new Vector3(x, SurfaceHeight(x, z) - 0.02f, z), Quaternion.Euler(R(-8f, 8f), R(0f, 360f), R(-8f, 8f)), Vector3.one * R(0.9f, 1.3f));
-                PropMeshes.Flower(chunk, rng, petals[colorIndex]);
+                chunk.Push(new Vector3(x, SurfaceHeight(x, z) - 0.02f, z), Quaternion.identity, Vector3.one * R(0.9f, 1.3f));
+                PropMeshes.FlowerClump(chunk, rng);
                 chunk.Pop();
                 flowers++;
+            }
+
+            // Wheat fields in loose rows.
+            for (float x = 40f; x < 64f; x += 1.1f)
+            for (float z = -36f; z < 0f; z += 1.0f)
+            {
+                float jx = x + R(-0.35f, 0.35f), jz = z + R(-0.35f, 0.35f);
+                if (FieldMask(jx, jz) <= 0f || PathMask(jx, jz) > 0.2f || BlockedForFoliage(jx, jz) || R(0f, 1f) < 0.08f) continue;
+                var chunk = FoliageChunk(jx, jz);
+                chunk.Push(new Vector3(jx, SurfaceHeight(jx, jz) - 0.05f, jz), Quaternion.identity, Vector3.one * R(0.9f, 1.15f));
+                PropMeshes.WheatClump(chunk, rng);
+                chunk.Pop();
+            }
+        }
+
+        // ---- Hamlet, windmill and road details ---------------------------------------------------------
+
+        readonly List<Vector2> houseFootprints = new List<Vector2>();
+
+        void BuildHamlet()
+        {
+            var houses = new (Vector2 pos, float yaw, float w, float d, float h, bool tiles)[]
+            {
+                (new Vector2(34f, -23f), 180f, 7f, 5f, 3.0f, true),
+                (new Vector2(44f, -13f), 90f, 6f, 4.6f, 2.8f, false),
+                (new Vector2(26f, -5f), -37f, 8f, 5.2f, 3.2f, true),
+            };
+            for (int i = 0; i < houses.Length; i++)
+            {
+                var h = houses[i];
+                houseFootprints.Add(h.pos);
+                Vector3 p = Ground(h.pos.x, h.pos.y) + Vector3.down * 0.15f;
+                var rotation = Quaternion.Euler(0f, h.yaw, 0f);
+                var chunk = DecorChunk(p.x, p.z);
+                chunk.Push(p, rotation, Vector3.one);
+                PropMeshes.House(chunk, rng, h.w, h.d, h.h, h.tiles);
+                chunk.Pop();
+                AddBoxCollider("House", p + Vector3.up * (0.6f + h.h) * 0.5f, rotation, new Vector3(h.w + 0.3f, 0.6f + h.h + 0.4f, h.d + 0.3f));
+                AddBoxCollider("House Roof", p + Vector3.up * (0.6f + h.h + h.d * 0.25f), rotation, new Vector3(h.w + 0.6f, h.d * 0.5f, h.d * 0.6f));
+
+                // Barrels and crates by each house.
+                for (int k = 0; k < 3; k++)
+                {
+                    Vector3 local = new Vector3(h.w * 0.5f + 0.9f, 0f, R(-h.d * 0.4f, h.d * 0.4f) + k * 0.3f);
+                    Vector3 wp = p + rotation * local;
+                    wp.y = SurfaceHeight(wp.x, wp.z) - 0.02f;
+                    var c = DecorChunk(wp.x, wp.z);
+                    c.Push(wp, Quaternion.Euler(0f, R(0f, 360f), 0f), Vector3.one);
+                    if (k == 0) PropMeshes.Crate(c, rng, R(0.7f, 0.9f));
+                    else PropMeshes.Barrel(c, rng);
+                    c.Pop();
+                    AddBoxCollider(k == 0 ? "Crate" : "Barrel", wp + Vector3.up * 0.45f, Quaternion.identity, new Vector3(0.8f, 0.9f, 0.8f));
+                }
+            }
+
+            // Windmill on its rise, with rotating sails.
+            Vector3 mill = Ground(WindmillCenter.x, WindmillCenter.y) + Vector3.down * 0.3f;
+            var millRotation = Quaternion.Euler(0f, 200f, 0f);
+            const float towerHeight = 8f;
+            var millChunk = DecorChunk(mill.x, mill.z);
+            millChunk.Push(mill, millRotation, Vector3.one);
+            PropMeshes.WindmillTower(millChunk, rng, towerHeight);
+            millChunk.Pop();
+            var millCollider = new GameObject("Windmill");
+            millCollider.transform.SetParent(colliderRoot, false);
+            millCollider.transform.position = mill;
+            var capsule = millCollider.AddComponent<CapsuleCollider>();
+            capsule.radius = 2.3f;
+            capsule.height = towerHeight + 2f;
+            capsule.center = Vector3.up * (towerHeight * 0.5f + 0.5f);
+
+            var sailsBuilder = new MeshBuilder();
+            PropMeshes.WindmillSails(sailsBuilder, rng, 6.5f);
+            Mesh sailsMesh = GeneratedAssets.SaveMesh(sailsBuilder, "WindmillSails");
+            Vector3 hub = mill + millRotation * new Vector3(0f, towerHeight + 0.6f, -2.35f);
+            var sails = CreateMeshObject("Windmill Sails", sailsMesh, worldMaterial, hub, millRotation, root);
+            var rotator = sails.AddComponent<Rotator>();
+            SceneWiring.Set(rotator, "degreesPerSecond", new Vector3(0f, 0f, -14f));
+
+            // Lantern posts along the hamlet road; two carry real lights, the rest only glow.
+            Vector2[] lanterns =
+            {
+                new Vector2(30f, -10.5f), new Vector2(38f, -17.5f), new Vector2(20f, -10.5f), new Vector2(9f, -12f),
+                new Vector2(41f, -3f), new Vector2(-1f, -15f),
+            };
+            for (int i = 0; i < lanterns.Length; i++)
+            {
+                Vector3 p = Ground(lanterns[i].x, lanterns[i].y);
+                float yaw = Mathf.Atan2(HamletCenter.x - p.x, HamletCenter.y - p.z) * Mathf.Rad2Deg - 90f;
+                var chunk = DecorChunk(p.x, p.z);
+                var rotation = Quaternion.Euler(0f, yaw, 0f);
+                chunk.Push(p, rotation, Vector3.one);
+                PropMeshes.LanternPost(chunk, rng);
+                chunk.Pop();
+                AddBoxCollider("Lantern Post", p + Vector3.up * 1.4f, rotation, new Vector3(0.22f, 2.9f, 0.22f));
+                if (i < 2)
+                {
+                    var lightGo = new GameObject("Lantern Light");
+                    lightGo.transform.SetParent(root, false);
+                    lightGo.transform.position = p + rotation * new Vector3(0.62f, 2.1f, 0f);
+                    var lamp = lightGo.AddComponent<Light>();
+                    lamp.type = LightType.Point;
+                    lamp.color = new Color(1f, 0.7f, 0.38f);
+                    lamp.range = 7f;
+                    lamp.intensity = 1.6f;
+                    lamp.shadows = LightShadows.None;
+                    var flicker = lightGo.AddComponent<LightFlicker>();
+                    SceneWiring.Set(flicker, "baseIntensity", 1.6f);
+                    SceneWiring.Set(flicker, "intensityVariation", 0.25f);
+                }
+            }
+
+            // Signpost at the fork.
+            Vector3 sign = Ground(-1.5f, -9f);
+            var signChunk = DecorChunk(sign.x, sign.z);
+            signChunk.Push(sign, Quaternion.Euler(0f, 10f, 0f), Vector3.one);
+            PropMeshes.Signpost(signChunk, rng);
+            signChunk.Pop();
+            AddBoxCollider("Signpost", sign + Vector3.up * 1.2f, Quaternion.identity, new Vector3(0.2f, 2.4f, 0.2f));
+        }
+
+        void BuildPuddles()
+        {
+            Vector2[] main = paths[0];
+            for (int i = 6; i < main.Length - 6; i += 13)
+            {
+                Vector2 p = main[i] + new Vector2(R(-0.8f, 0.8f), R(-0.8f, 0.8f));
+                var chunk = DecorChunk(p.x, p.y);
+                chunk.Push(Ground(p.x, p.y), Quaternion.Euler(0f, R(0f, 360f), 0f), Vector3.one);
+                PropMeshes.Puddle(chunk, rng, R(0.7f, 1.3f));
+                chunk.Pop();
             }
         }
 

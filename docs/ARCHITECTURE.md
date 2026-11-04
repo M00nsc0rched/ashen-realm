@@ -9,13 +9,15 @@
 ## Runtime modules (`Assets/Scripts`)
 ```
 Core/          GameBootstrap (frame rate, orientation), AtmosphereController (ambient + fog at runtime),
-               GameMessages (notification channel), LightFlicker, OptionalAttribute
+               GameMessages (notification channel), PixelCamera (low-res world render), LightFlicker, Rotator,
+               OptionalAttribute
 Input/         IPlayerInput (gameplay-facing contract), PlayerInputHub (keyboard/mouse, gamepad, touch merge)
 Player/        FirstPersonController, Stamina, CameraEffects, PlayerLifecycle, FirstPersonWeaponAnimator
 Combat/        DamageInfo + IDamageable + IDamageFilter, Health, PlayerCombat, HitFlash, ImpactEffects
 AI/            CursedKnightAI (FSM), KnightAnimator (procedural rig)
 Interactions/  IInteractable, PlayerInteractor, TreasureChest, LoreInspectable
-UI/            HUDController, TouchJoystick, TouchLookArea, TouchButton, TouchControlsRoot, SafeAreaFitter, DesktopHint
+UI/            HUDController, CompassStrip, PauseMenu, TouchJoystick, TouchLookArea, TouchButton, TouchControlsRoot,
+               SafeAreaFitter, DesktopHint
 ```
 
 ### Input flow
@@ -60,27 +62,44 @@ for animated models later without touching gameplay. The knight rig is `Model/Hi
 | `IOSBuildConfigurator` | Menu `Ashen Realm > Apply iOS Player Settings` |
 | `PlaytestRunner` | Menu `Ashen Realm > Run Automated Playtest`; Play-mode scenario driven through the input hub |
 | `PreviewCapture` | Menu `Ashen Realm > Capture Preview Shots`; offscreen renders of key vantage points |
+| `WebGLBuilder` | Menu `Ashen Realm > Build WebGL` → `Builds/WebGL` with the `AshenRealm` web template |
 | `BatchTasks` | `-executeMethod` entry points with exit codes |
-| `Generation/MeshBuilder` | Flat-shaded mesh accumulation with auto-oriented faces and a transform stack |
-| `Generation/Palette` | 32×32 palette texture: column = colour family, row = shade |
-| `Generation/PropMeshes` | Sword, shield, pines, rocks, grass, flowers, fences, chest, camp, banners, mountains, knight parts |
-| `Generation/ValleyGenerator` | Heightfield, paths, ruins, graveyard, camp, scattering, chunking, colliders, bounds |
-| `Generation/ActorFactory` | Player, Cursed Knight and chest hierarchies |
-| `Generation/HudBuilder` | HUD canvas, touch controls, generated UI sprites |
+| `Generation/MeshBuilder` | Mesh accumulation for PixelLit: vertex colour, texture-layer UVs, wind weights, auto-oriented faces |
+| `Generation/Palette` | Colour families (sRGB → linear vertex colours) and each family's default texture layer / UV mode |
+| `Generation/PixelTextures` | 20 procedural 64×64 pixel-art layers (Texture2DArray) and the painted panoramic sky |
+| `Generation/PropMeshes` | Sword, shield, pines (bough cards), autumn trees, grass/flower/wheat cards, houses, windmill, lanterns, barrels, crates, chest, camp, knight parts |
+| `Generation/ValleyGenerator` | Smooth blended terrain, paths, ruins, graveyard, camp, hamlet, windmill, puddles, scattering, chunking, colliders, bounds |
+| `Generation/ActorFactory` | Player (with pixel camera and drifting leaves), Cursed Knight and chest hierarchies |
+| `Generation/HudBuilder` | HUD canvas (top bars, compass, emblem, pause), touch controls, pause menu, pixel screen, generated UI sprites |
 
-### Rendering approach
-- One URP Lit material (`M_World`) samples the palette with point filtering; per-face colour comes from UVs. All static
-  geometry shares it → SRP batcher friendly. Decoration is merged into a 4×4 grid of chunk meshes
-  (`Decor_x_z` casts shadows, `Foliage_x_z` does not). Colliders are separate primitives / convex rock meshes.
-- Flat shading (unshared vertices) gives the low-poly painterly look; the URP assets render at 0.65 scale with point
-  upscaling for the slightly pixelated presentation (UI stays native resolution).
-- Fully realtime lighting: one soft-shadowed directional sun, flat ambient + linear fog applied at runtime, procedural
-  dusk skybox, global volume (neutral tonemapping, colour adjustments, split toning, vignette, quarter-res bloom).
+### Rendering approach (pixel-art painterly look)
+- **Low-resolution world, crisp UI.** `PixelCamera` renders the world camera into a 360 px-high render texture with point
+  filtering; a full-screen RawImage (`Pixel Screen` canvas) shows it through `AshenRealm/PixelComposite`, which
+  posterises colour with 4×4 Bayer dithering. A separate `Screen Camera` (culling mask: nothing) draws only the UI.
+  URP render scale is kept at 1 because URP would otherwise down-scale (and blur) the render texture too.
+- **`AshenRealm/PixelLit` shader** (`Assets/Art/Shaders`): samples a `Texture2DArray` of pixel-art layers (two layers
+  blended per vertex, e.g. grass→dirt on terrain), multiplies by vertex colour, banded three-step lighting with a cool
+  shadow tint, stepped metal sheen, emission (lanterns, windows, fire, knight eyes), alpha clip and wind sway for
+  foliage, fog, shadows, Forward and Forward+ additional lights. Two materials: `M_World` (opaque) and `M_Foliage`
+  (cutout, two-sided, wind).
+- **UVs** come from the surface mode: stone blocks get one tile per face (bevelled block look), wood/terrain/metal are
+  projected along the face's dominant axis in metres, cards use explicit UVs.
+- Static decoration is merged into 4×4 chunk grids: `Decor_x_z` (opaque), `Trees_x_z` (bough/leaf cards, shadows on),
+  `Foliage_x_z` (grass, flowers, wheat; shadows off).
+- Lighting: low golden sun from the WNW, flat cool ambient, linear fog in the sky's horizon colour, painted panoramic
+  sky (`Skybox/Panoramic`), global volume (neutral tonemapping, colour adjustments, split toning, vignette; no bloom).
 
 ### World layout (deterministic, seed 1337)
-Spawn (0,−86) in a fenced lane → dirt road north → ruined chapel (0,32) with the chest at the altar and the Cursed Knight
-patrolling its entrance. Branches: camp with campfire (26,−42), sword graveyard (−32,−6) with an inspectable blade.
-Playable area ≈ 206×206 m enclosed by rim hills and four invisible boundary walls; distant mountain ring at 215–330 m.
+Spawn (0,−86) in a fenced lane → dirt road north (puddles) → ruined chapel (0,32) with the chest at the altar and the
+Cursed Knight patrolling its entrance. Branches: camp with campfire (26,−42), giant-sword graveyard in a flower meadow
+(−32,−6) with an inspectable blade, hamlet of three half-timbered houses with lantern posts (34,−14), windmill on a
+rise (54,8) beside wheat fields. Playable area ≈ 206×206 m enclosed by rim hills and four invisible boundary walls;
+distant mountain ring at 215–330 m.
+
+### Web platform
+`GameBootstrap` leaves frame pacing to the browser on WebGL. Losing pointer lock (Esc in the browser) raises
+`PlayerInputHub.PauseRequested`, which opens `PauseMenu` (time scale 0, cursor released, fullscreen toggle,
+look speed). The page template caps device pixel ratio and shows a rotate-device notice on phones in portrait.
 
 ## Extending
 - New enemy: reuse `Health`, `HitFlash`, implement an AI + animator pair, add a factory method, rerun the generator.

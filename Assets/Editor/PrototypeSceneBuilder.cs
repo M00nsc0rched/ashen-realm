@@ -21,8 +21,6 @@ namespace AshenRealm.EditorTools
     public static class PrototypeSceneBuilder
     {
         const string LogPrefix = "[AshenRealm]";
-        /// <summary>Render scale applied to the URP assets for the slightly pixelated presentation.</summary>
-        const float PixelatedRenderScale = 0.65f;
 
         [MenuItem("Ashen Realm/Generate Prototype", priority = 0)]
         public static void GenerateFromMenu()
@@ -49,22 +47,25 @@ namespace AshenRealm.EditorTools
                 GeneratedAssets.EnsureFolders();
                 GeneratedAssets.BeginMeshPass();
 
-                Progress("Palette and UI textures", 0.06f);
-                var palette = GeneratedAssets.WriteTexture<Texture2D>(Palette.CreateTexture(), GeneratedAssets.PalettePath, false, FilterMode.Point);
+                Progress("Pixel-art textures, sky and UI sprites", 0.06f);
+                var detailArray = GeneratedAssets.SaveTextureArray(PixelTextures.CreateArray(), GeneratedAssets.DetailArrayPath);
+                var sky = GeneratedAssets.WriteTexture<Texture2D>(PixelTextures.PaintSky(1024, 512, -(SunRotation * Vector3.forward), out Color horizon),
+                    GeneratedAssets.SkyPath, false, FilterMode.Point, true, TextureWrapMode.Repeat);
+                var leaf = GeneratedAssets.WriteTexture<Texture2D>(LeafTexture(), GeneratedAssets.TextureFolder + "/T_Leaf.png", false, FilterMode.Point);
                 var sprites = HudBuilder.CreateSprites();
 
                 Progress("Materials", 0.1f);
-                var materials = CreateMaterials(palette);
-                Material skybox = CreateSkybox();
+                var materials = CreateMaterials(detailArray, leaf);
+                Material skybox = CreateSkybox(sky);
                 VolumeProfile volumeProfile = CreateVolumeProfile();
                 ConfigureRenderPipelineAssets();
 
                 Progress("Creating scene", 0.14f);
                 var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-                CreateSceneServices(skybox, volumeProfile);
+                CreateSceneServices(skybox, volumeProfile, horizon);
 
-                Progress("Generating valley (terrain, forest, ruins)", 0.2f);
-                ValleyLayout layout = new ValleyGenerator(materials.World, materials.Metal, materials.Fire).Generate();
+                Progress("Generating valley (terrain, forest, ruins, hamlet)", 0.2f);
+                ValleyLayout layout = new ValleyGenerator(materials.World, materials.Foliage).Generate();
 
                 Progress("Actors", 0.75f);
                 var impacts = CreateImpactEffects(materials.Sparks);
@@ -88,8 +89,13 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(knight, "impactEffects", impacts);
                 SceneWiring.Set(knight, "patrolPoints", layout.PatrolPoints);
 
-                Progress("HUD and touch controls", 0.88f);
-                HudBuilder.Build(sprites, player.Input, player.Health, player.Stamina, player.Interactor, player.Lifecycle, knight);
+                Progress("HUD, touch controls and pixel screen", 0.88f);
+                HudBuilder.Build(sprites, player.Input, player.Health, player.Stamina, player.Interactor, player.Lifecycle, knight,
+                    player.CameraEffects.transform, layout.ChestPosition);
+                var pixelScreen = HudBuilder.BuildPixelScreen(materials.Composite);
+                pixelScreen.enabled = false; // PixelCamera enables it at runtime; edit mode shows the world camera directly
+                SceneWiring.Set(player.PixelCamera, "output", pixelScreen);
+                SceneWiring.Set(player.PixelCamera, "screenCamera", CreateScreenCamera());
 
                 Progress("Saving", 0.94f);
                 int stale = GeneratedAssets.DeleteStaleMeshes();
@@ -124,41 +130,60 @@ namespace AshenRealm.EditorTools
 
         // ---- Materials & rendering -----------------------------------------------------------------------
 
-        static GeneratedMaterials CreateMaterials(Texture2D palette)
+        static GeneratedMaterials CreateMaterials(Texture2DArray detail, Texture2D leaf)
         {
-            Shader lit = Shader.Find("Universal Render Pipeline/Lit");
-            Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
+            Shader pixelLit = Shader.Find("AshenRealm/PixelLit");
+            Shader composite = Shader.Find("AshenRealm/PixelComposite");
             Shader particles = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-            if (lit == null || unlit == null || particles == null)
+            if (pixelLit == null || composite == null)
+                throw new System.InvalidOperationException("AshenRealm shaders not found (Assets/Art/Shaders). Did they fail to compile?");
+            if (particles == null)
                 throw new System.InvalidOperationException("URP shaders not found. Is the Universal Render Pipeline package installed and active?");
 
-            Material Lit(string name, float smoothness, float metallic)
+            Material PixelLit(string name, bool foliage)
             {
-                var m = GeneratedAssets.GetOrCreateMaterial(name, lit);
-                m.SetTexture("_BaseMap", palette);
-                m.SetColor("_BaseColor", Color.white);
-                m.SetFloat("_Smoothness", smoothness);
-                m.SetFloat("_Metallic", metallic);
-                // No reflection probes are baked; skip environment reflections so surfaces do not go murky.
-                m.SetFloat("_EnvironmentReflections", 0f);
-                m.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+                var m = GeneratedAssets.GetOrCreateMaterial(name, pixelLit);
+                m.SetTexture("_DetailArray", detail);
+                m.SetColor("_Tint", Color.white);
+                m.SetFloat("_LightBands", 3f);
+                m.SetFloat("_BandSoftness", 0.08f);
+                m.SetColor("_ShadowColor", new Color(0.84f, 0.85f, 0.97f));
+                m.SetFloat("_AlphaClip", foliage ? 1f : 0f);
+                m.SetFloat("_Wind", foliage ? 1f : 0f);
+                m.SetFloat("_Cull", foliage ? (float)CullMode.Off : (float)CullMode.Back);
+                m.SetFloat("_Cutoff", 0.5f);
+                if (foliage)
+                {
+                    m.EnableKeyword("_ALPHATEST_ON");
+                    m.EnableKeyword("_WIND_ON");
+                    m.renderQueue = (int)RenderQueue.AlphaTest;
+                }
+                else
+                {
+                    m.DisableKeyword("_ALPHATEST_ON");
+                    m.DisableKeyword("_WIND_ON");
+                    m.renderQueue = (int)RenderQueue.Geometry;
+                }
                 m.enableInstancing = true;
                 return m;
             }
 
             var materials = new GeneratedMaterials
             {
-                World = Lit("M_World", 0.1f, 0f),
-                Metal = Lit("M_Metal", 0.55f, 0.3f),
+                World = PixelLit("M_World", false),
+                Foliage = PixelLit("M_Foliage", true),
             };
 
-            materials.Fire = GeneratedAssets.GetOrCreateMaterial("M_Fire", unlit);
-            materials.Fire.SetTexture("_BaseMap", palette);
-            materials.Fire.SetColor("_BaseColor", new Color(1.4f, 1.15f, 1f));
+            materials.Composite = GeneratedAssets.GetOrCreateMaterial("M_PixelComposite", composite);
+            materials.Composite.SetFloat("_Levels", 18f);
+            materials.Composite.SetFloat("_Dither", 0.55f);
+            materials.Composite.SetFloat("_Saturation", 1.1f);
+            materials.Composite.SetFloat("_Contrast", 1.04f);
 
-            materials.Glow = GeneratedAssets.GetOrCreateMaterial("M_KnightEyes", unlit);
-            materials.Glow.SetTexture("_BaseMap", null);
-            materials.Glow.SetColor("_BaseColor", new Color(1.6f, 0.45f, 0.12f));
+            materials.DriftingLeaves = GeneratedAssets.GetOrCreateMaterial("M_DriftingLeaves", particles);
+            MakeTransparent(materials.DriftingLeaves, false);
+            materials.DriftingLeaves.SetTexture("_BaseMap", leaf);
+            materials.DriftingLeaves.SetColor("_BaseColor", Color.white);
 
             materials.Trail = GeneratedAssets.GetOrCreateMaterial("M_SwordTrail", particles);
             MakeTransparent(materials.Trail, false);
@@ -186,19 +211,46 @@ namespace AshenRealm.EditorTools
             m.SetShaderPassEnabled("ShadowCaster", false);
         }
 
-        static Material CreateSkybox()
+        /// <summary>8×8 pixel-art leaf for the drifting-leaves particles.</summary>
+        static Texture2D LeafTexture()
         {
-            Shader shader = Shader.Find("Skybox/Procedural");
-            var sky = GeneratedAssets.GetOrCreateMaterial("M_Skybox_Dusk", shader);
-            sky.SetFloat("_SunDisk", 2f);
-            sky.SetFloat("_SunSize", 0.035f);
-            sky.SetFloat("_SunSizeConvergence", 6f);
-            sky.SetFloat("_AtmosphereThickness", 1.45f);
-            sky.SetColor("_SkyTint", new Color(0.42f, 0.4f, 0.5f));
-            sky.SetColor("_GroundColor", new Color(0.3f, 0.26f, 0.24f));
-            sky.SetFloat("_Exposure", 1.05f);
+            string[] rows =
+            {
+                "........",
+                "....##..",
+                "..####..",
+                ".#####+.",
+                ".####+..",
+                "..##+...",
+                "..+.....",
+                ".+......",
+            };
+            var texture = new Texture2D(8, 8, TextureFormat.RGBA32, false);
+            for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++)
+            {
+                char c = rows[7 - y][x];
+                texture.SetPixel(x, y, c == '#' ? Color.white : c == '+' ? new Color(0.7f, 0.6f, 0.45f, 1f) : new Color(1f, 1f, 1f, 0f));
+            }
+            texture.Apply();
+            return texture;
+        }
+
+        static Material CreateSkybox(Texture2D panorama)
+        {
+            Shader shader = Shader.Find("Skybox/Panoramic");
+            var sky = GeneratedAssets.GetOrCreateMaterial("M_Skybox_Painted", shader);
+            sky.SetTexture("_MainTex", panorama);
+            sky.SetFloat("_Mapping", 1f);      // latitude-longitude layout
+            sky.SetFloat("_ImageType", 0f);    // 360°
+            sky.SetFloat("_Exposure", 1f);
+            sky.SetFloat("_Rotation", 0f);
+            sky.SetColor("_Tint", new Color(0.5f, 0.5f, 0.5f, 0.5f));
             return sky;
         }
+
+        /// <summary>Golden-hour sun from the west-north-west, low enough for long painterly shadows.</summary>
+        static readonly Quaternion SunRotation = Quaternion.Euler(24f, 110f, 0f);
 
         static VolumeProfile CreateVolumeProfile()
         {
@@ -232,34 +284,30 @@ namespace AshenRealm.EditorTools
             tonemapping.mode.Override(TonemappingMode.Neutral);
 
             var color = Add<ColorAdjustments>();
-            color.postExposure.Override(0.2f);
-            color.contrast.Override(16f);
-            color.saturation.Override(-4f);
-            color.colorFilter.Override(new Color(1f, 0.95f, 0.88f));
+            color.postExposure.Override(0.15f);
+            color.contrast.Override(10f);
+            color.saturation.Override(8f);
+            color.colorFilter.Override(new Color(1f, 0.97f, 0.92f));
 
             var split = Add<SplitToning>();
-            split.shadows.Override(new Color(0.36f, 0.4f, 0.58f));
-            split.highlights.Override(new Color(0.8f, 0.63f, 0.42f));
-            split.balance.Override(-12f);
+            split.shadows.Override(new Color(0.46f, 0.47f, 0.56f));
+            split.highlights.Override(new Color(0.76f, 0.64f, 0.46f));
+            split.balance.Override(-10f);
 
+            // No bloom: soft glow fights the crisp pixel look. A light vignette frames the low-res image.
             var vignette = Add<Vignette>();
-            vignette.intensity.Override(0.32f);
-            vignette.smoothness.Override(0.45f);
-            vignette.color.Override(new Color(0.05f, 0.03f, 0.03f));
-
-            var bloom = Add<Bloom>();
-            bloom.threshold.Override(1.0f);
-            bloom.intensity.Override(0.45f);
-            bloom.scatter.Override(0.6f);
-            bloom.downscale.Override(BloomDownscaleMode.Quarter);
+            vignette.intensity.Override(0.24f);
+            vignette.smoothness.Override(0.5f);
+            vignette.color.Override(new Color(0.06f, 0.04f, 0.06f));
 
             EditorUtility.SetDirty(profile);
             return profile;
         }
 
         /// <summary>
-        /// Gives every URP asset used by a quality level the pixelated look (reduced render scale, point upscaling).
-        /// Only these two fields are touched; each change is logged.
+        /// The pixel look comes from PixelCamera's fixed low-resolution target. URP applies its render scale even when
+        /// rendering into a texture (which would blur that target), so every URP asset used by a quality level gets
+        /// render scale 1. Only this field is touched; each change is logged.
         /// </summary>
         static void ConfigureRenderPipelineAssets()
         {
@@ -267,18 +315,34 @@ namespace AshenRealm.EditorTools
             for (int i = 0; i < QualitySettings.names.Length; i++)
             {
                 if (!(QualitySettings.GetRenderPipelineAssetAt(i) is UniversalRenderPipelineAsset urp) || !seen.Add(urp)) continue;
-                if (!Mathf.Approximately(urp.renderScale, PixelatedRenderScale))
+                if (!Mathf.Approximately(urp.renderScale, 1f))
                 {
-                    Debug.Log($"{LogPrefix} {urp.name}: renderScale {urp.renderScale} → {PixelatedRenderScale}");
-                    urp.renderScale = PixelatedRenderScale;
+                    Debug.Log($"{LogPrefix} {urp.name}: renderScale {urp.renderScale} → 1");
+                    urp.renderScale = 1f;
+                    EditorUtility.SetDirty(urp);
                 }
-                if (urp.upscalingFilter != UpscalingFilterSelection.Point)
-                {
-                    Debug.Log($"{LogPrefix} {urp.name}: upscalingFilter {urp.upscalingFilter} → Point");
-                    urp.upscalingFilter = UpscalingFilterSelection.Point;
-                }
-                EditorUtility.SetDirty(urp);
             }
+        }
+
+        /// <summary>
+        /// Camera that draws only the screen-space UI (including the pixel-world RawImage) to the display.
+        /// Starts disabled; PixelCamera enables it at runtime.
+        /// </summary>
+        static Camera CreateScreenCamera()
+        {
+            var go = new GameObject("Screen Camera");
+            var camera = go.AddComponent<Camera>();
+            camera.cullingMask = 0;
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = Color.black;
+            camera.depth = 10f;
+            camera.orthographic = true;
+            var data = camera.GetUniversalAdditionalCameraData();
+            data.renderPostProcessing = false;
+            data.renderShadows = false;
+            data.antialiasing = AntialiasingMode.None;
+            camera.enabled = false;
+            return camera;
         }
 
         static LightingSettings GetLightingSettings()
@@ -297,25 +361,30 @@ namespace AshenRealm.EditorTools
             return settings;
         }
 
-        static void CreateSceneServices(Material skybox, VolumeProfile profile)
+        static void CreateSceneServices(Material skybox, VolumeProfile profile, Color horizon)
         {
             new GameObject("Game Bootstrap").AddComponent<GameBootstrap>();
 
             var sunGo = new GameObject("Sun");
-            sunGo.transform.rotation = Quaternion.Euler(22f, 110f, 0f);
+            sunGo.transform.rotation = SunRotation;
             var sun = sunGo.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1f, 0.8f, 0.58f);
-            sun.intensity = 1.6f;
+            sun.color = new Color(1f, 0.86f, 0.66f);
+            sun.intensity = 1.45f;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.8f;
+            sun.shadowStrength = 0.85f;
 
             RenderSettings.sun = sun;
             RenderSettings.skybox = skybox;
             Lightmapping.lightingSettings = GetLightingSettings();
 
+            // Cool ambient against the warm sun; fog matches the painted sky's horizon for atmospheric depth.
             var atmosphereGo = new GameObject("Atmosphere");
             var atmosphere = atmosphereGo.AddComponent<AtmosphereController>();
+            SceneWiring.Set(atmosphere, "ambientColor", new Color(0.6f, 0.58f, 0.64f));
+            SceneWiring.Set(atmosphere, "fogColor", horizon);
+            SceneWiring.Set(atmosphere, "fogStart", 30f);
+            SceneWiring.Set(atmosphere, "fogEnd", 320f);
             atmosphere.Apply();
 
             var volume = atmosphereGo.AddComponent<Volume>();

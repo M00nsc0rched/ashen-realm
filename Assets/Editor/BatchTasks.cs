@@ -36,6 +36,38 @@ namespace AshenRealm.EditorTools
             EditorApplication.Exit(0);
         }
 
+        /// <summary>Generate, validate, then build WebGL. Run with -buildTarget WebGL to skip a platform switch.</summary>
+        public static void GenerateValidateAndBuildWebGL()
+        {
+            if (!PrototypeSceneBuilder.Generate())
+            {
+                EditorApplication.Exit(1);
+                return;
+            }
+            if (PrototypeValidator.Run(out _).Count > 0)
+            {
+                EditorApplication.Exit(2);
+                return;
+            }
+            EditorApplication.Exit(WebGLBuilder.Build() ? 0 : 4);
+        }
+
+        public static void BuildWebGL() => EditorApplication.Exit(WebGLBuilder.Build() ? 0 : 4);
+
+        /// <summary>Generate, apply iOS and WebGL player settings, validate. No player build.</summary>
+        public static void GenerateConfigureAndValidate()
+        {
+            if (!PrototypeSceneBuilder.Generate())
+            {
+                EditorApplication.Exit(1);
+                return;
+            }
+            IOSBuildConfigurator.Apply();
+            WebGLBuilder.ApplySettings();
+            AssetDatabase.SaveAssets();
+            EditorApplication.Exit(PrototypeValidator.Run(out _).Count == 0 ? 0 : 2);
+        }
+
         public static void ApplyIOSSettings()
         {
             IOSBuildConfigurator.Apply();

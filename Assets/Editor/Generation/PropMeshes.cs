@@ -44,13 +44,13 @@ namespace AshenRealm.EditorTools
                 float a0 = i * Mathf.PI * 2f / sides, a1 = (i + 1) * Mathf.PI * 2f / sides;
                 Vector3 p0 = new Vector3(Mathf.Cos(a0), Mathf.Sin(a0), 0f) * radius;
                 Vector3 p1 = new Vector3(Mathf.Cos(a1), Mathf.Sin(a1), 0f) * radius;
-                b.SetColor(i % 2 == 0 ? Pal.Wood : Pal.WoodDark, R(rng, 0.42f, 0.6f));
+                b.SetColor(Pal.PaintBlue, i % 2 == 0 ? R(rng, 0.5f, 0.6f) : R(rng, 0.4f, 0.48f));
                 b.Triangle(center, p0 + Vector3.forward * thickness, p1 + Vector3.forward * thickness, b.Matrix.MultiplyVector(Vector3.forward));
                 // The back faces the camera and is usually unlit, so it gets lighter shades.
-                b.SetColor(i % 2 == 0 ? Pal.Wood : Pal.Bone, i % 2 == 0 ? 0.72f : 0.3f);
+                b.SetColor(Pal.Wood, i % 2 == 0 ? 0.72f : 0.62f);
                 b.Triangle(Vector3.zero, p0, p1, b.Matrix.MultiplyVector(Vector3.back));
                 // Iron rim.
-                b.SetColor(Pal.SteelDark, R(rng, 0.45f, 0.6f));
+                b.SetColor(Pal.Brass, R(rng, 0.45f, 0.6f));
                 Vector3 mid = (p0 + p1) * 0.5f;
                 b.Push(mid + Vector3.forward * thickness * 0.5f, Quaternion.LookRotation(Vector3.forward, mid.normalized), Vector3.one);
                 b.Box(Vector3.zero, new Vector3((p1 - p0).magnitude + 0.01f, 0.035f, thickness + 0.03f));
@@ -74,26 +74,74 @@ namespace AshenRealm.EditorTools
             b.Box(new Vector3(0f, 0f, -0.02f), new Vector3(0.05f, 0.26f, 0.025f));
         }
 
-        public static void Pine(MeshBuilder b, System.Random rng, float height)
+        /// <summary>
+        /// Pine: trunk and a dark core cone go into <paramref name="solid"/>; tiers of drooping bough cards with the
+        /// ragged pixel fringe go into <paramref name="cutout"/> (alpha-clipped foliage material).
+        /// </summary>
+        public static void Pine(MeshBuilder solid, MeshBuilder cutout, System.Random rng, float height)
         {
             float trunkRadius = height * 0.035f;
-            b.SetColor(Pal.Bark, R(rng, 0.35f, 0.55f));
-            b.Prism(new Vector3(0f, -0.3f, 0f), trunkRadius * 1.2f, trunkRadius * 0.7f, height * 0.32f + 0.3f, 6, false, false);
+            solid.SetColor(Pal.Bark, R(rng, 0.35f, 0.55f));
+            solid.Prism(new Vector3(0f, -0.3f, 0f), trunkRadius * 1.2f, trunkRadius * 0.5f, height * 0.9f, 6, false, false);
+            solid.SetColor(Pal.PineDark, R(rng, 0.18f, 0.3f));
+            solid.Prism(new Vector3(0f, height * 0.24f, 0f), height * 0.15f, 0f, height * 0.78f, 6, true, false);
 
-            int tiers = 4;
-            float y = height * 0.2f;
-            float tierHeight = (height - y) / tiers * 1.45f;
-            float radius = height * 0.27f;
-            for (int i = 0; i < tiers; i++)
+            const int tiers = 6;
+            for (int t = 0; t < tiers; t++)
             {
-                b.SetColor(i % 2 == 0 ? Pal.PineDark : Pal.PineMid, R(rng, 0.3f, 0.6f) + i * 0.05f);
-                b.Push(new Vector3(R(rng, -0.08f, 0.08f), y, R(rng, -0.08f, 0.08f)),
-                    Quaternion.Euler(R(rng, -4f, 4f), R(rng, 0f, 360f), R(rng, -4f, 4f)), Vector3.one);
-                b.Prism(Vector3.zero, radius, 0f, tierHeight, 7, true, false);
-                b.Pop();
-                y += tierHeight * 0.58f;
-                radius *= 0.74f;
-                tierHeight *= 0.86f;
+                float k = t / (float)(tiers - 1);
+                float y = Mathf.Lerp(height * 0.26f, height * 0.94f, k);
+                float reach = Mathf.Lerp(height * 0.3f, height * 0.09f, k);
+                float drop = reach * 0.85f;
+                int boughs = Mathf.RoundToInt(Mathf.Lerp(9f, 5f, k));
+                float offset = R(rng, 0f, 360f);
+                for (int i = 0; i < boughs; i++)
+                {
+                    float angle = (offset + i * 360f / boughs + R(rng, -12f, 12f)) * Mathf.Deg2Rad;
+                    var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                    var side = new Vector3(-dir.z, 0f, dir.x);
+                    float width = reach * R(rng, 0.85f, 1.15f);
+                    Vector3 root = new Vector3(0f, y, 0f) + dir * (reach * 0.08f);
+                    Vector3 outer = root + dir * reach + Vector3.down * drop;
+                    cutout.SetColor(R(rng, 0f, 1f) < 0.5f ? Pal.PineMid : Pal.PineDark, R(rng, 0.42f, 0.66f) + k * 0.08f);
+                    cutout.SetLayer(TexLayer.PineBranch, UVMode.Explicit);
+                    cutout.Card(outer - side * width * 0.55f, outer + side * width * 0.55f, root + side * width * 0.2f, root - side * width * 0.2f,
+                        (Vector3.up + dir * 0.7f).normalized, 0.05f, true, 0.5f);
+                }
+            }
+        }
+
+        /// <summary>Broadleaf tree with clustered leaf cards (golden autumn birch look).</summary>
+        public static void AutumnTree(MeshBuilder solid, MeshBuilder cutout, System.Random rng, float height, Pal leaves)
+        {
+            solid.SetColor(Pal.BirchBark, R(rng, 0.45f, 0.62f));
+            solid.Prism(new Vector3(0f, -0.3f, 0f), 0.17f, 0.07f, height * 0.85f, 6, false, true);
+            for (int i = 0; i < 3; i++)
+            {
+                solid.Push(new Vector3(0f, height * R(rng, 0.45f, 0.65f), 0f), Quaternion.Euler(0f, R(rng, 0f, 360f), R(rng, 30f, 50f)), Vector3.one);
+                solid.Prism(Vector3.zero, 0.06f, 0.02f, height * 0.3f, 5, false, false);
+                solid.Pop();
+            }
+
+            Vector3 crown = new Vector3(0f, height * 0.72f, 0f);
+            int clusters = rng.Next(6, 9);
+            for (int c = 0; c < clusters; c++)
+            {
+                float a = R(rng, 0f, Mathf.PI * 2f);
+                float r = R(rng, 0f, height * 0.22f);
+                Vector3 centre = crown + new Vector3(Mathf.Cos(a) * r, R(rng, -height * 0.15f, height * 0.25f), Mathf.Sin(a) * r);
+                float size = R(rng, height * 0.3f, height * 0.42f);
+                Vector3 normal = (centre - crown + Vector3.up * height * 0.3f).normalized;
+                cutout.SetColor(leaves, R(rng, 0.42f, 0.7f));
+                cutout.SetLayer(TexLayer.Leaves, UVMode.Explicit);
+                float yaw = R(rng, 0f, 180f);
+                for (int k = 0; k < 3; k++)
+                {
+                    float ang = (yaw + k * 60f) * Mathf.Deg2Rad;
+                    var dir = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                    Vector3 half = dir * size * 0.5f, up = Vector3.up * size * 0.5f;
+                    cutout.Card(centre - half - up, centre + half - up, centre + half + up, centre - half + up, normal, 0.6f, true, 0.3f);
+                }
             }
         }
 
@@ -112,35 +160,37 @@ namespace AshenRealm.EditorTools
             }
         }
 
-        public static void GrassTuft(MeshBuilder b, System.Random rng, Pal family)
+        /// <summary>Two crossed cards; normals point up so the clump is lit like the ground under it.</summary>
+        static void CrossedCards(MeshBuilder b, float width, float height, float wind, float yaw)
         {
-            int blades = 3;
-            for (int i = 0; i < blades; i++)
+            for (int k = 0; k < 2; k++)
             {
-                float angle = R(rng, 0f, Mathf.PI * 2f);
-                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
-                var side = new Vector3(-dir.z, 0f, dir.x);
-                float h = R(rng, 0.25f, 0.55f);
-                float w = R(rng, 0.05f, 0.09f);
-                Vector3 root = dir * R(rng, 0f, 0.08f);
-                Vector3 tip = root + dir * R(rng, 0.08f, 0.22f) + Vector3.up * h;
-                b.SetColor(family, R(rng, 0.35f, 0.75f));
-                b.DoubleSided(root - side * w, root + side * w, tip, Vector3.up);
+                float a = (yaw + k * 90f) * Mathf.Deg2Rad;
+                var half = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a)) * (width * 0.5f);
+                b.Card(-half, half, half + Vector3.up * height, -half + Vector3.up * height, Vector3.up, wind);
             }
         }
 
-        public static void Flower(MeshBuilder b, System.Random rng, Pal petal)
+        public static void GrassClump(MeshBuilder b, System.Random rng, Pal family)
         {
-            float h = R(rng, 0.25f, 0.45f);
-            b.SetColor(Pal.GrassOlive, 0.4f);
-            b.DoubleSided(new Vector3(-0.012f, 0f, 0f), new Vector3(0.012f, 0f, 0f), new Vector3(0f, h, 0f), Vector3.up);
-            float s = R(rng, 0.05f, 0.08f);
-            Vector3 c = new Vector3(0f, h, 0f);
-            b.SetColor(petal, R(rng, 0.45f, 0.75f));
-            b.DoubleSided(c + new Vector3(-s, 0f, 0f), c + new Vector3(0f, 0.01f, s), c + new Vector3(s, 0f, 0f), Vector3.up);
-            b.DoubleSided(c + new Vector3(-s, 0f, 0f), c + new Vector3(s, 0f, 0f), c + new Vector3(0f, 0.01f, -s), Vector3.up);
-            b.SetColor(Pal.FlowerYellow, 0.6f);
-            b.DoubleSided(c + new Vector3(-0.015f, 0.012f, 0f), c + new Vector3(0f, 0.012f, 0.015f), c + new Vector3(0.015f, 0.012f, 0f), Vector3.up);
+            b.SetColor(family, R(rng, 0.38f, 0.66f));
+            b.SetLayer(TexLayer.GrassCard, UVMode.Explicit);
+            CrossedCards(b, R(rng, 0.6f, 1.0f), R(rng, 0.35f, 0.65f), 1f, R(rng, 0f, 90f));
+        }
+
+        public static void FlowerClump(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.FlowerWhite, 0.5f);
+            b.SetLayer(TexLayer.Flowers, UVMode.Explicit, 1f, 1f);
+            b.Current.Color = Color.white;
+            CrossedCards(b, R(rng, 0.5f, 0.8f), R(rng, 0.35f, 0.55f), 0.8f, R(rng, 0f, 90f));
+        }
+
+        public static void WheatClump(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.Wheat, 0.5f);
+            b.Current.Color = Color.white * R(rng, 0.85f, 1f);
+            CrossedCards(b, R(rng, 1.0f, 1.4f), R(rng, 0.95f, 1.3f), 0.7f, R(rng, 0f, 90f));
         }
 
         /// <summary>Fence section from local origin along +X of the given length.</summary>
@@ -319,6 +369,208 @@ namespace AshenRealm.EditorTools
                 b.DoubleSided(new Vector3(x0, 0f, -0.03f), new Vector3((x0 + x1) * 0.5f, -len - 0.15f, -0.08f), new Vector3(x0, -len * 0.9f, -0.08f), Vector3.forward);
             }
             b.Pop();
+        }
+
+        // ---- Hamlet ----------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Half-timbered house: stone footing, plaster walls with dark timber frame, lit windows, tiled gable roof
+        /// with the ridge along X and a chimney. Origin at ground centre, front (door) faces -Z.
+        /// </summary>
+        public static void House(MeshBuilder b, System.Random rng, float width, float depth, float wallHeight, bool tiledRoof)
+        {
+            const float footing = 0.6f;
+            float top = footing + wallHeight;
+            float roofHeight = depth * 0.55f;
+
+            b.ShadedBox(new Vector3(0f, footing * 0.5f - 0.1f, 0f), new Vector3(width + 0.25f, footing + 0.2f, depth + 0.25f), Pal.Stone, rng, 0.38f, 0.5f);
+            b.SetColor(Pal.Plaster, R(rng, 0.45f, 0.6f));
+            b.Box(new Vector3(0f, footing + wallHeight * 0.5f, 0f), new Vector3(width, wallHeight, depth));
+
+            // Timber frame: corner posts, sill / mid / top beams and braces on the long walls.
+            float tx = width * 0.5f + 0.04f, tz = depth * 0.5f + 0.04f;
+            void Beam(Vector3 centre, Vector3 size, float roll = 0f)
+            {
+                b.SetColor(Pal.WoodDark, R(rng, 0.25f, 0.4f));
+                b.Push(centre, Quaternion.Euler(0f, 0f, roll), Vector3.one);
+                b.Box(Vector3.zero, size);
+                b.Pop();
+            }
+            foreach (float sx in new[] { -1f, 1f })
+            foreach (float sz in new[] { -1f, 1f })
+                Beam(new Vector3(sx * (tx - 0.08f), footing + wallHeight * 0.5f, sz * (tz - 0.08f)), new Vector3(0.24f, wallHeight, 0.24f));
+            foreach (float y in new[] { footing + 0.08f, footing + wallHeight * 0.52f, top - 0.08f })
+            foreach (float sz in new[] { -1f, 1f })
+                Beam(new Vector3(0f, y, sz * tz), new Vector3(width + 0.1f, 0.16f, 0.1f));
+            foreach (float sz in new[] { -1f, 1f })
+            for (int i = 0; i < 2; i++)
+            {
+                float x = (i == 0 ? -1f : 1f) * width * 0.38f;
+                Beam(new Vector3(x, footing + wallHeight * 0.76f, sz * tz), new Vector3(0.12f, wallHeight * 0.55f, 0.1f), (i == 0 ? 1f : -1f) * 35f);
+            }
+
+            // Door and lit windows.
+            b.SetColor(Pal.WoodDark, 0.32f);
+            b.Box(new Vector3(-width * 0.12f, footing + 0.95f, -tz - 0.03f), new Vector3(1.0f, 1.9f, 0.08f));
+            b.SetColor(Pal.Brass, 0.5f);
+            b.Box(new Vector3(-width * 0.12f + 0.32f, footing + 0.95f, -tz - 0.08f), new Vector3(0.08f, 0.08f, 0.05f));
+            foreach (float sz in new[] { -1f, 1f })
+            foreach (float x in new[] { width * 0.22f, -width * 0.36f })
+            {
+                if (sz < 0f && x < 0f) continue; // door side
+                Vector3 c = new Vector3(x, footing + wallHeight * 0.62f, sz * (tz + 0.02f));
+                b.SetColor(Pal.WoodDark, 0.3f);
+                b.Box(c, new Vector3(0.86f, 0.74f, 0.08f));
+                b.SetColor(Pal.Lantern, 0.55f);
+                b.Current.Emission = 0.45f;
+                b.Box(c + new Vector3(0f, 0f, sz * 0.03f), new Vector3(0.66f, 0.54f, 0.06f));
+                b.SetColor(Pal.WoodDark, 0.25f);
+                b.Box(c + new Vector3(0f, 0f, sz * 0.06f), new Vector3(0.06f, 0.6f, 0.03f));
+            }
+
+            // Gable ends (x = ±width/2) and the two roof slopes.
+            foreach (float sx in new[] { -1f, 1f })
+            {
+                b.SetColor(Pal.Plaster, 0.5f);
+                b.TriangleOutward(new Vector3(sx * width * 0.5f, top, -depth * 0.5f), new Vector3(sx * width * 0.5f, top, depth * 0.5f),
+                    new Vector3(sx * width * 0.5f, top + roofHeight, 0f), Vector3.up * (top + roofHeight * 0.3f));
+                Beam(new Vector3(sx * (width * 0.5f + 0.04f), top + roofHeight * 0.4f, 0f), new Vector3(0.1f, roofHeight * 0.8f, 0.14f));
+            }
+            // Each slope runs from the ridge to an eave that overhangs the wall by `overhang`.
+            const float overhang = 0.45f;
+            float halfSpan = depth * 0.5f + overhang;
+            float drop = overhang * roofHeight / (depth * 0.5f);
+            float slope = Mathf.Atan2(roofHeight, depth * 0.5f) * Mathf.Rad2Deg;
+            float slabLength = Mathf.Sqrt(halfSpan * halfSpan + (roofHeight + drop) * (roofHeight + drop));
+            foreach (float sz in new[] { -1f, 1f })
+            {
+                b.SetColor(tiledRoof ? Pal.RoofTile : Pal.Thatch, R(rng, 0.42f, 0.55f));
+                Vector3 centre = new Vector3(0f, top + (roofHeight - drop) * 0.5f + 0.1f, sz * halfSpan * 0.5f);
+                b.Push(centre, Quaternion.Euler(sz * slope, 0f, 0f), Vector3.one);
+                b.Box(Vector3.zero, new Vector3(width + overhang * 2f, 0.2f, slabLength));
+                b.Pop();
+            }
+            b.SetColor(Pal.WoodDark, 0.3f);
+            b.Box(new Vector3(0f, top + roofHeight + 0.08f, 0f), new Vector3(width + overhang * 2f + 0.05f, 0.18f, 0.24f));
+
+            // Chimney.
+            b.ShadedBox(new Vector3(width * 0.28f, top + roofHeight * 0.75f, depth * 0.18f), new Vector3(0.65f, roofHeight + 1.0f, 0.65f), Pal.Stone, rng, 0.35f, 0.5f);
+        }
+
+        /// <summary>Stone windmill tower with a conical cap. The rotating sails are built separately.</summary>
+        public static void WindmillTower(MeshBuilder b, System.Random rng, float height)
+        {
+            b.SetColor(Pal.Stone, 0.5f);
+            b.Prism(new Vector3(0f, -0.4f, 0f), 2.3f, 1.65f, height + 0.4f, 8, false, false, Mathf.PI / 8f);
+            b.SetColor(Pal.Thatch, 0.45f);
+            b.Prism(new Vector3(0f, height - 0.05f, 0f), 2.15f, 0f, 2.4f, 8, true, false, Mathf.PI / 8f);
+            b.SetColor(Pal.WoodDark, 0.3f);
+            b.Box(new Vector3(0f, 1.1f, -2.05f), new Vector3(1.1f, 2.1f, 0.2f));
+            b.Box(new Vector3(0f, height + 0.6f, -1.85f), new Vector3(0.5f, 0.5f, 0.8f));   // axle housing
+            foreach (float y in new[] { height * 0.45f, height * 0.75f })
+            {
+                b.SetColor(Pal.Lantern, 0.4f);
+                b.Current.Emission = 0.3f;
+                b.Box(new Vector3(0f, y, -1.86f - (height - y) * 0.06f), new Vector3(0.45f, 0.6f, 0.1f));
+            }
+        }
+
+        /// <summary>Four lattice sails around the local Z axis (hub at the origin, sails face -Z).</summary>
+        public static void WindmillSails(MeshBuilder b, System.Random rng, float length)
+        {
+            b.SetColor(Pal.WoodDark, 0.35f);
+            b.Prism(new Vector3(0f, 0f, 0f), 0.25f, 0.25f, 0.4f, 8);
+            for (int i = 0; i < 4; i++)
+            {
+                b.Push(Vector3.zero, Quaternion.Euler(0f, 0f, i * 90f + 12f), Vector3.one);
+                b.SetColor(Pal.Wood, R(rng, 0.38f, 0.5f));
+                b.Box(new Vector3(0f, length * 0.5f, -0.1f), new Vector3(0.18f, length, 0.14f));
+                b.SetColor(Pal.ClothRed, 0.2f);
+                b.SetLayer(TexLayer.Cloth, UVMode.Triplanar, 0.8f);
+                b.Current.Color = Palette.Linear(Pal.Bone, R(rng, 0.45f, 0.6f));
+                b.DoubleSided(new Vector3(0.12f, length * 0.2f, -0.12f), new Vector3(0.95f, length * 0.24f, -0.12f), new Vector3(0.95f, length * 0.98f, -0.12f), Vector3.back);
+                b.DoubleSided(new Vector3(0.12f, length * 0.2f, -0.12f), new Vector3(0.95f, length * 0.98f, -0.12f), new Vector3(0.12f, length, -0.12f), Vector3.back);
+                b.SetColor(Pal.Wood, 0.42f);
+                for (int r = 1; r <= 5; r++)
+                    b.Box(new Vector3(0.52f, length * (0.2f + r * 0.15f), -0.16f), new Vector3(0.9f, 0.05f, 0.05f));
+                b.Pop();
+            }
+        }
+
+        /// <summary>Wooden post with an arm and a hanging lantern (glass emissive). Origin at the post base.</summary>
+        public static void LanternPost(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.WoodDark, R(rng, 0.3f, 0.42f));
+            b.Box(new Vector3(0f, 1.4f, 0f), new Vector3(0.18f, 2.9f, 0.18f));
+            b.Box(new Vector3(0.35f, 2.75f, 0f), new Vector3(0.8f, 0.12f, 0.12f));
+            b.Push(new Vector3(0.62f, 2.75f, 0f), Quaternion.Euler(0f, 0f, 45f), Vector3.one);
+            b.Box(new Vector3(-0.2f, -0.2f, 0f), new Vector3(0.08f, 0.5f, 0.08f));
+            b.Pop();
+            b.SetColor(Pal.SteelDark, 0.45f);
+            b.Box(new Vector3(0.62f, 2.5f, 0f), new Vector3(0.03f, 0.3f, 0.03f));
+            b.Box(new Vector3(0.62f, 2.3f, 0f), new Vector3(0.3f, 0.06f, 0.3f));
+            b.Box(new Vector3(0.62f, 1.96f, 0f), new Vector3(0.3f, 0.05f, 0.3f));
+            b.SetColor(Pal.Lantern, 0.6f);
+            b.Box(new Vector3(0.62f, 2.13f, 0f), new Vector3(0.22f, 0.3f, 0.22f));
+        }
+
+        public static void Barrel(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.Wood, R(rng, 0.4f, 0.55f));
+            b.Prism(new Vector3(0f, 0f, 0f), 0.34f, 0.4f, 0.45f, 10, true, false);
+            b.Prism(new Vector3(0f, 0.45f, 0f), 0.4f, 0.34f, 0.45f, 10, false, true);
+            b.SetColor(Pal.SteelDark, 0.4f);
+            foreach (float y in new[] { 0.12f, 0.75f })
+                b.Prism(new Vector3(0f, y, 0f), y < 0.4f ? 0.37f : 0.38f, y < 0.4f ? 0.38f : 0.36f, 0.06f, 10, false, false);
+        }
+
+        public static void Crate(MeshBuilder b, System.Random rng, float size)
+        {
+            b.SetColor(Pal.Wood, R(rng, 0.45f, 0.6f));
+            b.Box(new Vector3(0f, size * 0.5f, 0f), Vector3.one * size);
+            b.SetColor(Pal.WoodDark, 0.35f);
+            float e = size * 0.5f + 0.01f, t = 0.07f;
+            foreach (float sx in new[] { -1f, 1f })
+            foreach (float sz in new[] { -1f, 1f })
+                b.Box(new Vector3(sx * (e - t * 0.5f), size * 0.5f, sz * (e - t * 0.5f)), new Vector3(t, size + 0.02f, t));
+            foreach (float y in new[] { t * 0.5f, size - t * 0.5f })
+            {
+                b.Box(new Vector3(0f, y, -e + t * 0.5f), new Vector3(size, t, t));
+                b.Box(new Vector3(0f, y, e - t * 0.5f), new Vector3(size, t, t));
+            }
+        }
+
+        /// <summary>Signpost with two arrow boards (pointing ±X).</summary>
+        public static void Signpost(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.WoodDark, 0.38f);
+            b.Box(new Vector3(0f, 1.2f, 0f), new Vector3(0.14f, 2.4f, 0.14f));
+            for (int i = 0; i < 2; i++)
+            {
+                float dir = i == 0 ? 1f : -1f;
+                b.SetColor(Pal.Wood, R(rng, 0.45f, 0.6f));
+                b.Push(new Vector3(dir * 0.45f, 2.05f - i * 0.38f, 0f), Quaternion.Euler(0f, R(rng, -10f, 10f), R(rng, -4f, 4f)), Vector3.one);
+                b.Box(Vector3.zero, new Vector3(0.8f, 0.24f, 0.05f));
+                b.TriangleOutward(new Vector3(dir * 0.4f, 0.12f, -0.025f), new Vector3(dir * 0.4f, -0.12f, -0.025f), new Vector3(dir * 0.58f, 0f, -0.025f), new Vector3(0f, 0f, 1f));
+                b.TriangleOutward(new Vector3(dir * 0.4f, 0.12f, 0.025f), new Vector3(dir * 0.4f, -0.12f, 0.025f), new Vector3(dir * 0.58f, 0f, 0.025f), new Vector3(0f, 0f, -1f));
+                b.Pop();
+            }
+        }
+
+        /// <summary>Irregular flat puddle (fan) slightly above the ground.</summary>
+        public static void Puddle(MeshBuilder b, System.Random rng, float radius)
+        {
+            const int sides = 10;
+            b.SetColor(Pal.Water, R(rng, 0.45f, 0.55f));
+            var ring = new Vector3[sides];
+            for (int i = 0; i < sides; i++)
+            {
+                float a = i * Mathf.PI * 2f / sides;
+                float r = radius * R(rng, 0.6f, 1.15f);
+                ring[i] = new Vector3(Mathf.Cos(a) * r * 1.4f, 0.04f, Mathf.Sin(a) * r);
+            }
+            for (int i = 0; i < sides; i++)
+                b.Triangle(new Vector3(0f, 0.04f, 0f), ring[i], ring[(i + 1) % sides], Vector3.up);
         }
 
         // ---- Cursed Knight parts (each animated separately) --------------------------------------

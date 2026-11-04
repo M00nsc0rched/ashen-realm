@@ -1,12 +1,26 @@
 # ASHEN REALM — project rules for Claude Code
 
-Original first-person dark fantasy RPG for iPhone (landscape). Unity **6000.6.8f1**, URP 17.6, Input System 1.20, uGUI 2.6.
+Original first-person dark fantasy RPG. Primary target: **web browser (WebGL)**, desktop and mobile; iPhone native
+remains supported. Unity **6000.6.8f1**, URP 17.6, Input System 1.20, uGUI 2.6.
 Current milestone: first playable vertical slice (`Assets/Scenes/Prototype_Valley.unity`). Do not expand scope
 (quests, inventory, progression, multiplayer, weather) unless asked.
+
+## Art direction (match the user's reference screenshots)
+Pixel-art painterly 3D: world rendered at 360 px height with hard pixels, posterised + Bayer-dithered; hand-made-looking
+pixel textures (stone blocks, planks, cobbles, grass strokes, tiles); drooping-fringe pines, golden autumn trees, flower
+and wheat cards; warm low sun, cool violet shadows, hazy blue distance; half-timbered houses, lanterns, windmill.
+Long thin bars and a compass at the top centre, round emblem top-left, pause top-right, stone-ring touch controls.
+- All world geometry uses `AshenRealm/PixelLit` (`M_World` opaque, `M_Foliage` cutout + wind). Colour/texture come from
+  vertex data written by `MeshBuilder` via `Palette.SurfaceFor`; add new looks as texture layers in `PixelTextures`
+  (append to `TexLayer`, never reorder) and families in `Pal`.
+- Review visual changes with `BatchTasks.CapturePreviews` (emulates the pixel pipeline) before declaring them done.
 
 ## Golden rules
 - The scene and its art are **generated**. Change generators in `Assets/Editor/`, then run
   `Ashen Realm > Generate Prototype`. Never hand-edit `Prototype_Valley.unity` or `Assets/Art/Generated/**`.
+  Generated outputs are git-ignored (≈80 MB); regenerate after cloning.
+- Do not run batch-mode Unity on a machine where the Editor is importing assets: it starved the Editor's shader
+  compiler and crashed it twice. Ask the user to close the Editor, or wait until it is idle.
 - Generation must stay deterministic (seed `ValleyGenerator.Seed`) and repeatable: update assets in place (keep GUIDs),
   rebuild the scene from an empty scene, delete only stale files inside generated folders.
 - Gameplay reads input only through `IPlayerInput` (`PlayerInputHub`). Touch UI pushes into the hub; gameplay never
@@ -14,8 +28,11 @@ Current milestone: first playable vertical slice (`Assets/Scenes/Prototype_Valle
 - Damage flows through `IDamageable.ApplyDamage(DamageInfo)`; mitigation via `IDamageFilter` on the same GameObject as `Health`.
 - Animation is procedural and purely visual (`FirstPersonWeaponAnimator`, `KnightAnimator`); timing lives in gameplay code.
 - Every serialized reference must be assigned unless the field has `[Optional]`. `Ashen Realm > Validate Prototype` enforces it.
-- Mobile budget: 30 FPS baseline, one shared palette material (`M_World`) for the world, chunked static meshes,
-  no realtime GI, one shadowed directional light, ≤1 small point light in view.
+- Performance budget (mobile browsers are the weakest target): fixed 360 px world render, two world materials,
+  chunked static meshes, no realtime GI, one shadowed directional light, ≤3 small point lights.
+- URP render scale must stay 1 (PixelCamera owns resolution; the validator checks it).
+- WebGL build: `Ashen Realm > Build WebGL` or `BatchTasks.GenerateValidateAndBuildWebGL` with `-buildTarget WebGL`.
+  Test via `tools/serve-webgl.ps1` (http://localhost:8080). See `docs/BUILD_WEBGL.md`.
 - Use only first-party Unity packages. Use the modern Input System (no `UnityEngine.Input`). UI text uses legacy
   `UnityEngine.UI.Text` with the built-in `LegacyRuntime.ttf` (no TMP essentials import needed).
 - Never claim compilation, validation or an iOS build succeeded without running it and reading the log.

@@ -8,7 +8,8 @@ namespace AshenRealm.Combat
     /// </summary>
     public sealed class HitFlash : MonoBehaviour
     {
-        static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        // AshenRealm/PixelLit multiplies albedo by _Tint.
+        static readonly int BaseColorId = Shader.PropertyToID("_Tint");
 
         [SerializeField] Health health;
         [SerializeField] Renderer[] renderers;

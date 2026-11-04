@@ -79,22 +79,37 @@ namespace AshenRealm.EditorTools
             string[] required =
             {
                 GeneratedAssets.ScenePath,
-                GeneratedAssets.PalettePath,
+                GeneratedAssets.DetailArrayPath,
+                GeneratedAssets.SkyPath,
                 GeneratedAssets.PrefabFolder + "/Player.prefab",
                 GeneratedAssets.PrefabFolder + "/CursedKnight.prefab",
                 GeneratedAssets.PrefabFolder + "/TreasureChest.prefab",
                 GeneratedAssets.MaterialFolder + "/M_World.mat",
-                GeneratedAssets.MaterialFolder + "/M_Metal.mat",
+                GeneratedAssets.MaterialFolder + "/M_Foliage.mat",
+                GeneratedAssets.MaterialFolder + "/M_PixelComposite.mat",
                 GeneratedAssets.SettingsFolder + "/VP_AshenValley.asset",
                 GeneratedAssets.MeshFolder + "/Terrain.asset",
                 GeneratedAssets.MeshFolder + "/Ruins.asset",
+                GeneratedAssets.MeshFolder + "/WindmillSails.asset",
             };
             foreach (string path in required)
                 r.Check(AssetDatabase.LoadMainAssetAtPath(path) != null, $"Missing generated asset: {path}");
 
-            var world = AssetDatabase.LoadAssetAtPath<Material>(GeneratedAssets.MaterialFolder + "/M_World.mat");
-            if (world != null)
-                r.Check(world.GetTexture("_BaseMap") != null, "M_World has no palette texture assigned");
+            foreach (string name in new[] { "M_World", "M_Foliage" })
+            {
+                var material = AssetDatabase.LoadAssetAtPath<Material>($"{GeneratedAssets.MaterialFolder}/{name}.mat");
+                if (material == null) continue;
+                r.Check(material.shader != null && material.shader.name == "AshenRealm/PixelLit" && material.shader.isSupported,
+                    $"{name} must use a supported AshenRealm/PixelLit shader");
+                r.Check(material.GetTexture("_DetailArray") is Texture2DArray array && array.depth == System.Enum.GetValues(typeof(TexLayer)).Length,
+                    $"{name} has no complete detail texture array assigned");
+            }
+            var foliage = AssetDatabase.LoadAssetAtPath<Material>(GeneratedAssets.MaterialFolder + "/M_Foliage.mat");
+            if (foliage != null)
+                r.Check(foliage.IsKeywordEnabled("_ALPHATEST_ON") && foliage.IsKeywordEnabled("_WIND_ON"), "M_Foliage must enable alpha clip and wind");
+
+            foreach (var urp in UniversalAssets())
+                r.Check(Mathf.Approximately(urp.renderScale, 1f), $"{urp.name} render scale must be 1 (PixelCamera controls resolution)");
 
             r.Check(EditorBuildSettings.scenes.Length > 0 && EditorBuildSettings.scenes[0].path == GeneratedAssets.ScenePath && EditorBuildSettings.scenes[0].enabled,
                 "Prototype_Valley is not the first enabled scene in Build Settings");
@@ -140,6 +155,12 @@ namespace AshenRealm.EditorTools
             One<ImpactEffects>();
             One<Volume>();
             One<LoreInspectable>();
+            var pixelCamera = One<PixelCamera>();
+            One<PauseMenu>();
+            One<CompassStrip>();
+            One<Rotator>();
+            if (pixelCamera != null)
+                r.Check(pixelCamera.GetComponent<Camera>() != null && pixelCamera.CompareTag("MainCamera"), "PixelCamera must sit on the main camera");
 
             var buttons = All<TouchButton>();
             foreach (PlayerButton action in Enum.GetValues(typeof(PlayerButton)))
@@ -172,6 +193,14 @@ namespace AshenRealm.EditorTools
         }
 
         static float GetFloat(Object target, string field) => new SerializedObject(target).FindProperty(field).floatValue;
+
+        static IEnumerable<UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset> UniversalAssets()
+        {
+            var seen = new HashSet<UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset>();
+            for (int i = 0; i < QualitySettings.names.Length; i++)
+                if (QualitySettings.GetRenderPipelineAssetAt(i) is UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset urp && seen.Add(urp))
+                    yield return urp;
+        }
 
         /// <summary>Every object reference on an AshenRealm component must be assigned unless marked [Optional].</summary>
         static void CheckReferences(Report r, GameObject[] roots)

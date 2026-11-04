@@ -8,7 +8,47 @@ _Last updated: 2026-11-04_
   Test Framework 1.8.0 present as a transitive dependency (not used yet). No packages were added.
 - Installed build modules: Windows Standalone, WebGL. **iOS Build Support is not installed.** Host OS is Windows,
   so a native iOS build (Xcode) cannot be performed on this machine.
-- Git: no repository initialised yet. `.gitignore` is ready.
+- Git: repository on `master` (E: has no file ownership, so the path is in the global `safe.directory` list).
+
+## Checkpoint E — web target and reference art direction (2026-11-04)
+Goal from the user: play in a web page, look like the supplied reference screenshots (pixel-art painterly 3D).
+- [x] `AshenRealm/PixelLit` URP shader (texture-array pixel textures, banded light, cool shadows, sheen, emission,
+      alpha clip, wind; Forward and Forward+) and `AshenRealm/PixelComposite` (posterise + Bayer dither)
+- [x] `PixelCamera`: world at 360 px height, point-upscaled; UI at native resolution via a UI-only screen camera
+- [x] 20 procedural pixel-art texture layers, painted panoramic sky, smooth blended terrain (grass/dirt/rock)
+- [x] New art: drooping-fringe pines, golden autumn trees, grass/flower/wheat cards, hamlet (3 half-timbered houses,
+      lantern posts, barrels, crates, signpost), windmill with turning sails, puddles, giant graveyard swords in a
+      flower meadow, drifting golden leaves
+- [x] HUD restyled after the references: compass strip, long top-centre health/stamina bars with metal caps, round
+      weapon emblem, pause button, stone-ring touch controls; pause menu (resume, fullscreen, look speed)
+- [x] Browser behaviour: Esc / lost pointer lock opens the pause menu; browser-paced frame rate on WebGL
+- [x] WebGL tooling: `AshenRealm` page template, `Ashen Realm > Build WebGL`, `tools/serve-webgl.ps1`, `docs/BUILD_WEBGL.md`
+- URP render scale reset to 1 on both quality levels (it would blur the low-res target); logged by the generator.
+- Generated outputs (`Assets/Art/Generated`, the scene, prefabs, materials, volume/lighting assets; ≈80 MB) are now
+  git-ignored. Run **Ashen Realm > Generate Prototype** after cloning.
+
+### Checkpoint E validation (2026-11-04)
+| Check | Result |
+|---|---|
+| Compile (batch, copy and real project) | 0 errors, 0 warnings in project code; both custom shaders compile and report supported |
+| Validator | 850/850 (adds shader/texture-array/material, render-scale, PixelCamera, pause, compass, rotator checks) |
+| Play-mode playtest | 25/25 on the copy and on the real project; no runtime errors with the pixel camera active |
+| Preview renders | 10 shots reviewed against the references; fixes: shield back texture, giant graveyard swords, denser meadow, softer blue shadows, capture warm-up |
+| WebGL build | Succeeded, 16.6 MB (gzip + fallback); first build 43.6 min, rebuild 0.7 min |
+| Browser test (`tools/serve-webgl.ps1`, in-app Chromium) | Loads, renders the pixel look, compass turns, touch buttons respond, pause/resume works, no console errors; missing "−" glyph found and fixed |
+
+### Not yet verified (Checkpoint E)
+- Real phones and tablets in a mobile browser (performance, touch, safe areas). Desktop browsers other than the
+  in-app Chromium (Firefox, Safari).
+- Desktop pointer lock + Esc-to-pause in a regular browser window (the in-app pane reports a touchscreen, so it ran
+  in touch mode).
+- Publishing to a public host.
+
+### Incident
+The Unity Editor that was open on this project crashed twice (18:47, 19:29) while auto-importing shaders: its
+`UnityShaderCompiler.exe` timed out on start-up ("Failed to get ipc connection ... even after 10 retries"). Both times
+coincided with heavy batch-mode Unity runs on a copy of the project, so resource contention is the likely cause; the
+same shaders compile cleanly in batch mode. Avoid running batch builds while the Editor is importing.
 
 ## Checkpoint A — foundation
 - [x] Project inspected; assembly definitions `AshenRealm.Runtime` / `AshenRealm.Editor`

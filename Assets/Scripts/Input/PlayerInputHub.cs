@@ -42,11 +42,16 @@ namespace AshenRealm.Input
         float jumpPressTime = -1f, attackPressTime = -1f, interactPressTime = -1f;
         bool touchMode;
         float sensitivityMultiplier = 1f;
+        bool paused;
+        bool wasCursorLocked;
 
         public event Action<bool> TouchModeChanged;
+        /// <summary>Raised when the player asks for the pause menu (Esc, or the browser released pointer lock).</summary>
+        public event Action PauseRequested;
 
         public bool TouchMode => touchMode;
         public bool SprintToggled => sprintToggled;
+        public bool Paused => paused;
 
         /// <summary>Global look sensitivity multiplier (persisted in PlayerPrefs).</summary>
         public float LookSensitivity
@@ -63,15 +68,16 @@ namespace AshenRealm.Input
         {
             get
             {
+                if (paused) return Vector2.zero;
                 Vector2 move = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
                 if (touchMove.sqrMagnitude > move.sqrMagnitude) move = touchMove;
                 return Vector2.ClampMagnitude(move, 1f);
             }
         }
 
-        public bool SprintHeld => sprintToggled || (sprintAction != null && sprintAction.IsPressed());
-        public bool BlockHeld => touchBlockHeld || (blockAction != null && blockAction.IsPressed() && MouseActionsAllowed);
-        public bool AttackHeld => touchAttackHeld || (attackAction != null && attackAction.IsPressed() && MouseActionsAllowed && !mouseAttackSuppressed);
+        public bool SprintHeld => !paused && (sprintToggled || (sprintAction != null && sprintAction.IsPressed()));
+        public bool BlockHeld => !paused && (touchBlockHeld || (blockAction != null && blockAction.IsPressed() && MouseActionsAllowed));
+        public bool AttackHeld => !paused && (touchAttackHeld || (attackAction != null && attackAction.IsPressed() && MouseActionsAllowed && !mouseAttackSuppressed));
 
         /// <summary>Mouse buttons drive gameplay only while the cursor is captured (prevents UI clicks from attacking).</summary>
         bool MouseActionsAllowed => touchMode || Cursor.lockState == CursorLockMode.Locked || Application.isMobilePlatform;
@@ -133,6 +139,11 @@ namespace AshenRealm.Input
         void Update()
         {
             UpdateDesktopCursor();
+            if (paused)
+            {
+                lookAccumulator = Vector2.zero;
+                return;
+            }
 
             if (Cursor.lockState == CursorLockMode.Locked && !touchMode)
             {
@@ -160,7 +171,7 @@ namespace AshenRealm.Input
             if (!touchMode && Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
                 SetTouchMode(true);
 
-#if UNITY_EDITOR || UNITY_STANDALONE
+#if UNITY_EDITOR || UNITY_STANDALONE || UNITY_WEBGL
             if (Keyboard.current != null && Keyboard.current.f1Key.wasPressedThisFrame)
                 SetTouchMode(!touchMode);
 #endif
@@ -172,21 +183,49 @@ namespace AshenRealm.Input
         void UpdateDesktopCursor()
         {
             cursorCapturedThisFrame = false;
-            if (Application.isMobilePlatform || touchMode) return;
+            bool escape = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+            if (Application.isMobilePlatform || touchMode)
+            {
+                wasCursorLocked = false;
+                if (escape) PauseRequested?.Invoke();
+                return;
+            }
 
             var mouse = Mouse.current;
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            bool locked = Cursor.lockState == CursorLockMode.Locked;
+            if (escape)
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
+                PauseRequested?.Invoke();
             }
-            else if (mouse != null && Cursor.lockState != CursorLockMode.Locked && mouse.leftButton.wasPressedThisFrame)
+            else if (wasCursorLocked && !locked && !paused)
+            {
+                // The browser released pointer lock (Esc in WebGL, alt-tab): treat it as a pause request.
+                PauseRequested?.Invoke();
+            }
+            else if (!paused && mouse != null && !locked && mouse.leftButton.wasPressedThisFrame)
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
                 cursorCapturedThisFrame = true;
                 mouseAttackSuppressed = true;
             }
+            wasCursorLocked = Cursor.lockState == CursorLockMode.Locked;
+        }
+
+        /// <summary>Freezes gameplay input (pause menu). Releases the cursor so menus can be clicked.</summary>
+        public void SetPaused(bool value)
+        {
+            paused = value;
+            if (!paused) return;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            wasCursorLocked = false;
+            lookAccumulator = Vector2.zero;
+            jumpPressTime = attackPressTime = interactPressTime = -1f;
+            touchMove = Vector2.zero;
+            touchAttackHeld = touchBlockHeld = false;
         }
 
         public void SetTouchMode(bool enabled)
@@ -215,14 +254,14 @@ namespace AshenRealm.Input
 
         public Vector2 ConsumeLook()
         {
-            Vector2 look = lookAccumulator;
+            Vector2 look = paused ? Vector2.zero : lookAccumulator;
             lookAccumulator = Vector2.zero;
             return look;
         }
 
-        public bool ConsumeJump() => Consume(ref jumpPressTime, jumpBuffer);
-        public bool ConsumeAttack() => Consume(ref attackPressTime, attackBuffer);
-        public bool ConsumeInteract() => Consume(ref interactPressTime, interactBuffer);
+        public bool ConsumeJump() => Consume(ref jumpPressTime, jumpBuffer) && !paused;
+        public bool ConsumeAttack() => Consume(ref attackPressTime, attackBuffer) && !paused;
+        public bool ConsumeInteract() => Consume(ref interactPressTime, interactBuffer) && !paused;
 
         public void CancelSprint() => sprintToggled = false;
 

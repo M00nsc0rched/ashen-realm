@@ -1,11 +1,12 @@
 # ASHEN REALM
 
-An original first-person dark fantasy action RPG for iPhone (landscape). This repository contains the first playable
-vertical slice: a small, atmospheric valley with a ruined chapel, a Cursed Knight to fight and a chest to loot.
-All art is generated procedurally in the Editor — no paid or third-party assets.
+An original first-person dark fantasy action RPG with a pixel-art painterly look, playable in the web browser
+(desktop and mobile) and prepared for iPhone. This repository contains the first playable vertical slice: a golden
+valley with a hamlet and windmill, a sword graveyard, a ruined chapel, a Cursed Knight to fight and a chest to loot.
+All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in the Editor: no paid or third-party assets.
 
-- Engine: Unity **6000.6.8f1** · URP 17.6 · Input System 1.20 · uGUI
-- Target: iPhone, Metal, landscape, 30 FPS baseline
+- Engine: Unity **6000.6.8f1** · URP 17.6 (custom `AshenRealm/PixelLit` shader) · Input System 1.20 · uGUI
+- Targets: **WebGL** (see [docs/BUILD_WEBGL.md](docs/BUILD_WEBGL.md)), iPhone (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md))
 
 ## Open and generate
 1. Open the `AshenRealm` folder with Unity Hub (Editor 6000.6.8f1).
@@ -17,12 +18,14 @@ All art is generated procedurally in the Editor — no paid or third-party asset
    - URP assets: render scale 0.65 with point upscaling (pixelated look)
 
    It is safe to run again at any time; it rebuilds the scene and updates assets in place.
+   Generated files are not stored in git, so run this once after cloning.
 4. Optional checks:
    - **Ashen Realm > Validate Prototype** — static checks (references, placement, combat logic)
    - **Ashen Realm > Run Automated Playtest** — plays the slice in Play mode (move, fight, loot, die, respawn)
    - **Ashen Realm > Capture Preview Shots** — renders reference images to `Screenshots/`
-5. For iPhone: **Ashen Realm > Apply iOS Player Settings** (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md)).
-6. Press **Play**.
+5. For the browser: **Ashen Realm > Build WebGL**, then run `tools/serve-webgl.ps1` and open http://localhost:8080.
+6. For iPhone: **Ashen Realm > Apply iOS Player Settings** (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md)).
+7. Press **Play**. (In edit mode the Game view shows the full-resolution camera; the pixel look appears in Play mode.)
 
 > If you change anything under `Assets/Editor/`, regenerate. Do not hand-edit the generated scene.
 
@@ -36,6 +39,7 @@ All art is generated procedurally in the Editor — no paid or third-party asset
 | Attack | left mouse (hold to keep swinging) | **STRIKE** | right trigger |
 | Block | hold right mouse | hold **BLOCK** | left trigger |
 | Interact | E | **USE** | West button |
+| Pause menu (resume, fullscreen, look speed) | Esc | ‖ button top-right | – |
 | Toggle touch controls (testing) | F1 | – | – |
 
 Touch controls appear automatically on devices and in the Device Simulator; press **F1** in the Game view to try the

@@ -11,12 +11,14 @@ namespace AshenRealm.EditorTools
 {
     internal sealed class GeneratedMaterials
     {
+        /// <summary>Opaque AshenRealm/PixelLit (all solid geometry; metal sheen and glow come from vertex data).</summary>
         public Material World;
-        public Material Metal;
-        public Material Fire;
-        public Material Glow;
+        /// <summary>Alpha-clipped, two-sided, wind-swayed AshenRealm/PixelLit (foliage cards).</summary>
+        public Material Foliage;
         public Material Trail;
         public Material Sparks;
+        public Material DriftingLeaves;
+        public Material Composite;
     }
 
     internal sealed class PlayerRig
@@ -30,6 +32,7 @@ namespace AshenRealm.EditorTools
         public PlayerInteractor Interactor;
         public PlayerLifecycle Lifecycle;
         public CameraEffects CameraEffects;
+        public AshenRealm.Core.PixelCamera PixelCamera;
     }
 
     /// <summary>
@@ -80,6 +83,8 @@ namespace AshenRealm.EditorTools
             cameraData.renderShadows = true;
             cameraGo.AddComponent<AudioListener>();
             rig.CameraEffects = cameraGo.AddComponent<CameraEffects>();
+            rig.PixelCamera = cameraGo.AddComponent<AshenRealm.Core.PixelCamera>();
+            CreateDriftingLeaves(root.transform, materials.DriftingLeaves);
 
             // Weapon pivots are the attachment points for future animated models.
             var weaponRig = Child("Weapon Rig", cameraGo.transform, Vector3.zero, Quaternion.identity);
@@ -90,7 +95,7 @@ namespace AshenRealm.EditorTools
             var swordBuilder = new MeshBuilder();
             PropMeshes.Sword(swordBuilder);
             var swordMesh = GeneratedAssets.SaveMesh(swordBuilder, "Player_Sword");
-            var sword = MeshChild("Sword", swordPivot, swordMesh, materials.Metal, Vector3.zero, Quaternion.identity, Vector3.one * 0.7f, false);
+            var sword = MeshChild("Sword", swordPivot, swordMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.7f, false);
 
             var tip = Child("Blade Tip", sword.transform, new Vector3(0f, 0.92f, 0f), Quaternion.identity);
             var trail = tip.gameObject.AddComponent<TrailRenderer>();
@@ -198,16 +203,16 @@ namespace AshenRealm.EditorTools
 
             var renderers = new[]
             {
-                MeshChild("Leg L Mesh", legL, legMesh, materials.Metal).GetComponent<Renderer>(),
-                MeshChild("Leg R Mesh", legR, legMesh, materials.Metal).GetComponent<Renderer>(),
-                MeshChild("Torso Mesh", torso, torsoMesh, materials.Metal).GetComponent<Renderer>(),
-                MeshChild("Head Mesh", head, headMesh, materials.Metal).GetComponent<Renderer>(),
-                MeshChild("Arm L Mesh", armL, armMesh, materials.Metal).GetComponent<Renderer>(),
-                MeshChild("Arm R Mesh", armR, armMesh, materials.Metal).GetComponent<Renderer>(),
+                MeshChild("Leg L Mesh", legL, legMesh, materials.World).GetComponent<Renderer>(),
+                MeshChild("Leg R Mesh", legR, legMesh, materials.World).GetComponent<Renderer>(),
+                MeshChild("Torso Mesh", torso, torsoMesh, materials.World).GetComponent<Renderer>(),
+                MeshChild("Head Mesh", head, headMesh, materials.World).GetComponent<Renderer>(),
+                MeshChild("Arm L Mesh", armL, armMesh, materials.World).GetComponent<Renderer>(),
+                MeshChild("Arm R Mesh", armR, armMesh, materials.World).GetComponent<Renderer>(),
                 MeshChild("Cape Mesh", cape, capeMesh, materials.World).GetComponent<Renderer>(),
-                MeshChild("Greatsword", armR, swordMesh, materials.Metal, new Vector3(0f, -0.72f, 0.03f), Quaternion.Euler(160f, 0f, 0f), Vector3.one * 1.25f).GetComponent<Renderer>(),
+                MeshChild("Greatsword", armR, swordMesh, materials.World, new Vector3(0f, -0.72f, 0.03f), Quaternion.Euler(160f, 0f, 0f), Vector3.one * 1.25f).GetComponent<Renderer>(),
             };
-            var eyes = MeshChild("Eyes", head, eyesMesh, materials.Glow, Vector3.zero, Quaternion.identity, Vector3.one, false).GetComponent<Renderer>();
+            var eyes = MeshChild("Eyes", head, eyesMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one, false).GetComponent<Renderer>();
 
             SceneWiring.Set(animator, "model", model);
             SceneWiring.Set(animator, "torso", torso);
@@ -243,7 +248,7 @@ namespace AshenRealm.EditorTools
             MeshChild("Body", root.transform, GeneratedAssets.SaveMesh(bodyBuilder, "Chest_Body"), materials.World);
             var goldBuilder = new MeshBuilder();
             PropMeshes.ChestGold(goldBuilder);
-            MeshChild("Gold", root.transform, GeneratedAssets.SaveMesh(goldBuilder, "Chest_Gold"), materials.Metal, Vector3.zero, Quaternion.identity, Vector3.one, false);
+            MeshChild("Gold", root.transform, GeneratedAssets.SaveMesh(goldBuilder, "Chest_Gold"), materials.World, Vector3.zero, Quaternion.identity, Vector3.one, false);
 
             var lidPivot = Child("Lid Hinge", root.transform, new Vector3(0f, 0.5f, 0.3f), Quaternion.identity);
             var lidBuilder = new MeshBuilder();
@@ -264,6 +269,50 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(chest, "healAmount", 40f);
             SceneWiring.Set(chest, "rewardMessage", "Found 48 gold and a Healing Draught (+40 health).");
             return chest;
+        }
+
+        /// <summary>Golden leaves and motes drifting around the player (world-space particles, follows the player).</summary>
+        static void CreateDriftingLeaves(Transform player, Material material)
+        {
+            var go = new GameObject("Drifting Leaves");
+            go.transform.SetParent(player, false);
+            go.transform.localPosition = new Vector3(0f, 7f, 0f);
+            var ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.duration = 5f;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(7f, 11f);
+            main.startSpeed = 0f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.1f, 0.2f);
+            main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.8f, 0.35f), new Color(0.95f, 0.55f, 0.2f));
+            main.gravityModifier = 0.015f;
+            main.maxParticles = 160;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var emission = ps.emission;
+            emission.rateOverTime = 14f;
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(36f, 10f, 36f);
+            var noise = ps.noise;
+            noise.enabled = true;
+            noise.strength = 0.6f;
+            noise.frequency = 0.25f;
+            var rotation = ps.rotationOverLifetime;
+            rotation.enabled = true;
+            rotation.z = new ParticleSystem.MinMaxCurve(-1.5f, 1.5f);
+            var colorOverLifetime = ps.colorOverLifetime;
+            colorOverLifetime.enabled = true;
+            var fade = new Gradient();
+            fade.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+                new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.15f), new GradientAlphaKey(1f, 0.8f), new GradientAlphaKey(0f, 1f) });
+            colorOverLifetime.color = fade;
+            var renderer = go.GetComponent<ParticleSystemRenderer>();
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
         }
 
         // ---- Helpers ----------------------------------------------------------------------------------------
