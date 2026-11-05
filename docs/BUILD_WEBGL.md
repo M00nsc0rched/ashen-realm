@@ -32,9 +32,16 @@ your own web space, GitHub Pages, Netlify, itch.io (upload a zip of the folder, 
 "This file will be played in the browser"). For best load times configure the host to send
 `Content-Encoding: gzip` for `*.gz` files; without it the decompression fallback still works.
 
+### GitHub Pages (this repository)
+The live build at https://m00nsc0rched.github.io/ashen-realm/ is served from the `gh-pages` branch, which holds only
+the contents of `Builds/WebGL` plus an empty `.nojekyll`. To update it after a new build, check out `gh-pages` in a
+separate folder, replace its files with the new `Builds/WebGL` contents (keep `.nojekyll`), commit and push. Pages
+serves the `.unityweb` files without `Content-Encoding`, so the loader's decompression fallback unpacks them.
+
 ## Controls in the browser
 - Desktop: click the game to capture the mouse (pointer lock). Esc releases it and opens the pause menu
   (Resume, Fullscreen, look speed). WASD, Shift, Space, left/right mouse, E.
+- When the touch buttons are showing (touchscreen laptops, F1), the mouse only turns the view; attack with **TÁMADÁS**.
 - Phones/tablets: touch controls appear automatically. Hold the device in landscape. Use the browser's
   "Add to Home Screen" for a fullscreen-like experience on iOS (Safari does not allow page fullscreen on iPhone).
 

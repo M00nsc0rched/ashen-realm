@@ -1,5 +1,7 @@
 # ASHEN REALM
 
+**Játék a böngészőben (play in the browser): https://m00nsc0rched.github.io/ashen-realm/**
+
 An original first-person dark fantasy action RPG with a pixel-art painterly look, playable in the web browser
 (desktop and mobile) and prepared for iPhone. This repository contains the first playable vertical slice: a golden
 valley with a hamlet and windmill, a sword graveyard, a ruined chapel, a Cursed Knight to fight and a chest to loot.

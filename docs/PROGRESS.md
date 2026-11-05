@@ -18,7 +18,9 @@ User feedback: turning the view started attacks; attacking must only happen with
 - [x] All player-facing text is Hungarian and lives in `Core/GameText`; the web page template is translated too.
 - [x] Measured the font the WebGL build embeds (`LegacyRuntime`, scanned from `WebGL.data`): it covers U+0020–U+007E
       and U+00A0–U+017F (ő/ű included) but not U+2212, U+2014, U+2026. The validator now checks every string against it.
-- [x] Public repository and GitHub Pages build (see README for the links).
+- [x] Public repository https://github.com/M00nsc0rched/ashen-realm (commits use the GitHub noreply address); the web
+      build is served by GitHub Pages from the `gh-pages` branch: https://m00nsc0rched.github.io/ashen-realm/ (verified:
+      loads in the in-app Chromium with Hungarian HUD and no console errors).
 
 ### Checkpoint F validation (2026-11-05)
 | Check | Result |
@@ -60,7 +62,7 @@ Goal from the user: play in a web page, look like the supplied reference screens
   in-app Chromium (Firefox, Safari).
 - Desktop pointer lock + Esc-to-pause in a regular browser window (the in-app pane reports a touchscreen, so it ran
   in touch mode).
-- Publishing to a public host.
+- Publishing to a public host: done in Checkpoint F (GitHub Pages).
 
 ### Incident
 The Unity Editor that was open on this project crashed twice (18:47, 19:29) while auto-importing shaders: its
