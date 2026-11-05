@@ -13,8 +13,10 @@ namespace AshenRealm.UI
     {
         [SerializeField] PlayerInputHub input;
         [SerializeField] CanvasGroup group;
+        [SerializeField, Optional] DialoguePanel dialogue;
         [SerializeField] Text sensitivityLabel;
         [SerializeField] Text fullscreenLabel;
+        [SerializeField, Optional] Text objectiveLabel;
 
         float lastToggle = -999f;
 
@@ -35,11 +37,16 @@ namespace AshenRealm.UI
         public void Toggle()
         {
             // Esc and a pointer-lock release can arrive on consecutive frames; treat them as one request.
-            if (Time.unscaledTime - lastToggle < 0.3f) return;
+            if (Time.unscaledTime - lastToggle < 0.3f || (dialogue != null && dialogue.IsOpen)) return;
             Apply(!IsOpen);
         }
 
         public void Resume() => Apply(false);
+
+        public void SetObjective(string text)
+        {
+            if (objectiveLabel != null) objectiveLabel.text = text;
+        }
 
         public void ToggleFullscreen()
         {

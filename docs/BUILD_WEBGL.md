@@ -26,6 +26,9 @@ powershell -ExecutionPolicy Bypass -File tools/serve-webgl.ps1
 ```
 then open http://localhost:8080. (Any static server works, e.g. `python -m http.server` inside `Builds/WebGL`.)
 
+To review a deep zone without playing down to it, add `?zone=N` (1 Hollowgate, 2-6 the depths): after the class choice the
+game starts there. Guardians above it stay alive, so its stair up still works but nothing is unlocked by skipping.
+
 ## Publish
 Upload the **contents** of `Builds/WebGL` (index.html, Build/, TemplateData/) to any static host:
 your own web space, GitHub Pages, Netlify, itch.io (upload a zip of the folder, choose "HTML" and tick

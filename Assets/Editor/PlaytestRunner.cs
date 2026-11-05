@@ -6,6 +6,9 @@ using AshenRealm.Core;
 using AshenRealm.Input;
 using AshenRealm.Interactions;
 using AshenRealm.Player;
+using AshenRealm.Story;
+using AshenRealm.UI;
+using AshenRealm.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -27,7 +30,7 @@ namespace AshenRealm.EditorTools
         const string ResultKey = "AshenRealm.Playtest.Result";
         const string BatchKey = "AshenRealm.Playtest.Batch";
         const string LogPrefix = "[AshenRealm][Playtest]";
-        const double TimeoutSeconds = 150.0;
+        const double TimeoutSeconds = 240.0;
 
         static IEnumerator routine;
         static float waitUntil;
@@ -89,13 +92,13 @@ namespace AshenRealm.EditorTools
         {
             if (!EditorApplication.isPlaying) return;
             bool timedOut = EditorApplication.timeSinceStartup - startedAt > TimeoutSeconds;
-            if (!timedOut && Time.time < waitUntil) return;
+            if (!timedOut && Time.unscaledTime < waitUntil) return; // unscaled: dialogues freeze game time
 
             bool more;
             try
             {
                 more = !timedOut && routine.MoveNext();
-                if (more && routine.Current is float seconds) waitUntil = Time.time + seconds;
+                if (more && routine.Current is float seconds) waitUntil = Time.unscaledTime + seconds;
             }
             catch (System.Exception e)
             {
@@ -148,6 +151,16 @@ namespace AshenRealm.EditorTools
             var knight = Object.FindAnyObjectByType<CursedKnightAI>();
             var chest = Object.FindAnyObjectByType<TreasureChest>();
             if (!Check(input && controller && combat && lifecycle && knight && chest, "Scene actors found at runtime")) yield break;
+
+            // The class choice opens the game: two pages, then time starts.
+            var choice = Object.FindAnyObjectByType<DialoguePanel>();
+            Check(choice != null && choice.IsOpen, "The class choice opens the game");
+            choice.Choose((int)CharacterClass.Knight);
+            Check(choice.IsOpen, "A class shows its story before it is chosen");
+            choice.Choose(0);
+            Check(!choice.IsOpen && GameSession.Instance.ClassChosen && GameSession.Instance.Class.Id == CharacterClass.Knight, "The knight is chosen");
+            Check(GameSession.Instance.Honor == Catalog.ClassOf(CharacterClass.Knight).StartHonor, "The class sets the starting honor");
+            yield return 0.3f;
 
             var player = controller.transform;
             var health = controller.GetComponent<Health>();
@@ -287,6 +300,129 @@ namespace AshenRealm.EditorTools
             yield return 4.5f;
             Check(!lifecycle.IsDead && health.IsAlive && Mathf.Approximately(health.Current, health.Max), "Player respawns with full health");
             Check(Vector3.Distance(player.position, spawn) < 1.5f, $"Player respawns at the spawn point ({Vector3.Distance(player.position, spawn):F1} m away)");
+
+            // The story from the gate down.
+            var session = Object.FindAnyObjectByType<GameSession>();
+            var zones = Object.FindAnyObjectByType<ZoneManager>();
+            var dialogue = Object.FindAnyObjectByType<DialoguePanel>();
+            var director = Object.FindAnyObjectByType<StoryDirector>();
+            var abilities = controller.GetComponent<PlayerAbilities>();
+            var status = controller.GetComponent<StatusEffects>();
+            if (!Check(session && zones && dialogue && director && abilities && status, "Story services found at runtime")) yield break;
+
+            Check(session.HasFlag(StoryDirector.DeadFlag("knight")), "Slaying the knight is recorded");
+            Check(session.Gold >= 48 + 25, $"Knight and chest paid out (gold {session.Gold})");
+
+            var gate = Object.FindAnyObjectByType<ZonePortal>();
+            Check(gate != null && gate.TargetZone == 1, "The valley has a gate to Hollowgate");
+            gate.Interact(controller.gameObject);
+            yield return 1.6f;
+            Check(zones.CurrentIndex == 1 && !zones.Travelling, $"The gate leads to Hollowgate (zone {zones.CurrentIndex})");
+            Check(RenderSettings.sun != null && RenderSettings.sun.enabled, "The sun shines on the city");
+
+            NpcActor npc = System.Array.Find(Object.FindObjectsByType<NpcActor>(), n => n.NpcId == "merchant");
+            Check(npc != null, "Hollowgate has its merchant");
+            int potionsBefore = session.Potions;
+            int goldBefore = session.Gold;
+            npc.Interact(controller.gameObject);
+            Check(dialogue.IsOpen && Time.timeScale == 0f, "Talking opens the dialogue and freezes time");
+            dialogue.Choose(0);
+            Check(session.Potions == potionsBefore + 1 && session.Gold < goldBefore, $"The merchant sells a potion ({session.Potions} potions, {session.Gold} gold)");
+            dialogue.Choose(0);
+            Check(!dialogue.IsOpen && Time.timeScale == 1f, "Closing the dialogue resumes time");
+
+            zones.Travel(2, false);
+            yield return 1.6f;
+            Check(zones.CurrentIndex == 2 && zones.Current.Underground, $"The stair leads to the first depth (zone {zones.CurrentIndex})");
+            Check(RenderSettings.sun != null && !RenderSettings.sun.enabled, "No sun underground");
+            Check(controller.GetComponentInChildren<Light>(false) != null, "The torch burns underground");
+
+            // Every foe in the depth is alive and awake; fight one with the sword.
+            EnemyAI[] foes = Object.FindObjectsByType<EnemyAI>();
+            Check(foes.Length >= 8, $"The depth is inhabited ({foes.Length} foes)");
+            EnemyAI foe = System.Array.Find(foes, e => e.Definition != null && e.Definition.Rank == EnemyRank.Common);
+            if (!Check(foe != null, "A common foe exists")) yield break;
+            status.Clear();
+            Vector3 foeFront = foe.transform.position - foe.transform.forward * 2f + Vector3.up * 0.1f;
+            controller.Teleport(foeFront, foe.transform.eulerAngles.y);
+            Physics.SyncTransforms();
+            goldBefore = session.Gold;
+            for (float t = 0f; t < 10f && foe.Health.IsAlive && health.IsAlive; t += 0.1f)
+            {
+                Vector3 to = Flat(foe.transform.position - player.position);
+                if (to.sqrMagnitude > 0.01f) controller.Teleport(foe.transform.position - to.normalized * 1.8f, Quaternion.LookRotation(to).eulerAngles.y);
+                input.SetTouchButton(PlayerButton.Attack, true);
+                input.SetTouchButton(PlayerButton.Attack, false);
+                yield return 0.1f;
+            }
+            Check(!foe.Health.IsAlive, $"{foe.DisplayName} falls to the sword (health {foe.Health.Current:F0})");
+            Check(session.Gold > goldBefore, "Slain foes drop gold");
+            Check(abilities.Focus > 0f, "Focus is available");
+
+            // Class ability: spends focus and hits what is in front.
+            EnemyAI next = System.Array.Find(foes, e => e != foe && e.Health.IsAlive && e.Definition.Rank == EnemyRank.Common);
+            if (next != null)
+            {
+                controller.Teleport(next.transform.position - next.transform.forward * 1.9f, next.transform.eulerAngles.y);
+                Physics.SyncTransforms();
+                yield return 0.2f;
+                float focusBefore = abilities.Focus;
+                float foeHealth = next.Health.Current;
+                bool used = abilities.TryUse(0);
+                Check(used && abilities.Focus < focusBefore, "Shield Bash spends focus");
+                Check(next.Health.Current < foeHealth && next.GetComponent<StatusEffects>().Stunned, "Shield Bash hurts and stuns");
+            }
+
+            // The Legendary Guardian: speech first, then the stair opens when it falls.
+            EnemyAI keeper = System.Array.Find(foes, e => e.EnemyId == "morr");
+            ZonePortal stairDown = System.Array.Find(Object.FindObjectsByType<ZonePortal>(), p => p.TargetZone == 3);
+            if (!Check(keeper != null && stairDown != null, "Morr bars the stair down")) yield break;
+            Check(stairDown.InteractionPrompt == GameText.Barred, "The stair is barred while the guardian lives");
+            controller.Teleport(keeper.transform.position - keeper.transform.forward * 8f, keeper.transform.eulerAngles.y);
+            Physics.SyncTransforms();
+            yield return 0.6f;
+            Check(dialogue.IsOpen, "The guardian speaks before the fight");
+            dialogue.Choose(0);
+            yield return 0.2f;
+            Check(keeper.IsEngaged, "The guardian fights after the speech");
+            keeper.Health.ApplyDamage(new DamageInfo(10000f, keeper.transform.position, Vector3.forward, controller.gameObject));
+            yield return 0.2f;
+            Check(session.HasFlag(StoryDirector.DeadFlag("morr")), "The guardian's death is recorded");
+            Check(stairDown.InteractionPrompt == GameText.StairDown, "The stair opens when the guardian falls");
+
+            // Enemy bolts: a caster on the last depth shoots, and the Gloamlord's death ends the story.
+            zones.Travel(6, false);
+            yield return 1.6f;
+            Check(zones.CurrentIndex == 6, $"Travel reaches the last depth (zone {zones.CurrentIndex})");
+            EnemyAI lord = System.Array.Find(Object.FindObjectsByType<EnemyAI>(), e => e.EnemyId == "gloamlord");
+            if (!Check(lord != null, "The Gloamlord sits his throne")) yield break;
+            lord.Engage();
+            lord.Health.ApplyDamage(new DamageInfo(10000f, lord.transform.position, Vector3.forward, controller.gameObject));
+            yield return 0.2f;
+            Check(director.Finished && dialogue.IsOpen, "The Gloamlord's death opens the ending");
+            dialogue.Choose(0);
+            yield return 1.6f;
+            Check(zones.CurrentIndex == 1, "The ending returns to Hollowgate");
+            Check(RenderSettings.fogEndDistance > 100f, "Surface fog restored");
+
+            // The witch throws fire instead of swinging.
+            combat.ApplyClass(Catalog.ClassOf(CharacterClass.Witch));
+            input.SetTouchButton(PlayerButton.Attack, true);
+            input.SetTouchButton(PlayerButton.Attack, false);
+            yield return 0.4f;
+            Check(Object.FindAnyObjectByType<Projectile>() != null, "A ranged class throws a bolt");
+
+            // Each class holds its own weapons, in both hands, and nobody else's.
+            bool Held(string hand, string weapon)
+            {
+                Transform t = player.Find($"Camera Pivot/Main Camera/Weapon Rig/{hand}/{weapon}");
+                return t != null && t.gameObject.activeInHierarchy;
+            }
+            const string right = "Sword Pivot (Right Hand)", left = "Shield Pivot (Left Hand)";
+            Check(Held(right, "Sword") && Held(left, "Shield"), "The knight holds sword and shield");
+            session.ChooseClass(CharacterClass.Gravethief);
+            Check(Held(right, "Dagger Right") && Held(left, "Dagger Left"), "The Gravethief holds two daggers");
+            Check(!Held(right, "Sword") && !Held(left, "Shield"), "The Gravethief does not hold the knight's weapons");
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);

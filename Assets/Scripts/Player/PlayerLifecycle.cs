@@ -56,12 +56,15 @@ namespace AshenRealm.Player
             ReturnToSpawn();
             health.ResetHealth();
             if (stamina != null) stamina.Refill();
+            if (TryGetComponent(out StatusEffects status)) status.Clear();
             foreach (var b in disableWhileDead)
                 if (b != null) b.enabled = true;
             controller.InputEnabled = true;
             IsDead = false;
             Respawned?.Invoke();
         }
+
+        public void SetSpawnPoint(Transform point) => spawnPoint = point;
 
         void ReturnToSpawn()
         {

@@ -2,6 +2,7 @@ using System;
 using AshenRealm.Core;
 using AshenRealm.Input;
 using AshenRealm.Player;
+using AshenRealm.Story;
 using UnityEngine;
 
 namespace AshenRealm.Combat
@@ -22,6 +23,8 @@ namespace AshenRealm.Combat
         [SerializeField] Transform aimOrigin;
         [SerializeField, Optional] CameraEffects cameraEffects;
         [SerializeField, Optional] ImpactEffects impactEffects;
+        [SerializeField, Optional] StatusEffects status;
+        [SerializeField, Optional] ProjectileLibrary projectiles;
 
         [Header("Sword")]
         [SerializeField] float damage = 25f;
@@ -51,10 +54,15 @@ namespace AshenRealm.Combat
         float attackStartTime = -999f;
         bool hitPending;
         int comboIndex;
+        bool ranged;
+        float moveMultiplier = 1f;
+        float poisonUntil;
 
         public bool IsBlocking { get; private set; }
         public bool IsAttacking => Time.time < attackStartTime + attackDuration;
         public float Damage => damage;
+        /// <summary>Sharper weapons from the forge and whatever fury or weakness the player is under.</summary>
+        public float OutgoingMultiplier => (1f + 0.12f * (GameSession.Instance != null ? GameSession.Instance.WeaponLevel : 0)) * (status != null ? status.DamageMultiplier : 1f);
         public float Range => range;
 
         /// <summary>Raised when the sword damages something: (target, damage applied).</summary>
@@ -79,7 +87,8 @@ namespace AshenRealm.Combat
             bool attacking = IsAttacking;
             IsBlocking = input.BlockHeld && !attacking && stamina.Current > 0f;
             weapons.SetBlocking(IsBlocking);
-            controller.SpeedMultiplier = IsBlocking ? blockMoveSpeedMultiplier : attacking ? attackMoveSpeedMultiplier : 1f;
+            float stance = IsBlocking ? blockMoveSpeedMultiplier : attacking ? attackMoveSpeedMultiplier : 1f;
+            controller.SpeedMultiplier = stance * moveMultiplier * (status != null && status.Stunned ? 0.35f : 1f);
 
             if (!IsBlocking && Time.time >= nextAttackTime && stamina.Current > 0f)
             {
@@ -91,7 +100,8 @@ namespace AshenRealm.Combat
             if (hitPending && Time.time >= hitTime)
             {
                 hitPending = false;
-                PerformHit();
+                if (ranged) ThrowBolt();
+                else PerformHit();
             }
         }
 
@@ -104,15 +114,54 @@ namespace AshenRealm.Combat
             weapons.PlaySlash(comboIndex++, attackDuration);
         }
 
+        /// <summary>Applies the class's opening stats. Called once, when the class is chosen.</summary>
+        public void ApplyClass(ClassDefinition definition)
+        {
+            damage = definition.Damage;
+            attackCooldown = definition.AttackCooldown;
+            attackDuration = definition.AttackDuration;
+            blockDamageReduction = definition.BlockReduction;
+            moveMultiplier = definition.MoveMultiplier;
+            ranged = definition.Ranged;
+        }
+
+        /// <summary>For the next few seconds every landed blow also poisons (Poison Blade).</summary>
+        public void CoatBlade(float seconds) => poisonUntil = Time.time + seconds;
+
+        /// <summary>Plays a swing for an ability without spending stamina or starting a normal hit.</summary>
+        public void PlayAbilitySwing()
+        {
+            attackStartTime = Time.time;
+            nextAttackTime = Time.time + attackCooldown;
+            weapons.PlaySlash(comboIndex++, attackDuration);
+        }
+
+        void ThrowBolt()
+        {
+            if (projectiles == null) return;
+            Vector3 origin = aimOrigin.position + aimOrigin.forward * 0.8f + aimOrigin.right * 0.15f - aimOrigin.up * 0.1f;
+            projectiles.Launch(BoltKind.Fire, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true);
+        }
+
+        /// <summary>Where the crosshair lands, so a bolt thrown from the hand flies to it.</summary>
+        Vector3 AimPoint()
+        {
+            const float far = 30f;
+            return Physics.Raycast(aimOrigin.position, aimOrigin.forward, out RaycastHit hit, far, hitMask, QueryTriggerInteraction.Ignore)
+                ? hit.point : aimOrigin.position + aimOrigin.forward * far;
+        }
+
+        void PerformHit() => Strike(damage, range, hitRadius);
+
         /// <summary>
         /// Sphere-casts along the camera forward. The nearest valid collider wins: a damageable takes damage,
-        /// solid geometry stops the blade.
+        /// solid geometry stops the blade. Returns the foe struck, if any, for an ability's extra effects.
         /// </summary>
-        void PerformHit()
+        public GameObject Strike(float amount, float reach, float radius)
         {
             Vector3 origin = aimOrigin.position;
             Vector3 direction = aimOrigin.forward;
-            int count = Physics.SphereCastNonAlloc(origin, hitRadius, direction, hitBuffer, range, hitMask, QueryTriggerInteraction.Ignore);
+            int count = Physics.SphereCastNonAlloc(origin, radius, direction, hitBuffer, reach, hitMask, QueryTriggerInteraction.Ignore);
 
             int best = -1;
             float bestDistance = float.MaxValue;
@@ -126,7 +175,7 @@ namespace AshenRealm.Combat
                     best = i;
                 }
             }
-            if (best < 0) return;
+            if (best < 0) return null;
 
             RaycastHit target = hitBuffer[best];
             // Colliders already overlapping the sphere at the cast origin report distance 0 and no point.
@@ -136,23 +185,28 @@ namespace AshenRealm.Combat
             var damageable = target.collider.GetComponentInParent<IDamageable>();
             if (damageable != null && damageable.IsAlive)
             {
-                float applied = damageable.ApplyDamage(new DamageInfo(damage, point, direction, gameObject));
+                float applied = damageable.ApplyDamage(new DamageInfo(amount * OutgoingMultiplier, point, direction, gameObject));
                 weapons.PlayHitImpact();
                 if (cameraEffects != null) cameraEffects.AddTrauma(0.18f);
                 if (impactEffects != null) impactEffects.Emit(point, normal, ImpactEffects.Kind.Flesh);
                 HitLanded?.Invoke(damageable, applied);
+
+                var struck = ((Component)damageable).gameObject;
+                if (Time.time < poisonUntil && struck.TryGetComponent(out StatusEffects venom)) venom.ApplyPoison(5f, 5f);
+                return struck;
             }
-            else if (damageable == null)
+            if (damageable == null)
             {
                 weapons.PlayWallImpact();
                 if (cameraEffects != null) cameraEffects.AddTrauma(0.1f);
                 if (impactEffects != null) impactEffects.Emit(point, normal, ImpactEffects.Kind.Stone);
             }
+            return null;
         }
 
         public float FilterDamage(in DamageInfo info, float amount)
         {
-            if (!IsBlocking) return amount;
+            if (!IsBlocking || info.Source == null) return amount; // poison ignores the shield
 
             Vector3 toAttacker = info.Source != null ? info.Source.transform.position - transform.position : -info.Direction;
             toAttacker.y = 0f;

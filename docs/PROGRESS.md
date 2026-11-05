@@ -10,6 +10,41 @@ _Last updated: 2026-11-05_
   so a native iOS build (Xcode) cannot be performed on this machine.
 - Git: repository on `master` (E: has no file ownership, so the path is in the global `safe.directory` list).
 
+## Checkpoint G — Graveborne integration, first pass (2026-11-05)
+- World: seven zones instead of one: the valley with a new gate north of the chapel, Hollowgate, and five generated
+  depths of the Deep Dark (rooms and corridors, 135 × 105 m each). Only the current zone is active.
+- Classes: Ashen Knight, Gravethief, Hollow Witch, Oathwarden, each with stats, weapons, honor, focus and two abilities.
+- Foes: `EnemyAI` runs 23 bestiary entries from data (melee, bolts, healing, fury, ward, poison, stun, weaken), on humanoid,
+  beast, flyer and blob rigs. The Cursed Knight keeps its own AI.
+- Story: class choice with backstory, Hollowgate's people with lines by class and alignment, 8 honor encounters with
+  warped variants, guardian speeches, gold and potions, forge and chapel services, whispers, class endings.
+- HUD: focus bar, honor, gold and potions, ability buttons with cooldown sweep, zone title cards, enemy bar with name,
+  moved to the top. Compass and pause objective follow the zone.
+- Details and the list of what is not ported: [GRAVEBORNE.md](GRAVEBORNE.md).
+
+### Checkpoint G validation (2026-11-05)
+Run on the `_BatchValidation` copy because the project was open in the Editor.
+| Check | Result |
+|---|---|
+| Compile | no errors or warnings in the generation log |
+| Generate | about 90 s |
+| Validator | 4820/4820 |
+| Automated playtest | 66/66, including class choice, gate, merchant, stair, a sword kill, Shield Bash, Morr, the Gloamlord and the ending |
+| WebGL build | success, 19.1 MB (16.6 min with the IL2CPP cache) |
+| Browser (in-app Chromium, touch mode) | class choice, Gravethief kit, ability and potion buttons; `?zone=2` reaches the Catacombs with the knight's weapons; no console errors |
+
+Bugs found by looking rather than by the tests: the depths were too dark (ambient, shades, torch), the torch burned out the
+weapons, the enemy bar overlapped the touch buttons, and every class but the knight held the wrong weapons (index by class
+instead of by class and hand; the playtest now checks this).
+
+### Not yet verified (Checkpoint G)
+- Nobody has played from the valley to the Gloamlord by hand. The playtest teleports between the key points and kills the
+  guardians directly, so balance and the length of the descent are untested.
+- Enemy steering in corridors in real play: it is the Cursed Knight's side-step, built for open ground.
+- Hollow Witch and Oathwarden abilities in the browser (the Witch's bolt is covered by the playtest only).
+- Depths 2-5 and Hollowgate in the browser (previews only), phones, Firefox, Safari, desktop pointer lock.
+- Frame rate on mobile with the larger scene.
+
 ## Checkpoint F — attack input fix, Hungarian text, public repository (2026-11-05)
 User feedback: turning the view started attacks; attacking must only happen with the attack button. Game text in Hungarian.
 - [x] Cause: in touch mode (on when the browser reports a touchscreen) the left mouse button still attacked, so every

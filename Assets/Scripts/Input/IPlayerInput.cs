@@ -8,7 +8,10 @@ namespace AshenRealm.Input
         Block,
         Jump,
         Interact,
-        Sprint
+        Sprint,
+        Ability1,
+        Ability2,
+        Potion
     }
 
     /// <summary>
@@ -28,6 +31,9 @@ namespace AshenRealm.Input
         bool ConsumeJump();
         bool ConsumeAttack();
         bool ConsumeInteract();
+        /// <summary>Class ability press, slot 0 or 1.</summary>
+        bool ConsumeAbility(int slot);
+        bool ConsumePotion();
 
         /// <summary>Clears a latched sprint toggle (e.g. when stamina runs out).</summary>
         void CancelSprint();

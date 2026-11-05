@@ -4,6 +4,8 @@ using System.Linq;
 using AshenRealm.AI;
 using AshenRealm.Combat;
 using AshenRealm.Core;
+using AshenRealm.Story;
+using AshenRealm.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -67,35 +69,102 @@ namespace AshenRealm.EditorTools
                 Progress("Generating valley (terrain, forest, ruins, hamlet)", 0.2f);
                 ValleyLayout layout = new ValleyGenerator(materials.World, materials.Foliage).Generate();
 
-                Progress("Actors", 0.75f);
+                Progress("Actors", 0.5f);
                 var impacts = CreateImpactEffects(materials.Sparks);
+                var projectiles = ActorFactory.CreateProjectiles(materials);
 
+                var valley = NewZone("Zone Valley", Vector3.zero);
+                layout.Root.SetParent(valley.transform, true);
                 var spawn = new GameObject("Player Spawn").transform;
+                spawn.SetParent(valley.transform, false);
                 spawn.SetPositionAndRotation(layout.PlayerSpawn, Quaternion.Euler(0f, layout.PlayerYaw, 0f));
+                var gateArrival = Marker("Gate Arrival", valley.transform, layout.GateArrival, 180f);
+                var gateObjective = Marker("Gate Objective", valley.transform, layout.GatePosition, 0f);
 
                 PlayerRig player = ActorFactory.CreatePlayer(layout.PlayerSpawn, layout.PlayerYaw, materials);
                 CursedKnightAI knight = ActorFactory.CreateKnight(layout.KnightSpawn, layout.KnightYaw, materials);
                 var chest = ActorFactory.CreateChest(layout.ChestPosition, layout.ChestYaw, materials);
+                SceneWiring.Set(chest, "goldReward", 48);
+                SceneWiring.Set(chest, "potionReward", 1);
 
-                Progress("Prefabs", 0.82f);
+                Progress("Prefabs", 0.54f);
                 SavePrefab(player.Root, "Player");
                 SavePrefab(knight.gameObject, "CursedKnight");
                 SavePrefab(chest.gameObject, "TreasureChest");
+                knight.transform.SetParent(valley.transform, true);
+                chest.transform.SetParent(valley.transform, true);
 
                 // Scene-level references (stored as prefab instance overrides).
                 SceneWiring.Set(player.Lifecycle, "spawnPoint", spawn);
                 SceneWiring.Set(player.Combat, "impactEffects", impacts);
+                SceneWiring.Set(player.Combat, "projectiles", projectiles);
                 SceneWiring.Set(knight, "target", player.Root.transform);
                 SceneWiring.Set(knight, "impactEffects", impacts);
                 SceneWiring.Set(knight, "patrolPoints", layout.PatrolPoints);
 
-                Progress("HUD, touch controls and pixel screen", 0.88f);
-                HudBuilder.Build(sprites, player.Input, player.Health, player.Stamina, player.Interactor, player.Lifecycle, knight,
-                    player.CameraEffects.transform, layout.ChestPosition);
+                Progress("HUD, touch controls and pixel screen", 0.58f);
+                var hud = HudBuilder.Build(sprites, player.Input, player.Health, player.Stamina, player.Interactor, player.Lifecycle, player.Abilities,
+                    player.CameraEffects.transform, layout.GatePosition);
                 var pixelScreen = HudBuilder.BuildPixelScreen(materials.Composite);
                 pixelScreen.enabled = false; // PixelCamera enables it at runtime; edit mode shows the world camera directly
                 SceneWiring.Set(player.PixelCamera, "output", pixelScreen);
                 SceneWiring.Set(player.PixelCamera, "screenCamera", CreateScreenCamera());
+
+                var zoneManager = new GameObject("Zone Manager").AddComponent<ZoneManager>();
+                var storyGo = new GameObject("Story");
+                var session = storyGo.AddComponent<GameSession>();
+                var director = storyGo.AddComponent<StoryDirector>();
+                SceneWiring.Set(director, "session", session);
+                SceneWiring.Set(director, "dialogue", hud.Dialogue);
+                SceneWiring.Set(director, "zones", zoneManager);
+                SceneWiring.Set(director, "pauseMenu", hud.Pause);
+                SceneWiring.Set(director, "playerHealth", player.Health);
+                SceneWiring.Set(director, "playerAbilities", player.Abilities);
+
+                var zones = new List<Zone> { valley };
+                ActorFactory.CreatePortal("Gate To Hollowgate", layout.GatePosition, 0f, new Vector3(6f, 9f, 1f), valley.transform, zoneManager, CityZoneIndex, false,
+                    GameText.GateToCity, StoryDirector.DeadFlag("knight"), GameText.GateBarred);
+
+                Progress("Hollowgate", 0.62f);
+                Vector3 cityOrigin = ZoneOrigin(CityZoneIndex);
+                var city = NewZone("Zone Hollowgate", cityOrigin);
+                CityLayout cityLayout = new CityGenerator(materials.World, cityOrigin, ValleyGenerator.Seed + 1).Generate(city.transform);
+                var cityEntry = Marker("City Entry", city.transform, cityLayout.Entry, cityLayout.EntryYaw);
+                var cityArrival = Marker("City Stair Arrival", city.transform, cityLayout.StairArrival, 180f);
+                var cityObjective = Marker("City Objective", city.transform, cityLayout.Stair, 0f);
+                foreach (var person in cityLayout.People)
+                    ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.look, city.transform, director, materials);
+                ActorFactory.CreatePortal("Gate To Valley", cityLayout.Gate, 0f, new Vector3(9f, 7f, 1f), city.transform, zoneManager, 0, true,
+                    GameText.GateToValley, "", "");
+                ActorFactory.CreatePortal("Stair Down", cityLayout.Stair + new Vector3(0f, 0f, -0.4f), 0f, new Vector3(3.4f, 3.8f, 0.6f), city.transform, zoneManager, CityZoneIndex + 1, false,
+                    GameText.StairDown, "", "");
+                ConfigureZone(city, CityZoneIndex, false, new Color(0.54f, 0.5f, 0.6f), horizon, 28f, 300f, cityEntry, cityArrival, cityObjective);
+                zones.Add(city);
+
+                ConfigureZone(valley, 0, false, new Color(0.6f, 0.58f, 0.64f), horizon, 30f, 320f, spawn, gateArrival, gateObjective);
+
+                var enemies = new EnemyFactory(materials);
+                BiomeStyle[] biomes = Biomes();
+                for (int i = 0; i < biomes.Length; i++)
+                {
+                    int index = CityZoneIndex + 1 + i;
+                    bool last = i == biomes.Length - 1;
+                    Progress("Deep Dark: " + biomes[i].Name, 0.66f + 0.24f * i / biomes.Length);
+                    zones.Add(BuildDepth(biomes[i], index, last, materials, enemies, player, projectiles, impacts, zoneManager, director));
+                }
+
+                SceneWiring.Set(zoneManager, "zones", zones.ToArray());
+                SceneWiring.Set(zoneManager, "player", player.Controller);
+                SceneWiring.Set(zoneManager, "lifecycle", player.Lifecycle);
+                SceneWiring.Set(zoneManager, "atmosphere", Object.FindAnyObjectByType<AtmosphereController>());
+                SceneWiring.Set(zoneManager, "sun", RenderSettings.sun);
+                SceneWiring.Set(zoneManager, "torch", player.Torch);
+                SceneWiring.Set(zoneManager, "worldCamera", player.CameraEffects.GetComponent<Camera>());
+                SceneWiring.Set(zoneManager, "compass", hud.Compass);
+                SceneWiring.Set(zoneManager, "fade", hud.Fade);
+                SceneWiring.Set(zoneManager, "titleGroup", hud.ZoneTitle);
+                SceneWiring.Set(zoneManager, "titleText", hud.ZoneTitleText);
+                SceneWiring.Set(zoneManager, "subtitleText", hud.ZoneSubtitleText);
 
                 Progress("Saving", 0.94f);
                 int stale = GeneratedAssets.DeleteStaleMeshes();
@@ -120,6 +189,121 @@ namespace AshenRealm.EditorTools
             {
                 EditorUtility.ClearProgressBar();
             }
+        }
+
+        // ---- Zones -----------------------------------------------------------------------------------
+
+        const int CityZoneIndex = 1;
+        const float ZoneSpacing = 1000f;
+
+        /// <summary>Zones sit far apart along X, so they never see or touch each other even while all are active in the Editor.</summary>
+        static Vector3 ZoneOrigin(int index) => new Vector3(index * ZoneSpacing, 0f, 0f);
+
+        static Zone NewZone(string name, Vector3 origin)
+        {
+            var go = new GameObject(name);
+            go.transform.position = origin;
+            return go.AddComponent<Zone>();
+        }
+
+        static Transform Marker(string name, Transform parent, Vector3 position, float yaw)
+        {
+            var marker = new GameObject(name).transform;
+            marker.SetParent(parent, true);
+            marker.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            return marker;
+        }
+
+        static void ConfigureZone(Zone zone, int index, bool underground, Color ambient, Color fog, float fogStart, float fogEnd,
+            Transform entry, Transform exit, Transform objective)
+        {
+            SceneWiring.Set(zone, "title", StoryText.ZoneTitles[index]);
+            SceneWiring.Set(zone, "subtitle", StoryText.ZoneSubtitles[index]);
+            SceneWiring.Set(zone, "entry", entry);
+            SceneWiring.Set(zone, "exit", exit);
+            SceneWiring.Set(zone, "objective", objective);
+            SceneWiring.Set(zone, "underground", underground);
+            SceneWiring.Set(zone, "ambient", ambient);
+            SceneWiring.Set(zone, "fog", fog);
+            SceneWiring.Set(zone, "fogStart", fogStart);
+            SceneWiring.Set(zone, "fogEnd", fogEnd);
+        }
+
+        /// <summary>The five depths, from Graveborne's BIOMES table (colours lifted so the torch has something to show).</summary>
+        static BiomeStyle[] Biomes() => new[]
+        {
+            new BiomeStyle
+            {
+                Name = "Catacombs", Decor = DungeonDecor.Catacombs, Wall = Pal.Stone, WallBand = Pal.RockDark, Floor = Pal.Cobble, FloorPatch = Pal.Stone, Ceiling = Pal.RockDark,
+                Ambient = new Color(0.66f, 0.6f, 0.78f), Fog = new Color(0.14f, 0.12f, 0.2f), FogStart = 8f, FogEnd = 52f,
+                Enemies = new[] { "rat", "bat", "skeleton", "skeleton", "ooze" }, Elite = "gravemaw", Keeper = "morr", Encounters = new[] { "well", "beggar" },
+            },
+            new BiomeStyle
+            {
+                Name = "Fungal", Decor = DungeonDecor.Fungal, Wall = Pal.FungalRock, WallBand = Pal.RockDark, Floor = Pal.Dirt, FloorPatch = Pal.StoneMoss, Ceiling = Pal.FungalRock,
+                Ambient = new Color(0.5f, 0.72f, 0.6f), Fog = new Color(0.09f, 0.18f, 0.14f), FogStart = 8f, FogEnd = 52f,
+                Enemies = new[] { "ooze", "wolf", "ghoul", "bat" }, Elite = "sporetyrant", Keeper = "mycel", Encounters = new[] { "sporewife", "cage" },
+            },
+            new BiomeStyle
+            {
+                Name = "Harbor", Decor = DungeonDecor.Harbor, Wall = Pal.WetStone, WallBand = Pal.RockDark, Floor = Pal.Wood, FloorPatch = Pal.WetStone, Ceiling = Pal.RockDark,
+                Ambient = new Color(0.5f, 0.68f, 0.68f), Fog = new Color(0.08f, 0.16f, 0.17f), FogStart = 7f, FogEnd = 48f,
+                Enemies = new[] { "drownedthrall", "drownedthrall", "shade", "bat" }, Elite = "undertow", Keeper = "brine", Encounters = new[] { "ferryman", "shrine" },
+            },
+            new BiomeStyle
+            {
+                Name = "Ember", Decor = DungeonDecor.Ember, Wall = Pal.Basalt, WallBand = Pal.RockDark, Floor = Pal.Basalt, FloorPatch = Pal.DirtDark, Ceiling = Pal.Basalt,
+                Ambient = new Color(0.92f, 0.62f, 0.5f), Fog = new Color(0.26f, 0.12f, 0.07f), FogStart = 9f, FogEnd = 56f,
+                Enemies = new[] { "cultist", "imp", "rotpriest", "cultist" }, Elite = "cinderprophet", Keeper = "pyraxes", Encounters = new[] { "forgewidow" },
+            },
+            new BiomeStyle
+            {
+                Name = "Marrow", Decor = DungeonDecor.Marrow, Wall = Pal.BoneWall, WallBand = Pal.Stone, Floor = Pal.BoneWall, FloorPatch = Pal.Stone, Ceiling = Pal.BoneWall,
+                Ambient = new Color(0.72f, 0.68f, 0.6f), Fog = new Color(0.2f, 0.18f, 0.15f), FogStart = 9f, FogEnd = 56f,
+                Enemies = new[] { "skeleton", "archer", "bonehound", "shade" }, Elite = "marrowcantor", Keeper = "gloamlord", Encounters = new[] { "bonechoir" },
+            },
+        };
+
+        static Zone BuildDepth(BiomeStyle biome, int index, bool last, GeneratedMaterials materials, EnemyFactory enemies, PlayerRig player,
+            ProjectileLibrary projectiles, ImpactEffects impacts, ZoneManager zoneManager, StoryDirector director)
+        {
+            Vector3 origin = ZoneOrigin(index);
+            Zone zone = NewZone("Zone " + biome.Name, origin);
+            DungeonLayout layout = new DungeonGenerator(biome, materials.World, origin, ValleyGenerator.Seed + index * 97).Generate(zone.transform, last);
+            Transform playerRoot = player.Root.transform;
+
+            foreach (var spawn in layout.Spawns)
+                enemies.Create(spawn.id, spawn.position + Vector3.up * 0.05f, 0f, zone.transform, playerRoot, projectiles, impacts, spawn.patrol);
+            enemies.Create(biome.Keeper, layout.Keeper + Vector3.up * 0.05f, layout.KeeperYaw, zone.transform, playerRoot, projectiles, impacts, System.Array.Empty<Vector3>());
+
+            int gold = 20 + index * 12;
+            foreach (Vector3 position in layout.Chests)
+            {
+                var chest = ActorFactory.CreateChest(position, 180f, materials);
+                chest.transform.SetParent(zone.transform, true);
+                SceneWiring.Set(chest, "healAmount", 0f);
+                SceneWiring.Set(chest, "goldReward", gold);
+                SceneWiring.Set(chest, "potionReward", 1);
+                SceneWiring.Set(chest, "rewardMessage", string.Format(GameText.ChestGold, gold));
+            }
+            foreach (var encounter in layout.Encounters)
+                ActorFactory.CreateEncounter(encounter.id, encounter.position, zone.transform, director, materials);
+
+            HumanoidStyle merchantLook = EnemyFactory.Villager("Merchant", Pal.Robe, Pal.Bone, true);
+            ActorFactory.CreateNpc("merchant", layout.Merchant, 45f, merchantLook, zone.transform, director, materials);
+
+            var entry = Marker("Entry", zone.transform, layout.Entry + Vector3.up * 0.05f, layout.EntryYaw);
+            var exit = Marker("Stair Arrival", zone.transform, layout.StairDownArrival + Vector3.up * 0.05f, 180f);
+            var objective = Marker("Objective", zone.transform, layout.StairDown, 0f);
+
+            ActorFactory.CreatePortal("Stair Up", layout.StairUp + new Vector3(0f, 0f, 0.5f), 0f, new Vector3(3.4f, 3.8f, 1f), zone.transform, zoneManager, index - 1, true,
+                GameText.StairUp, "", "");
+            if (!last)
+                ActorFactory.CreatePortal("Stair Down", layout.StairDown + new Vector3(0f, 0f, -0.5f), 0f, new Vector3(3.4f, 3.8f, 1f), zone.transform, zoneManager, index + 1, false,
+                    GameText.StairDown, StoryDirector.DeadFlag(biome.Keeper), GameText.StairBarred);
+
+            ConfigureZone(zone, index, true, biome.Ambient, biome.Fog, biome.FogStart, biome.FogEnd, entry, exit, objective);
+            return zone;
         }
 
         static void Progress(string step, float t)

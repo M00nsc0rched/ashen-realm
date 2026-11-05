@@ -1,4 +1,5 @@
 using AshenRealm.AI;
+using AshenRealm.Story;
 using AshenRealm.Combat;
 using AshenRealm.Core;
 using AshenRealm.Input;
@@ -31,6 +32,16 @@ namespace AshenRealm.UI
         [SerializeField] Color staminaColor = new Color(0.72f, 0.64f, 0.32f);
         [SerializeField] Color staminaExhaustedColor = new Color(0.55f, 0.22f, 0.15f);
 
+        [Header("Class and story")]
+        [SerializeField] PlayerAbilities abilities;
+        [SerializeField] RectTransform focusFill;
+        [SerializeField] Text statusText;
+        [SerializeField] Text ability1Label;
+        [SerializeField] Text ability2Label;
+        [SerializeField] Text potionLabel;
+        [SerializeField] Image ability1Cooldown;
+        [SerializeField] Image ability2Cooldown;
+
         [Header("Center")]
         [SerializeField] Image crosshair;
         [SerializeField] Color crosshairIdle = new Color(1f, 1f, 1f, 0.55f);
@@ -49,7 +60,7 @@ namespace AshenRealm.UI
         [SerializeField] CanvasGroup deathGroup;
 
         [Header("Enemy")]
-        [SerializeField, Optional] CursedKnightAI enemy;
+        [SerializeField] Text enemyName;
         [SerializeField] CanvasGroup enemyBarGroup;
         [SerializeField] RectTransform enemyFill;
 
@@ -58,29 +69,49 @@ namespace AshenRealm.UI
         float notificationTimer;
         float vignette;
         float enemyBarTimer;
+        int focusRevision;
         float crosshairScale = 1f;
 
         void OnEnable()
         {
             GameMessages.Notification += ShowNotification;
             if (playerHealth != null) playerHealth.Damaged += OnPlayerDamaged;
-            if (enemy != null && enemy.Health != null) enemy.Health.Damaged += OnEnemyDamaged;
+
         }
 
         void OnDisable()
         {
             GameMessages.Notification -= ShowNotification;
             if (playerHealth != null) playerHealth.Damaged -= OnPlayerDamaged;
-            if (enemy != null && enemy.Health != null) enemy.Health.Damaged -= OnEnemyDamaged;
+
+        }
+
+        void RefreshSession()
+        {
+            GameSession session = GameSession.Instance;
+            if (session == null) return;
+            string alignment = session.Alignment == Alignment.Marked ? GameText.AlignmentMarked
+                : session.Alignment == Alignment.Hallowed ? GameText.AlignmentHallowed : GameText.AlignmentMortal;
+            statusText.text = $"{alignment}  {session.Honor}\n{GameText.GoldLabel}  {session.Gold}\n{GameText.PotionLabel}  {session.Potions}";
+            ability1Label.text = session.Class.Ability1.Name;
+            ability2Label.text = session.Class.Ability2.Name;
+            potionLabel.text = $"{GameText.Potion} {session.Potions}";
         }
 
         void Start()
         {
+            if (GameSession.Instance != null) GameSession.Instance.Changed += RefreshSession;
+            RefreshSession();
             notificationGroup.alpha = 0f;
             promptGroup.alpha = 0f;
             deathGroup.alpha = 0f;
             enemyBarGroup.alpha = 0f;
             SetVignette(0f);
+        }
+
+        void OnDestroy()
+        {
+            if (GameSession.Instance != null) GameSession.Instance.Changed -= RefreshSession;
         }
 
         void OnPlayerDamaged(DamageInfo info, float amount)
@@ -89,7 +120,7 @@ namespace AshenRealm.UI
             chipDelay = 0.6f;
         }
 
-        void OnEnemyDamaged(DamageInfo info, float amount) => enemyBarTimer = 6f;
+
 
         void ShowNotification(string message)
         {
@@ -115,6 +146,10 @@ namespace AshenRealm.UI
             if (health > chipValue) chipValue = health;
             else if (chipDelay <= 0f) chipValue = Mathf.MoveTowards(chipValue, health, dt * 0.6f);
             SetFill(healthChip, chipValue);
+
+            SetFill(focusFill, abilities.FocusNormalized);
+            ability1Cooldown.fillAmount = abilities.Affordable(0) ? abilities.CooldownFraction(0) : 1f;
+            ability2Cooldown.fillAmount = abilities.Affordable(1) ? abilities.CooldownFraction(1) : 1f;
 
             SetFill(staminaFill, playerStamina.Normalized);
             if (staminaFillImage != null)
@@ -159,10 +194,18 @@ namespace AshenRealm.UI
 
         void UpdateEnemyBar(float dt)
         {
-            if (enemy == null)
+            ICombatant enemy = CombatFocus.Current;
+            if (enemy == null || enemy.Health == null)
             {
                 enemyBarGroup.alpha = 0f;
                 return;
+            }
+
+            if (CombatFocus.Revision != focusRevision)
+            {
+                focusRevision = CombatFocus.Revision;
+                enemyBarTimer = 6f;
+                enemyName.text = enemy.DisplayName;
             }
 
             enemyBarTimer -= dt;

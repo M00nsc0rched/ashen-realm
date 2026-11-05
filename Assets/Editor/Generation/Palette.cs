@@ -10,7 +10,9 @@ namespace AshenRealm.EditorTools
         SteelDark, Brass, Leather, ClothRed, ClothDark, FlowerRed, FlowerWhite, FlowerViolet,
         FlowerYellow, Mountain, Snow, FireOrange, FireYellow, Bone, Glow, Black,
         PaintBlue, Plaster, RoofTile, LeafGold, LeafOrange, LeafGreen, Water, Lantern,
-        BirchBark, Cobble, Wheat, Thatch
+        BirchBark, Cobble, Wheat, Thatch,
+        Basalt, FungalRock, FungalCap, FungalGlow, Slime, WetStone, Lava, BoneWall,
+        Robe, RobeRot, GhoulSkin, DrownedSkin, FurGrey, FurDark, ImpSkin, Shadow
     }
 
     /// <summary>Layers of the generated detail Texture2DArray (order = array index).</summary>
@@ -60,6 +62,10 @@ namespace AshenRealm.EditorTools
             C(0.22f, 0.32f, 0.58f), C(0.86f, 0.80f, 0.68f), C(0.58f, 0.27f, 0.18f), C(0.98f, 0.76f, 0.24f),
             C(0.92f, 0.50f, 0.18f), C(0.36f, 0.52f, 0.24f), C(0.36f, 0.48f, 0.66f), C(1.00f, 0.78f, 0.40f),
             C(0.86f, 0.84f, 0.78f), C(0.54f, 0.52f, 0.48f), C(1.00f, 1.00f, 1.00f), C(0.76f, 0.64f, 0.38f),
+            C(0.40f, 0.33f, 0.33f), C(0.30f, 0.40f, 0.34f), C(0.56f, 0.34f, 0.46f), C(0.45f, 0.95f, 0.75f),
+            C(0.42f, 0.66f, 0.34f), C(0.34f, 0.44f, 0.42f), C(1.00f, 0.42f, 0.10f), C(0.80f, 0.76f, 0.63f),
+            C(0.36f, 0.17f, 0.15f), C(0.34f, 0.38f, 0.23f), C(0.54f, 0.57f, 0.47f), C(0.42f, 0.55f, 0.56f),
+            C(0.46f, 0.43f, 0.40f), C(0.21f, 0.21f, 0.25f), C(0.64f, 0.21f, 0.12f), C(0.10f, 0.09f, 0.14f),
         };
 
         static Color C(float r, float g, float b) => new Color(r, g, b, 1f);
@@ -91,6 +97,18 @@ namespace AshenRealm.EditorTools
                     s.Layer = TexLayer.Grass; s.TileSize = family >= Pal.PineDark ? 1f : 2.5f; break;
                 case Pal.Dirt: case Pal.DirtDark:
                     s.Layer = TexLayer.Dirt; s.TileSize = 2.5f; break;
+                case Pal.Basalt: case Pal.FungalRock:
+                    s.Layer = TexLayer.Rock; s.TileSize = 2f; break;
+                case Pal.WetStone:
+                    s.Layer = TexLayer.StoneBlock; s.Mode = UVMode.FaceUnit; break;
+                case Pal.BoneWall:
+                    s.Layer = TexLayer.Cobble; s.TileSize = 1.6f; break;
+                case Pal.Robe: case Pal.RobeRot: case Pal.Shadow:
+                    s.Layer = TexLayer.Cloth; s.TileSize = 1f; break;
+                case Pal.FurGrey: case Pal.FurDark: case Pal.GhoulSkin: case Pal.DrownedSkin: case Pal.ImpSkin:
+                    s.Layer = TexLayer.Leather; s.TileSize = 0.4f; break;
+                case Pal.Slime:
+                    s.Sheen = 1f; break;
                 case Pal.Rock: case Pal.RockWarm: case Pal.RockDark: case Pal.Bone:
                     s.Layer = TexLayer.Rock; s.TileSize = family == Pal.Bone ? 0.5f : 2f; break;
                 case Pal.Mountain: case Pal.Snow:
@@ -123,7 +141,7 @@ namespace AshenRealm.EditorTools
                     s.Layer = TexLayer.Leaves; s.Mode = UVMode.Explicit; break;
                 case Pal.Wheat:
                     s.Layer = TexLayer.Wheat; s.Mode = UVMode.Explicit; s.Direct = 1f; break;
-                case Pal.FireOrange: case Pal.FireYellow: case Pal.Glow: case Pal.Lantern:
+                case Pal.FireOrange: case Pal.FireYellow: case Pal.Glow: case Pal.Lantern: case Pal.Lava: case Pal.FungalGlow:
                     s.Emission = 1f; break;
             }
             return s;

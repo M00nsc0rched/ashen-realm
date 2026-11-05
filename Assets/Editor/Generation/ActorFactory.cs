@@ -4,6 +4,8 @@ using AshenRealm.Core;
 using AshenRealm.Input;
 using AshenRealm.Interactions;
 using AshenRealm.Player;
+using AshenRealm.Story;
+using AshenRealm.World;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -34,6 +36,9 @@ namespace AshenRealm.EditorTools
         public PlayerLifecycle Lifecycle;
         public CameraEffects CameraEffects;
         public AshenRealm.Core.PixelCamera PixelCamera;
+        public StatusEffects Status;
+        public PlayerAbilities Abilities;
+        public Light Torch;
     }
 
     /// <summary>
@@ -68,6 +73,8 @@ namespace AshenRealm.EditorTools
                 Combat = root.AddComponent<PlayerCombat>(),
                 Interactor = root.AddComponent<PlayerInteractor>(),
                 Lifecycle = root.AddComponent<PlayerLifecycle>(),
+                Status = root.AddComponent<StatusEffects>(),
+                Abilities = root.AddComponent<PlayerAbilities>(),
             };
 
             var pivot = Child("Camera Pivot", root.transform, new Vector3(0f, 1.62f, 0f), Quaternion.identity);
@@ -118,7 +125,50 @@ namespace AshenRealm.EditorTools
             var shieldBuilder = new MeshBuilder();
             PropMeshes.Shield(shieldBuilder);
             var shieldMesh = GeneratedAssets.SaveMesh(shieldBuilder, "Player_Shield");
-            MeshChild("Shield", shieldPivot, shieldMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.8f, false);
+            var shield = MeshChild("Shield", shieldPivot, shieldMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.8f, false);
+
+            // The other classes' weapons share the same pivots; PlayerClassRig leaves one pair enabled.
+            GameObject Held(string name, Transform pivot, System.Action<MeshBuilder> build, Vector3 scale)
+            {
+                var builder = new MeshBuilder();
+                build(builder);
+                return MeshChild(name, pivot, GeneratedAssets.SaveMesh(builder, "Player_" + name.Replace(" ", "")), materials.World, Vector3.zero, Quaternion.identity, scale, false);
+            }
+            var daggerRight = Held("Dagger Right", swordPivot, PropMeshes.Dagger, Vector3.one);
+            var daggerLeft = Held("Dagger Left", shieldPivot, PropMeshes.Dagger, Vector3.one);
+            var staff = Held("Witch Staff", swordPivot, PropMeshes.WitchStaff, Vector3.one);
+            var castingHand = Held("Casting Hand", shieldPivot, PropMeshes.CastingHand, Vector3.one);
+            var mace = Held("Mace", swordPivot, PropMeshes.Mace, Vector3.one);
+            var lantern = Held("Hand Lantern", shieldPivot, PropMeshes.HandLantern, Vector3.one);
+
+            // Underground the sun is off and this is the only light; ZoneManager switches it.
+            var torchGo = Child("Torch", cameraGo.transform, new Vector3(0f, 0.6f, 1.6f), Quaternion.identity).gameObject;
+            var torch = torchGo.AddComponent<Light>();
+            torch.type = LightType.Point;
+            torch.color = new Color(1f, 0.74f, 0.46f);
+            torch.range = 22f;
+            torch.intensity = 5f;
+            torch.shadows = LightShadows.None;
+            torch.enabled = false;
+            var flicker = torchGo.AddComponent<LightFlicker>();
+            SceneWiring.Set(flicker, "baseIntensity", 5f);
+            SceneWiring.Set(flicker, "intensityVariation", 0.4f);
+            rig.Torch = torch;
+
+            foreach (var other in new[] { daggerRight, daggerLeft, staff, castingHand, mace, lantern }) other.SetActive(false);
+
+            var classRig = root.AddComponent<PlayerClassRig>();
+            SceneWiring.Set(rig.Status, "health", rig.Health);
+            SceneWiring.Set(rig.Abilities, "inputSource", rig.Input);
+            SceneWiring.Set(rig.Abilities, "combat", rig.Combat);
+            SceneWiring.Set(rig.Abilities, "health", rig.Health);
+            SceneWiring.Set(rig.Abilities, "status", rig.Status);
+            SceneWiring.Set(rig.Abilities, "aimOrigin", cameraGo.transform);
+            SceneWiring.Set(rig.Combat, "status", rig.Status);
+            SceneWiring.Set(classRig, "health", rig.Health);
+            SceneWiring.Set(classRig, "combat", rig.Combat);
+            SceneWiring.Set(classRig, "abilities", rig.Abilities);
+            SceneWiring.Set(classRig, "weaponSets", new[] { sword, shield, daggerRight, daggerLeft, staff, castingHand, mace, lantern });
 
             // Internal wiring (prefab-safe).
             SceneWiring.Set(rig.Controller, "inputSource", rig.Input);
@@ -271,6 +321,180 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(chest, "prompt", GameText.OpenChest);
             SceneWiring.Set(chest, "rewardMessage", GameText.ChestReward);
             return chest;
+        }
+
+        // ---- People, encounters and bolts --------------------------------------------------------------
+
+        static Mesh FigureMesh(HumanoidStyle look, string name, System.Action<MeshBuilder> extra = null)
+        {
+            var b = new MeshBuilder();
+            CreatureMeshes.Figure(b, look);
+            extra?.Invoke(b);
+            return GeneratedAssets.SaveMesh(b, name);
+        }
+
+        public static NpcActor CreateNpc(string id, Vector3 position, float yaw, HumanoidStyle look, Transform parent, StoryDirector director, GeneratedMaterials materials)
+        {
+            var root = new GameObject("NPC " + id);
+            root.transform.SetParent(parent, true);
+            root.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.height = 1.9f;
+            capsule.radius = 0.4f;
+            capsule.center = new Vector3(0f, 0.95f, 0f);
+            MeshChild("Figure", root.transform, FigureMesh(look, "Npc_" + look.Name), materials.World);
+            var npc = root.AddComponent<NpcActor>();
+            SceneWiring.Set(npc, "npcId", id);
+            SceneWiring.Set(npc, "director", director);
+            return npc;
+        }
+
+        public static EncounterSite CreateEncounter(string id, Vector3 position, Transform parent, StoryDirector director, GeneratedMaterials materials)
+        {
+            var root = new GameObject("Encounter " + id);
+            root.transform.SetParent(parent, true);
+            root.transform.position = position;
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.height = 1.9f;
+            capsule.radius = 0.5f;
+            capsule.center = new Vector3(0f, 0.95f, 0f);
+
+            var rng = new System.Random(id.Length * 131);
+            HumanoidStyle look = EnemyFactory.Villager("Encounter_" + id, Pal.ClothDark, Pal.Plaster);
+            System.Action<MeshBuilder> extra = null;
+            switch (id)
+            {
+                case "well":
+                    look = EnemyFactory.Villager("Encounter_well", Pal.Mountain);
+                    extra = b =>
+                    {
+                        b.Push(new Vector3(1.3f, 0f, 0.4f), Quaternion.identity, Vector3.one);
+                        b.SetColor(Pal.StoneMoss, 0.4f);
+                        b.Prism(Vector3.zero, 0.8f, 0.8f, 0.8f, 8);
+                        b.SetColor(Pal.Water, 0.3f);
+                        b.Prism(new Vector3(0f, 0.8f, 0f), 0.66f, 0.66f, 0.02f, 8, false);
+                        b.Pop();
+                    };
+                    break;
+                case "beggar":
+                    look = EnemyFactory.Villager("Encounter_beggar", Pal.Thatch);
+                    break;
+                case "cage":
+                    extra = b =>
+                    {
+                        for (int i = 0; i < 12; i++)
+                        {
+                            float a = i * Mathf.PI / 6f;
+                            b.ShadedBox(new Vector3(Mathf.Cos(a) * 1.1f, 1.6f, Mathf.Sin(a) * 1.1f), new Vector3(0.07f, 3.2f, 0.07f), Pal.SteelDark, rng, 0.3f, 0.45f);
+                        }
+                    };
+                    look = EnemyFactory.Villager("Encounter_cage", Pal.FurGrey, Pal.FurGrey);
+                    break;
+                case "sporewife":
+                    look = EnemyFactory.Villager("Encounter_sporewife", Pal.FungalRock);
+                    extra = b => PropMeshes.Mushroom(b, rng, new Vector3(0.9f, 0f, 0.2f), 1.8f);
+                    break;
+                case "ferryman":
+                    look = EnemyFactory.Villager("Encounter_ferryman", Pal.ClothDark, Pal.Bone, true);
+                    break;
+                case "forgewidow":
+                    look = EnemyFactory.Villager("Encounter_forgewidow", Pal.Leather);
+                    extra = b => PropMeshes.Brazier(b, rng);
+                    break;
+                case "bonechoir":
+                    look = new HumanoidStyle { Name = "Encounter_bonechoir", Skeletal = true, Trim = Pal.Brass, Crowned = true };
+                    break;
+                case "shrine":
+                    look = null;
+                    break;
+            }
+
+            Mesh clearMesh;
+            if (look == null)
+            {
+                var shrine = new MeshBuilder();
+                for (int i = 0; i < 10; i++)
+                    PropMeshes.Skull(shrine, rng, new Vector3(Mathf.Cos(i * 2.4f) * (0.5f - i * 0.04f), 0.12f + i * 0.14f, Mathf.Sin(i * 2.4f) * (0.5f - i * 0.04f)));
+                shrine.Push(new Vector3(0f, 1.5f, 0f), Quaternion.identity, Vector3.one * 0.6f);
+                PropMeshes.Candles(shrine, rng);
+                shrine.Pop();
+                clearMesh = GeneratedAssets.SaveMesh(shrine, "Encounter_shrine");
+            }
+            else
+            {
+                clearMesh = FigureMesh(look, "Encounter_" + id, extra);
+            }
+
+            var clear = MeshChild("Clear", root.transform, clearMesh, materials.World);
+            GameObject warped = null;
+            if (StoryText.Encounter(id).Warped != null)
+            {
+                var silhouette = new HumanoidStyle { Name = "Silhouette", Robed = true, Hooded = true, Cloth = Pal.Shadow, Trim = Pal.Shadow, Skin = Pal.Shadow, Eyes = Pal.Glow };
+                warped = MeshChild("Warped", root.transform, FigureMesh(silhouette, "Encounter_Silhouette", b =>
+                {
+                    b.Push(new Vector3(0f, 1.74f, 0f), Quaternion.identity, Vector3.one);
+                    CreatureMeshes.Eyes(b, silhouette);
+                    b.Pop();
+                }), materials.World);
+            }
+
+            var site = root.AddComponent<EncounterSite>();
+            SceneWiring.Set(site, "encounterId", id);
+            SceneWiring.Set(site, "director", director);
+            SceneWiring.Set(site, "clearFigure", clear);
+            if (warped != null)
+            {
+                SceneWiring.Set(site, "warpedFigure", warped);
+                warped.SetActive(false);
+            }
+            return site;
+        }
+
+        public static ProjectileLibrary CreateProjectiles(GeneratedMaterials materials)
+        {
+            var kinds = new (BoltKind kind, Pal color, float length, float radius)[]
+            {
+                (BoltKind.Arrow, Pal.Bone, 0.9f, 0.05f), (BoltKind.Fire, Pal.Lava, 0.5f, 0.2f), (BoltKind.Shadow, Pal.FungalCap, 0.55f, 0.18f),
+                (BoltKind.Holy, Pal.Lantern, 0.55f, 0.18f), (BoltKind.Venom, Pal.Slime, 0.45f, 0.18f), (BoltKind.Brine, Pal.FungalGlow, 0.5f, 0.17f),
+            };
+
+            var prefabs = new Projectile[kinds.Length];
+            foreach (var k in kinds)
+            {
+                var b = new MeshBuilder();
+                b.SetColor(k.color, 0.75f);
+                b.Current.Emission = 1f;
+                b.Push(new Vector3(0f, 0f, -k.length * 0.5f), Quaternion.Euler(90f, 0f, 0f), Vector3.one);
+                b.Prism(Vector3.zero, k.radius, 0f, k.length, 6, true, false);
+                b.Pop();
+                string name = "Bolt_" + k.kind;
+                var go = new GameObject(name);
+                MeshChild("Bolt", go.transform, GeneratedAssets.SaveMesh(b, name), materials.World, Vector3.zero, Quaternion.identity, Vector3.one, false);
+                go.AddComponent<Projectile>();
+                prefabs[(int)k.kind] = UnityEditor.PrefabUtility.SaveAsPrefabAsset(go, $"{GeneratedAssets.PrefabFolder}/{name}.prefab").GetComponent<Projectile>();
+                Object.DestroyImmediate(go);
+            }
+
+            var library = new GameObject("Projectiles").AddComponent<ProjectileLibrary>();
+            SceneWiring.Set(library, "prefabs", prefabs);
+            return library;
+        }
+
+        public static ZonePortal CreatePortal(string name, Vector3 position, float yaw, Vector3 size, Transform parent, ZoneManager zones, int target, bool arriveAtExit,
+            string prompt, string requiredFlag, string lockedMessage)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, true);
+            go.transform.SetPositionAndRotation(position + Vector3.up * (size.y * 0.5f), Quaternion.Euler(0f, yaw, 0f));
+            go.AddComponent<BoxCollider>().size = size;
+            var portal = go.AddComponent<ZonePortal>();
+            SceneWiring.Set(portal, "zones", zones);
+            SceneWiring.Set(portal, "targetZone", target);
+            SceneWiring.Set(portal, "arriveAtExit", arriveAtExit);
+            SceneWiring.Set(portal, "prompt", prompt);
+            SceneWiring.Set(portal, "requiredFlag", requiredFlag);
+            SceneWiring.Set(portal, "lockedMessage", lockedMessage);
+            return portal;
         }
 
         /// <summary>Golden leaves and motes drifting around the player (world-space particles, follows the player).</summary>

@@ -3,8 +3,9 @@
 **Játék a böngészőben (play in the browser): https://m00nsc0rched.github.io/ashen-realm/**
 
 An original first-person dark fantasy action RPG with a pixel-art painterly look, playable in the web browser
-(desktop and mobile) and prepared for iPhone. This repository contains the first playable vertical slice: a golden
-valley with a hamlet and windmill, a sword graveyard, a ruined chapel, a Cursed Knight to fight and a chest to loot.
+(desktop and mobile) and prepared for iPhone. Choose one of four classes, cross the golden valley past the Cursed Knight,
+reach Hollowgate (Üregkapu), the last city above the Deep Dark, and go down five depths to the Gloamlord's throne. The
+world, story and bestiary come from the author's game Graveborne ([docs/GRAVEBORNE.md](docs/GRAVEBORNE.md)).
 All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in the Editor: no paid or third-party assets.
 
 - Engine: Unity **6000.6.8f1** · URP 17.6 (custom `AshenRealm/PixelLit` shader) · Input System 1.20 · uGUI
@@ -40,7 +41,10 @@ All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in t
 | Jump | Space | **UGRÁS** | South button |
 | Attack | left mouse while the cursor is captured (hold to keep swinging) | **TÁMADÁS** (the only way in touch mode) | right trigger |
 | Block | hold right mouse while the cursor is captured | hold **VÉDÉS** | left trigger |
-| Interact | E | **HASZNÁL** | West button |
+| Class abilities (cost focus) | Q, R | the two ability buttons (named after the ability) | right / left shoulder |
+| Healing potion | F | **FŐZET** | North button |
+| Interact, talk | E | **HASZNÁL** | West button |
+| Answer in a dialogue | click, or 1-4 | tap | – |
 | Pause menu (resume, fullscreen, look speed) | Esc | ‖ button top-right | – |
 | Toggle touch controls (testing) | F1 | – | – |
 
@@ -50,12 +54,15 @@ touch layout with the mouse. In touch mode the mouse never attacks: drag to look
 The game text is Hungarian; every in-game string lives in `Assets/Scripts/Core/GameText.cs`.
 
 ## What to try
+- Choose a class. Each has its own health, weapon, starting honor and two abilities.
 - Follow the dirt road north from the fenced spawn lane toward the ruined chapel.
 - The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,
-  then strike. 4 sword hits defeat it.
+  then strike. 4 sword hits defeat it, and the gate behind the chapel opens.
 - Inside the chapel, aim at the **chest** at the altar and press E / HASZNÁL ("LÁDA KINYITÁSA") for gold and a healing draught.
-- Visit the camp (east) and the sword graveyard (west); inspect the blade at the graveyard's centre.
-- If you fall in battle you rise again at the spawn after a few seconds.
+- In **Üregkapu**, talk to the Dark Wanderer and the townsfolk. Temper your weapon, buy potions, buy back your honor.
+- The tavern door is the stair down. Every depth has packs, a named terror, chests and encounters whose text changes
+  with your honor. A Legendary Guardian bars each stair; the Gloamlord waits at the bottom.
+- If you fall in battle you rise again at the zone's entry after a few seconds.
 
 ## Batch mode
 ```

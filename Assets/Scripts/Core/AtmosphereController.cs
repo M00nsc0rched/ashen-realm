@@ -22,6 +22,16 @@ namespace AshenRealm.Core
 
         void OnEnable() => Apply();
 
+        /// <summary>Switches to a zone's light and fog.</summary>
+        public void Apply(Color ambient, Color fog, float start, float end)
+        {
+            ambientColor = ambient;
+            fogColor = fog;
+            fogStart = start;
+            fogEnd = end;
+            Apply();
+        }
+
         public void Apply()
         {
             RenderSettings.ambientMode = AmbientMode.Flat;

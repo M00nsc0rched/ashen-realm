@@ -1,4 +1,6 @@
-# Ashen Realm — Architecture (vertical slice)
+# Ashen Realm — Architecture
+
+The Graveborne integration and what it left out: [GRAVEBORNE.md](GRAVEBORNE.md).
 
 ## Assemblies
 | Assembly | Path | References |
@@ -16,9 +18,26 @@ Player/        FirstPersonController, Stamina, CameraEffects, PlayerLifecycle, F
 Combat/        DamageInfo + IDamageable + IDamageFilter, Health, PlayerCombat, HitFlash, ImpactEffects
 AI/            CursedKnightAI (FSM), KnightAnimator (procedural rig)
 Interactions/  IInteractable, PlayerInteractor, TreasureChest, LoreInspectable
-UI/            HUDController, CompassStrip, PauseMenu, TouchJoystick, TouchLookArea, TouchButton, TouchControlsRoot,
-               SafeAreaFitter, DesktopHint
+UI/            HUDController, CompassStrip, PauseMenu, DialoguePanel, TouchJoystick, TouchLookArea, TouchButton,
+               TouchControlsRoot, SafeAreaFitter, DesktopHint
+Story/         StoryTypes (plain records), Catalog (classes, abilities, bestiary), StoryText (people, encounters, whispers),
+               GameSession (class, honor, gold, potions, flags), StoryDirector (everything that talks and pays out)
+World/         Zone, ZoneManager (one active zone, fade, atmosphere, respawn), ZonePortal
 ```
+Later additions: `AI/` gained `EnemyAI`, `ICreatureAnimator`, `CreatureAnimator`; `Combat/` gained `StatusEffects`,
+`PlayerAbilities`, `Projectile`, `ProjectileLibrary`, `CombatFocus`; `Player/PlayerClassRig` applies the chosen class.
+`Interactions/` gained `NpcActor` and `EncounterSite`.
+
+### Zones
+Seven zones sit 1000 m apart along X and all stay active in the Editor, so the validator can raycast them.
+`ZoneManager.Awake` leaves only the first one active, and `Travel` swaps them behind a fade. Sun, fog and ambient follow
+the zone; underground the sun is off and a point light on the camera is the only light. Respawning returns to the current
+zone's entry, and guardians heal when the player dies.
+
+### Story flow
+`StoryDirector.Start` opens the class choice in `DialoguePanel` (time scale 0, gameplay input paused). `EnemyAI` does not
+know about UI: a guardian raises `ConfrontationRequested`, the director shows its speech and answers with `Engage()`.
+`EnemyAI.Slain` pays gold and sets `dead_<id>`, which unbars the stair.
 
 ### Input flow
 ```

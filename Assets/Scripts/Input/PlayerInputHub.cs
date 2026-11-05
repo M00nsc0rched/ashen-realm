@@ -33,7 +33,7 @@ namespace AshenRealm.Input
         [SerializeField] float sprintToggleIdleCancel = 0.35f;
 
         InputAction moveAction, lookAction, gamepadLookAction, jumpAction, sprintAction, attackAction, blockAction, interactAction;
-        InputAction mouseAttackAction, mouseBlockAction;
+        InputAction mouseAttackAction, mouseBlockAction, ability1Action, ability2Action, potionAction;
         InputAction[] actions;
 
         Vector2 lookAccumulator;
@@ -41,7 +41,8 @@ namespace AshenRealm.Input
         bool touchAttackHeld, touchBlockHeld;
         bool sprintToggled;
         float moveIdleTime;
-        float jumpPressTime = -1f, attackPressTime = -1f, interactPressTime = -1f;
+        float jumpPressTime = -1f, attackPressTime = -1f, interactPressTime = -1f, potionPressTime = -1f;
+        readonly float[] abilityPressTime = { -1f, -1f };
         bool touchMode;
         float sensitivityMultiplier = 1f;
         bool paused;
@@ -143,10 +144,18 @@ namespace AshenRealm.Input
             mouseAttackAction = new InputAction("MouseAttack", InputActionType.Button, "<Mouse>/leftButton");
             mouseBlockAction = new InputAction("MouseBlock", InputActionType.Button, "<Mouse>/rightButton");
 
+            ability1Action = new InputAction("Ability1", InputActionType.Button, "<Keyboard>/q");
+            ability1Action.AddBinding("<Gamepad>/rightShoulder");
+            ability2Action = new InputAction("Ability2", InputActionType.Button, "<Keyboard>/r");
+            ability2Action.AddBinding("<Gamepad>/leftShoulder");
+            potionAction = new InputAction("Potion", InputActionType.Button, "<Keyboard>/f");
+            potionAction.AddBinding("<Gamepad>/buttonNorth");
+
             actions = new[]
             {
                 moveAction, lookAction, gamepadLookAction, jumpAction, sprintAction,
                 attackAction, blockAction, interactAction, mouseAttackAction, mouseBlockAction,
+                ability1Action, ability2Action, potionAction,
             };
         }
 
@@ -171,6 +180,9 @@ namespace AshenRealm.Input
 
             if (jumpAction.WasPressedThisFrame()) jumpPressTime = Time.time;
             if (interactAction.WasPressedThisFrame()) interactPressTime = Time.time;
+            if (ability1Action.WasPressedThisFrame()) abilityPressTime[0] = Time.time;
+            if (ability2Action.WasPressedThisFrame()) abilityPressTime[1] = Time.time;
+            if (potionAction.WasPressedThisFrame()) potionPressTime = Time.time;
             if (attackAction.WasPressedThisFrame()) attackPressTime = Time.time;
             if (mouseAttackAction.WasPressedThisFrame() && MouseActionsAllowed && !cursorCapturedThisFrame) attackPressTime = Time.time;
             if (mouseAttackSuppressed && !mouseAttackAction.IsPressed()) mouseAttackSuppressed = false;
@@ -238,7 +250,8 @@ namespace AshenRealm.Input
             Cursor.visible = true;
             wasCursorLocked = false;
             lookAccumulator = Vector2.zero;
-            jumpPressTime = attackPressTime = interactPressTime = -1f;
+            jumpPressTime = attackPressTime = interactPressTime = potionPressTime = -1f;
+            abilityPressTime[0] = abilityPressTime[1] = -1f;
             touchMove = Vector2.zero;
             touchAttackHeld = touchBlockHeld = false;
         }
@@ -277,6 +290,8 @@ namespace AshenRealm.Input
         public bool ConsumeJump() => Consume(ref jumpPressTime, jumpBuffer) && !paused;
         public bool ConsumeAttack() => Consume(ref attackPressTime, attackBuffer) && !paused;
         public bool ConsumeInteract() => Consume(ref interactPressTime, interactBuffer) && !paused;
+        public bool ConsumeAbility(int slot) => Consume(ref abilityPressTime[slot], attackBuffer) && !paused;
+        public bool ConsumePotion() => Consume(ref potionPressTime, attackBuffer) && !paused;
 
         public void CancelSprint() => sprintToggled = false;
 
@@ -315,6 +330,15 @@ namespace AshenRealm.Input
                     break;
                 case PlayerButton.Interact:
                     if (down) interactPressTime = Time.time;
+                    break;
+                case PlayerButton.Ability1:
+                    if (down) abilityPressTime[0] = Time.time;
+                    break;
+                case PlayerButton.Ability2:
+                    if (down) abilityPressTime[1] = Time.time;
+                    break;
+                case PlayerButton.Potion:
+                    if (down) potionPressTime = Time.time;
                     break;
                 case PlayerButton.Sprint:
                     if (down)

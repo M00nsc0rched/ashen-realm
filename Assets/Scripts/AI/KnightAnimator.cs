@@ -4,10 +4,10 @@ using UnityEngine;
 namespace AshenRealm.AI
 {
     /// <summary>
-    /// Procedural animation for the placeholder humanoid: walk cycle, overhead chop, hit flinch,
+    /// Procedural animation for every humanoid rig: walk cycle, overhead chop, hit flinch,
     /// blocked recoil and death fall. Pure presentation — timing comes from <see cref="CursedKnightAI"/>.
     /// </summary>
-    public sealed class KnightAnimator : MonoBehaviour
+    public sealed class KnightAnimator : MonoBehaviour, ICreatureAnimator
     {
         [Header("Rig")]
         [SerializeField] Transform model;

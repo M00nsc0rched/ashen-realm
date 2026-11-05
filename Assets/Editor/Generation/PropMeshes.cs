@@ -250,6 +250,196 @@ namespace AshenRealm.EditorTools
             b.Pop();
         }
 
+        // ---- Class weapons: grip at the origin, blade or shaft along +Y ----
+
+        public static void Dagger(MeshBuilder b)
+        {
+            var rng = new System.Random(61);
+            b.ShadedBox(new Vector3(0f, -0.04f, 0f), new Vector3(0.04f, 0.2f, 0.04f), Pal.Leather, rng, 0.3f, 0.4f);
+            b.ShadedBox(new Vector3(0f, 0.08f, 0f), new Vector3(0.16f, 0.03f, 0.05f), Pal.SteelDark, rng, 0.5f, 0.6f);
+            b.SetColor(Pal.Steel, 0.55f);
+            b.Prism(new Vector3(0f, 0.09f, 0f), 0.05f, 0f, 0.56f, 4, false, false, Mathf.PI * 0.25f);
+        }
+
+        public static void WitchStaff(MeshBuilder b)
+        {
+            var rng = new System.Random(62);
+            b.SetColor(Pal.WoodDark, 0.32f);
+            b.Prism(new Vector3(0f, -0.3f, 0f), 0.022f, 0.02f, 1.2f, 6);
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI * 0.5f;
+                b.ShadedBox(new Vector3(Mathf.Cos(a) * 0.05f, 0.92f, Mathf.Sin(a) * 0.05f), new Vector3(0.02f, 0.14f, 0.02f), Pal.Bone, rng, 0.4f, 0.5f);
+            }
+            b.SetColor(Pal.FungalGlow, 0.75f);
+            b.Box(new Vector3(0f, 0.94f, 0f), new Vector3(0.07f, 0.07f, 0.07f));
+        }
+
+        /// <summary>The free hand of a caster: an open glove around a small cold flame.</summary>
+        public static void CastingHand(MeshBuilder b)
+        {
+            var rng = new System.Random(63);
+            b.ShadedBox(new Vector3(0f, -0.12f, 0f), new Vector3(0.09f, 0.26f, 0.09f), Pal.ClothDark, rng, 0.35f, 0.45f);
+            b.ShadedBox(new Vector3(0f, 0.04f, 0f), new Vector3(0.12f, 0.08f, 0.1f), Pal.Leather, rng, 0.35f, 0.45f);
+            b.SetColor(Pal.FungalGlow, 0.7f);
+            b.Prism(new Vector3(0f, 0.1f, 0f), 0.05f, 0f, 0.15f, 5, false);
+        }
+
+        public static void Mace(MeshBuilder b)
+        {
+            var rng = new System.Random(64);
+            b.SetColor(Pal.WoodDark, 0.4f);
+            b.Prism(new Vector3(0f, -0.14f, 0f), 0.024f, 0.024f, 0.62f, 6);
+            b.ShadedBox(new Vector3(0f, -0.12f, 0f), new Vector3(0.05f, 0.14f, 0.05f), Pal.Leather, rng, 0.3f, 0.4f);
+            b.ShadedBox(new Vector3(0f, 0.5f, 0f), new Vector3(0.13f, 0.16f, 0.13f), Pal.Steel, rng, 0.5f, 0.6f);
+            for (int i = 0; i < 4; i++)
+            {
+                float a = i * Mathf.PI * 0.5f;
+                b.ShadedBox(new Vector3(Mathf.Cos(a) * 0.09f, 0.5f, Mathf.Sin(a) * 0.09f), new Vector3(0.07f, 0.13f, 0.07f), Pal.Brass, rng, 0.45f, 0.6f);
+            }
+            b.ShadedBox(new Vector3(0f, 0.6f, 0f), new Vector3(0.06f, 0.08f, 0.06f), Pal.Brass, rng, 0.5f, 0.6f);
+        }
+
+        public static void HandLantern(MeshBuilder b)
+        {
+            var rng = new System.Random(65);
+            b.ShadedBox(new Vector3(0f, -0.1f, 0f), new Vector3(0.09f, 0.24f, 0.09f), Pal.ClothDark, rng, 0.35f, 0.45f);
+            b.ShadedBox(new Vector3(0f, 0.06f, 0f), new Vector3(0.12f, 0.08f, 0.1f), Pal.Leather, rng, 0.35f, 0.45f);
+            b.SetColor(Pal.Brass, 0.45f);
+            b.Prism(new Vector3(0f, 0.12f, 0f), 0.01f, 0.01f, 0.12f, 4);
+            b.ShadedBox(new Vector3(0f, 0.26f, 0f), new Vector3(0.17f, 0.03f, 0.17f), Pal.Brass, rng, 0.4f, 0.5f);
+            b.ShadedBox(new Vector3(0f, 0.46f, 0f), new Vector3(0.17f, 0.03f, 0.17f), Pal.Brass, rng, 0.4f, 0.5f);
+            b.SetColor(Pal.Lantern, 0.8f);
+            b.Box(new Vector3(0f, 0.36f, 0f), new Vector3(0.12f, 0.18f, 0.12f));
+            for (int i = 0; i < 4; i++)
+            {
+                float a = Mathf.PI * 0.25f + i * Mathf.PI * 0.5f;
+                b.ShadedBox(new Vector3(Mathf.Cos(a) * 0.11f, 0.36f, Mathf.Sin(a) * 0.11f), new Vector3(0.02f, 0.2f, 0.02f), Pal.Brass, rng, 0.4f, 0.5f);
+            }
+        }
+
+        // ---- Dressing for the Deep Dark: purely decorative, the player walks through it (as in Graveborne) ----
+
+        public static void Mushroom(MeshBuilder b, System.Random rng, Vector3 position, float size)
+        {
+            b.Push(position, Quaternion.Euler(R(rng, -8f, 8f), R(rng, 0f, 360f), R(rng, -8f, 8f)), Vector3.one * size);
+            b.SetColor(Pal.Bone, 0.5f);
+            b.Prism(Vector3.zero, 0.12f, 0.08f, 0.7f, 6, false, false);
+            b.SetColor(Pal.FungalCap, R(rng, 0.4f, 0.6f));
+            b.Prism(new Vector3(0f, 0.66f, 0f), 0.46f, 0.1f, 0.3f, 7);
+            b.SetColor(Pal.FungalGlow, 0.65f);
+            b.Prism(new Vector3(0f, 0.62f, 0f), 0.3f, 0.44f, 0.05f, 7, false, false);
+            b.Pop();
+        }
+
+        public static void Sarcophagus(MeshBuilder b, System.Random rng)
+        {
+            b.ShadedBox(new Vector3(0f, 0.3f, 0f), new Vector3(0.95f, 0.6f, 2.1f), Pal.Stone, rng, 0.32f, 0.5f);
+            b.ShadedBox(new Vector3(0f, 0.68f, 0f), new Vector3(1.05f, 0.16f, 2.2f), Pal.Stone, rng, 0.42f, 0.55f);
+            b.ShadedBox(new Vector3(0f, 0.8f, 0.3f), new Vector3(0.5f, 0.1f, 1.3f), Pal.Stone, rng, 0.55f, 0.65f);
+        }
+
+        public static void Candles(MeshBuilder b, System.Random rng)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 p = new Vector3(R(rng, -0.3f, 0.3f), 0f, R(rng, -0.3f, 0.3f));
+                float h = R(rng, 0.15f, 0.42f);
+                b.SetColor(Pal.Plaster, 0.6f);
+                b.Prism(p, 0.045f, 0.04f, h, 5, false);
+                b.SetColor(Pal.Lantern, 0.85f);
+                b.Prism(p + Vector3.up * h, 0.025f, 0f, 0.09f, 4, false);
+            }
+        }
+
+        public static void Urn(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.RoofTile, R(rng, 0.35f, 0.5f));
+            b.Prism(Vector3.zero, 0.15f, 0.26f, 0.32f, 7);
+            b.Prism(new Vector3(0f, 0.32f, 0f), 0.26f, 0.12f, 0.26f, 7);
+            b.SetColor(Pal.RoofTile, 0.3f);
+            b.Prism(new Vector3(0f, 0.58f, 0f), 0.11f, 0.14f, 0.1f, 7);
+        }
+
+        public static void BonePile(MeshBuilder b, System.Random rng)
+        {
+            for (int i = 0; i < 9; i++)
+            {
+                b.Push(new Vector3(R(rng, -0.5f, 0.5f), R(rng, 0.03f, 0.18f), R(rng, -0.5f, 0.5f)), Quaternion.Euler(R(rng, -30f, 30f), R(rng, 0f, 180f), 90f + R(rng, -20f, 20f)), Vector3.one);
+                b.SetColor(Pal.Bone, R(rng, 0.4f, 0.7f));
+                b.Prism(new Vector3(0f, -0.28f, 0f), 0.035f, 0.03f, 0.56f, 5);
+                b.Pop();
+            }
+            for (int i = 0; i < 3; i++)
+                Skull(b, rng, new Vector3(R(rng, -0.35f, 0.35f), 0.14f, R(rng, -0.35f, 0.35f)));
+        }
+
+        public static void Skull(MeshBuilder b, System.Random rng, Vector3 position)
+        {
+            b.Push(position, Quaternion.Euler(R(rng, -15f, 15f), R(rng, 0f, 360f), R(rng, -15f, 15f)), Vector3.one);
+            b.ShadedBox(Vector3.zero, new Vector3(0.22f, 0.2f, 0.25f), Pal.Bone, rng, 0.5f, 0.68f);
+            b.SetColor(Pal.Black, 0.3f);
+            b.Box(new Vector3(-0.055f, 0.01f, 0.125f), new Vector3(0.06f, 0.06f, 0.01f));
+            b.Box(new Vector3(0.055f, 0.01f, 0.125f), new Vector3(0.06f, 0.06f, 0.01f));
+            b.Pop();
+        }
+
+        public static void Stalagmite(MeshBuilder b, System.Random rng, Pal family, float height)
+        {
+            b.SetColor(family, R(rng, 0.35f, 0.55f));
+            b.Prism(Vector3.zero, height * 0.22f, 0f, height, 6, false, false, R(rng, 0f, 1f));
+        }
+
+        public static void Brazier(MeshBuilder b, System.Random rng)
+        {
+            b.SetColor(Pal.SteelDark, 0.35f);
+            b.Prism(Vector3.zero, 0.18f, 0.05f, 0.7f, 6);
+            b.Prism(new Vector3(0f, 0.7f, 0f), 0.08f, 0.34f, 0.24f, 7, true, false);
+            b.SetColor(Pal.FireOrange, 0.75f);
+            b.Prism(new Vector3(0f, 0.86f, 0f), 0.26f, 0.05f, 0.45f, 6, false);
+            b.SetColor(Pal.FireYellow, 0.85f);
+            b.Prism(new Vector3(0.02f, 0.86f, 0f), 0.13f, 0f, 0.3f, 5, false);
+        }
+
+        public static void RottenPost(MeshBuilder b, System.Random rng)
+        {
+            b.Push(Vector3.zero, Quaternion.Euler(R(rng, -7f, 7f), 0f, R(rng, -7f, 7f)), Vector3.one);
+            b.SetColor(Pal.WoodDark, R(rng, 0.25f, 0.4f));
+            b.Prism(Vector3.zero, 0.15f, 0.12f, R(rng, 1.4f, 2.6f), 6);
+            b.Pop();
+        }
+
+        /// <summary>Stone frame around a dark stair; the doorway faces -Z and the origin is on the threshold.</summary>
+        public static void StairArch(MeshBuilder b, System.Random rng, Pal stone, bool leadsDown)
+        {
+            const float width = 3.4f, height = 3.8f, depth = 1.2f;
+            for (int i = -1; i <= 1; i += 2)
+                b.ShadedBox(new Vector3(i * (width * 0.5f + 0.4f), height * 0.5f, 0f), new Vector3(0.8f, height, depth), stone, rng, 0.4f, 0.55f);
+            b.ShadedBox(new Vector3(0f, height + 0.35f, 0f), new Vector3(width + 1.6f, 0.7f, depth), stone, rng, 0.45f, 0.6f);
+            // The darkness sits in front of the wall behind the frame; the world has no real stairwell to walk into.
+            b.SetColor(Pal.Black, 0.2f);
+            b.Box(new Vector3(0f, height * 0.5f, 0.52f), new Vector3(width, height, 0.1f));
+            if (leadsDown)
+            {
+                b.Box(new Vector3(0f, 0.015f, 0.05f), new Vector3(width, 0.03f, 0.9f));
+                return;
+            }
+            for (int i = 0; i < 3; i++)
+                b.ShadedBox(new Vector3(0f, 0.09f + i * 0.18f, 0.32f - i * 0.15f + 0.1f), new Vector3(width - 0.1f, 0.18f, 0.3f), stone, rng, 0.32f, 0.42f);
+        }
+
+        /// <summary>A throne of stacked bone, facing -Z.</summary>
+        public static void BoneThrone(MeshBuilder b, System.Random rng)
+        {
+            b.ShadedBox(new Vector3(0f, 0.25f, 0f), new Vector3(4.6f, 0.5f, 3.6f), Pal.BoneWall, rng, 0.4f, 0.55f);
+            b.ShadedBox(new Vector3(0f, 0.75f, 0.2f), new Vector3(3.2f, 0.5f, 2.6f), Pal.BoneWall, rng, 0.45f, 0.6f);
+            b.ShadedBox(new Vector3(0f, 2.7f, 1.2f), new Vector3(2.6f, 3.8f, 0.5f), Pal.BoneWall, rng, 0.42f, 0.58f);
+            for (int i = -1; i <= 1; i += 2)
+                b.ShadedBox(new Vector3(i * 1.25f, 1.4f, 0.2f), new Vector3(0.4f, 0.8f, 1.8f), Pal.BoneWall, rng, 0.45f, 0.6f);
+            for (int i = 0; i < 9; i++)
+                Skull(b, rng, new Vector3(-1.2f + i * 0.3f, 4.75f + Mathf.Sin(i * 0.8f) * 0.15f, 1.15f));
+        }
+
         public static void Gravestone(MeshBuilder b, System.Random rng)
         {
             b.Push(Vector3.zero, Quaternion.Euler(R(rng, -10f, 10f), 0f, R(rng, -8f, 8f)), Vector3.one);

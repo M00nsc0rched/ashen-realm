@@ -10,7 +10,7 @@ namespace AshenRealm.AI
     /// Moves with a CharacterController (no NavMesh) and steers around obstacles with a simple side-step.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public sealed class CursedKnightAI : MonoBehaviour
+    public sealed class CursedKnightAI : MonoBehaviour, ICombatant
     {
         public enum State { Idle, Patrol, Chase, Attack, Dead }
 
@@ -73,6 +73,10 @@ namespace AshenRealm.AI
         public Health Health => health;
         /// <summary>True while the knight is actively fighting the player.</summary>
         public bool IsEngaged => state == State.Chase || state == State.Attack;
+        public string DisplayName => GameText.KnightName;
+
+        /// <summary>The road to Hollowgate opens when the knight falls.</summary>
+        public static event Action Slain;
 
         public event Action<State> StateChanged;
 
@@ -101,6 +105,7 @@ namespace AshenRealm.AI
             state = next;
             stateTime = 0f;
             StateChanged?.Invoke(next);
+            if (next == State.Chase) CombatFocus.Set(this);
         }
 
         void Update()
@@ -289,6 +294,7 @@ namespace AshenRealm.AI
         void OnDamaged(DamageInfo info, float amount)
         {
             if (state == State.Dead) return;
+            CombatFocus.Set(this);
             animator.PlayHit(info.Direction);
             knockback = Flat(info.Direction).normalized * knockbackSpeed;
 
@@ -303,6 +309,7 @@ namespace AshenRealm.AI
             controller.enabled = false;
             animator.PlayDeath();
             GameMessages.Notify(GameText.KnightDefeated);
+            Slain?.Invoke();
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);

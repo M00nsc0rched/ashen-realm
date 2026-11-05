@@ -28,6 +28,11 @@ namespace AshenRealm.EditorTools
     {
         public PauseMenu Pause;
         public CompassStrip Compass;
+        public DialoguePanel Dialogue;
+        public CanvasGroup Fade;
+        public CanvasGroup ZoneTitle;
+        public Text ZoneTitleText;
+        public Text ZoneSubtitleText;
     }
 
     /// <summary>
@@ -163,7 +168,7 @@ namespace AshenRealm.EditorTools
         // ---- HUD ---------------------------------------------------------------------------------------
 
         public static HudRefs Build(HudSprites sprites, PlayerInputHub input, Health health, Stamina stamina, PlayerInteractor interactor,
-            PlayerLifecycle lifecycle, CursedKnightAI enemy, Transform viewer, Vector3 objective)
+            PlayerLifecycle lifecycle, PlayerAbilities abilities, Transform viewer, Vector3 objective)
         {
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -194,14 +199,20 @@ namespace AshenRealm.EditorTools
                 out RectTransform healthFill, out RectTransform healthChip, out _);
             var staminaBar = Bar("Stamina", top, new Vector2(140f, -72f), new Vector2(620f, 10f), new Color(0.24f, 0.44f, 0.86f), false,
                 out RectTransform staminaFill, out _, out Image staminaImage);
+            var focusBar = Bar("Focus", top, new Vector2(240f, -88f), new Vector2(420f, 8f), new Color(0.62f, 0.3f, 0.82f), false,
+                out RectTransform focusFill, out _, out _);
             EndCaps(healthBar);
             EndCaps(staminaBar);
+            EndCaps(focusBar);
 
             // ---- Top-left weapon emblem, top-right pause ----
             var emblem = Anchored("Weapon Emblem", safe, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(86f, -86f), new Vector2(120f, 120f));
             Img(emblem.gameObject, sprites.StoneRing, Color.white);
             var sword = Anchored("Sword", emblem, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(72f, 72f));
             Img(sword.gameObject, sprites.SwordIcon, Color.white);
+
+            var status = Anchored("Status", safe, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(290f, -92f), new Vector2(300f, 110f));
+            var statusText = Label(status, GameText.AlignmentMortal, 21, Parchment, TextAnchor.UpperLeft, font, FontStyle.Bold);
 
             var pauseRect = Anchored("Pause Button", safe, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-80f, -80f), new Vector2(96f, 96f));
             var pauseImage = Img(pauseRect.gameObject, sprites.StoneDisc, new Color(1f, 1f, 1f, 0.85f), true);
@@ -223,17 +234,17 @@ namespace AshenRealm.EditorTools
             promptGroup.blocksRaycasts = false;
             var promptText = Label(prompt, GameText.OpenChest, 30, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
 
-            var notify = Anchored("Notification", safe, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -200f), new Vector2(1300f, 110f));
+            var notify = Anchored("Notification", safe, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -250f), new Vector2(1300f, 110f));
             var notifyGroup = notify.gameObject.AddComponent<CanvasGroup>();
             notifyGroup.blocksRaycasts = false;
             var notifyText = Label(notify, "", 32, new Color(0.96f, 0.9f, 0.72f), TextAnchor.MiddleCenter, font, FontStyle.Italic);
 
-            // ---- Enemy bar (bottom centre) ----
-            var enemyBar = Anchored("Enemy Bar", safe, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 120f), new Vector2(680f, 60f));
+            // ---- Enemy bar (under the player bars, clear of the touch buttons) ----
+            var enemyBar = Anchored("Enemy Bar", safe, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -150f), new Vector2(680f, 60f));
             var enemyGroup = enemyBar.gameObject.AddComponent<CanvasGroup>();
             enemyGroup.blocksRaycasts = false;
             var enemyName = Anchored("Name", enemyBar, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(680f, 30f));
-            Label(enemyName, GameText.KnightName, 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            var enemyNameText = Label(enemyName, GameText.KnightName, 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
             var enemyFrame = Bar("Health", enemyBar, new Vector2(20f, -36f), new Vector2(640f, 12f), new Color(0.55f, 0.07f, 0.06f), false, out RectTransform enemyFill, out _, out _);
             EndCaps(enemyFrame);
 
@@ -276,6 +287,11 @@ namespace AshenRealm.EditorTools
             var interactButton = TouchButtonWidget(touchRoot, "Interact", GameText.Use, PlayerButton.Interact, new Vector2(1f, 0f), new Vector2(-420f, 400f), 125f, 22, input, sprites, font);
             interactButton.gameObject.AddComponent<CanvasGroup>();
             TouchButtonWidget(touchRoot, "Sprint", GameText.Run, PlayerButton.Sprint, new Vector2(0f, 0f), new Vector2(110f, 500f), 120f, 22, input, sprites, font);
+            var ability1Button = TouchButtonWidget(touchRoot, "Ability 1", GameText.Attack, PlayerButton.Ability1, new Vector2(1f, 0f), new Vector2(-690f, 130f), 140f, 19, input, sprites, font);
+            var ability2Button = TouchButtonWidget(touchRoot, "Ability 2", GameText.Attack, PlayerButton.Ability2, new Vector2(1f, 0f), new Vector2(-650f, 320f), 140f, 19, input, sprites, font);
+            var potionButton = TouchButtonWidget(touchRoot, "Potion", GameText.Potion, PlayerButton.Potion, new Vector2(0f, 0f), new Vector2(110f, 660f), 110f, 20, input, sprites, font);
+            var ability1Shade = CooldownShade(ability1Button.transform, sprites);
+            var ability2Shade = CooldownShade(ability2Button.transform, sprites);
 
             // ---- Death overlay ----
             var death = Stretch("Death Overlay", canvasGo.transform);
@@ -288,9 +304,27 @@ namespace AshenRealm.EditorTools
             var deathSub = Anchored("Subtitle", death, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -50f), new Vector2(1400f, 50f));
             Label(deathSub, GameText.DeathSubtitle, 28, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Italic);
 
-            // ---- Pause menu (top-most) ----
+            // ---- Zone title card and the travel fade ----
+            var title = Stretch("Zone Title", canvasGo.transform);
+            var titleGroup = title.gameObject.AddComponent<CanvasGroup>();
+            titleGroup.blocksRaycasts = false;
+            titleGroup.alpha = 0f;
+            var titleRect = Anchored("Title", title, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 120f), new Vector2(1500f, 100f));
+            var titleText = Label(titleRect, "", 68, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            var subtitleRect = Anchored("Subtitle", title, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 50f), new Vector2(1400f, 60f));
+            var subtitleText = Label(subtitleRect, "", 28, new Color(0.9f, 0.84f, 0.7f), TextAnchor.MiddleCenter, font, FontStyle.Italic);
+
+            var fade = Stretch("Travel Fade", canvasGo.transform);
+            var fadeGroup = fade.gameObject.AddComponent<CanvasGroup>();
+            fadeGroup.blocksRaycasts = false;
+            fadeGroup.alpha = 0f;
+            Img(fade.gameObject, null, Color.black);
+
+            // ---- Pause menu and dialogue (top-most) ----
             var pause = BuildPauseMenu(canvasGo.transform, input, font, sprites);
             UnityEventTools.AddPersistentListener(pauseButton.onClick, new UnityAction(pause.Toggle));
+            var dialogue = BuildDialogue(canvasGo.transform, input, font);
+            SceneWiring.Set(pause, "dialogue", dialogue);
 
             // ---- Wire the HUD controller ----
             SceneWiring.Set(hud, "playerHealth", health);
@@ -311,12 +345,24 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(hud, "notificationText", notifyText);
             SceneWiring.Set(hud, "damageVignette", vignetteImage);
             SceneWiring.Set(hud, "deathGroup", deathGroup);
-            SceneWiring.Set(hud, "enemy", enemy);
+            SceneWiring.Set(hud, "enemyName", enemyNameText);
+            SceneWiring.Set(hud, "abilities", abilities);
+            SceneWiring.Set(hud, "focusFill", focusFill);
+            SceneWiring.Set(hud, "statusText", statusText);
+            SceneWiring.Set(hud, "ability1Label", ability1Button.GetComponentInChildren<Text>());
+            SceneWiring.Set(hud, "ability2Label", ability2Button.GetComponentInChildren<Text>());
+            SceneWiring.Set(hud, "potionLabel", potionButton.GetComponentInChildren<Text>());
+            SceneWiring.Set(hud, "ability1Cooldown", ability1Shade);
+            SceneWiring.Set(hud, "ability2Cooldown", ability2Shade);
             SceneWiring.Set(hud, "enemyBarGroup", enemyGroup);
             SceneWiring.Set(hud, "enemyFill", enemyFill);
 
             SetLayer(canvasGo.transform, UILayer);
-            return new HudRefs { Pause = pause, Compass = compass };
+            return new HudRefs
+            {
+                Pause = pause, Compass = compass, Dialogue = dialogue, Fade = fadeGroup, ZoneTitle = titleGroup,
+                ZoneTitleText = titleText, ZoneSubtitleText = subtitleText,
+            };
         }
 
         static CompassStrip BuildCompass(RectTransform parent, Font font, Transform viewer, Vector3 objective)
@@ -403,14 +449,79 @@ namespace AshenRealm.EditorTools
             var sensitivity = Anchored("Look Speed", panel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -340f), new Vector2(330f, 72f));
             var sensitivityLabel = Label(sensitivity, GameText.LookSpeed + "  " + GameText.Decimal(1f), 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
             var help = Anchored("Help", panel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 80f), new Vector2(560f, 100f));
-            Label(help, GameText.Objective, 22,
+            var helpText = Label(help, GameText.Objective, 22,
                 new Color(0.85f, 0.8f, 0.7f, 0.9f), TextAnchor.MiddleCenter, font, FontStyle.Italic);
 
             SceneWiring.Set(menu, "input", input);
             SceneWiring.Set(menu, "group", group);
             SceneWiring.Set(menu, "sensitivityLabel", sensitivityLabel);
             SceneWiring.Set(menu, "fullscreenLabel", fullscreenLabel);
+            SceneWiring.Set(menu, "objectiveLabel", helpText);
             return menu;
+        }
+
+        static DialoguePanel BuildDialogue(Transform canvas, PlayerInputHub input, Font font)
+        {
+            var root = Stretch("Dialogue", canvas);
+            var group = root.gameObject.AddComponent<CanvasGroup>();
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+            group.interactable = false;
+            Img(root.gameObject, null, new Color(0.02f, 0.02f, 0.03f, 0.55f), true);
+
+            var panel = Anchored("Panel", root, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1240f, 860f));
+            Img(panel.gameObject, null, FrameColor);
+            var inner = Rect("Inner", panel, Vector2.zero, Vector2.one, new Vector2(6f, 6f), new Vector2(-6f, -6f));
+            Img(inner.gameObject, null, new Color(0.17f, 0.14f, 0.12f, 0.97f));
+
+            var speaker = Anchored("Speaker", panel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -56f), new Vector2(1120f, 64f));
+            var speakerText = Label(speaker, "", 40, BrassColor, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            var body = Anchored("Body", panel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -280f), new Vector2(1120f, 370f));
+            var bodyText = Label(body, "", 30, Parchment, TextAnchor.UpperLeft, font, FontStyle.Normal);
+            bodyText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            bodyText.resizeTextForBestFit = true;
+            bodyText.resizeTextMinSize = 20;
+            bodyText.resizeTextMaxSize = 30;
+            bodyText.verticalOverflow = VerticalWrapMode.Truncate;
+
+            var menu = root.gameObject.AddComponent<DialoguePanel>();
+            var buttons = new Button[4];
+            var labels = new Text[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var rect = Anchored("Choice " + i, panel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 334f - i * 92f), new Vector2(1120f, 80f));
+                var image = Img(rect.gameObject, null, new Color(0.3f, 0.25f, 0.2f, 1f), true);
+                var button = rect.gameObject.AddComponent<Button>();
+                button.targetGraphic = image;
+                button.navigation = new Navigation { mode = Navigation.Mode.None };
+                var colors = button.colors;
+                colors.highlightedColor = new Color(1.25f, 1.15f, 1f);
+                colors.pressedColor = new Color(0.75f, 0.7f, 0.65f);
+                button.colors = colors;
+                labels[i] = Label(Stretch("Label", rect), "", 27, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+                UnityEventTools.AddIntPersistentListener(button.onClick, menu.Choose, i);
+                buttons[i] = button;
+            }
+
+            SceneWiring.Set(menu, "input", input);
+            SceneWiring.Set(menu, "group", group);
+            SceneWiring.Set(menu, "speakerText", speakerText);
+            SceneWiring.Set(menu, "bodyText", bodyText);
+            SceneWiring.Set(menu, "buttons", buttons);
+            SceneWiring.Set(menu, "labels", labels);
+            return menu;
+        }
+
+        /// <summary>Radial shade that sweeps away as an ability recovers.</summary>
+        static Image CooldownShade(Transform button, HudSprites sprites)
+        {
+            var rect = Stretch("Cooldown", button);
+            var image = Img(rect.gameObject, sprites.Circle, new Color(0f, 0f, 0f, 0.62f));
+            image.type = Image.Type.Filled;
+            image.fillMethod = Image.FillMethod.Radial360;
+            image.fillOrigin = 2;
+            image.fillAmount = 0f;
+            return image;
         }
 
         // ---- Widgets -----------------------------------------------------------------------------------

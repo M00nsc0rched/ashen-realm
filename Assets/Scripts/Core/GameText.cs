@@ -29,7 +29,11 @@ namespace AshenRealm.Core
         public const string Fullscreen = "TELJES KÉPERNYŐ";
         public const string ExitFullscreen = "ABLAKOS MÓD";
         public const string LookSpeed = "ÉRZÉKENYSÉG";
-        public const string Objective = "Keresd meg a romos kápolnát északon.\nGyőzd le az Átkozott Lovagot, és szerezd meg, amit őriz.";
+        public const string Objective = "Az út Üregkapuba északra vezet, a romos kápolna mögött.\nGyőzd le az Átkozott Lovagot, aki elzárja.";
+        public const string ObjectiveValleyOpen = "A kapu szabad. Menj északra, a kápolna mögé, Üregkapuba.";
+        public const string ObjectiveCity = "Beszélj a város lakóival, aztán menj le a Kötél és Lámpás lépcsőjén a Mélysötétbe.";
+        public const string ObjectiveDepth = "Keresd meg a lépcsőt, győzd le az őrzőjét, és menj tovább lefelé.\nA legmélyén a Gloamlord vár.";
+        public const string ObjectiveDone = "A Gloamlord elesett. Térj vissza Üregkapuba.";
 
         // Touch buttons
         public const string Attack = "TÁMADÁS";
@@ -37,10 +41,69 @@ namespace AshenRealm.Core
         public const string Jump = "UGRÁS";
         public const string Use = "HASZNÁL";
         public const string Run = "FUTÁS";
+        public const string Potion = "FŐZET";
 
         public const string DesktopHint =
-            "Kattints a nézéshez  ·  WASD: mozgás  ·  Shift: futás  ·  Szóköz: ugrás  ·  Bal egérgomb: támadás  ·  " +
-            "Jobb egérgomb: védés  ·  E: használat  ·  Esc: szünet  ·  F1: érintőgombok";
+            "Kattints a nézéshez  ·  WASD: mozgás  ·  Shift: futás  ·  Szóköz: ugrás  ·  Bal egér: támadás  ·  " +
+            "Jobb egér: védés  ·  Q, R: képességek  ·  F: főzet  ·  E: használat  ·  Esc: szünet  ·  F1: érintőgombok";
+
+        // HUD
+        public const string HonorLabel = "BECSÜLET";
+        public const string GoldLabel = "ARANY";
+        public const string PotionLabel = "FŐZET";
+        public const string AlignmentMarked = "MEGJELÖLT";
+        public const string AlignmentMortal = "HALANDÓ";
+        public const string AlignmentHallowed = "MEGSZENTELT";
+
+        // Interactions
+        public const string Talk = "BESZÉLGETÉS";
+        public const string Approach = "ODALÉPSZ";
+        public const string Barred = "ELZÁRVA";
+        public const string GateToCity = "ÚT ÜREGKAPUBA";
+        public const string GateToValley = "VISSZA A VÖLGYBE";
+        public const string StairDown = "LE A LÉPCSŐN";
+        public const string StairUp = "FEL A LÉPCSŐN";
+        public const string GateBarred = "Az Átkozott Lovag még áll. Az út csak akkor nyílik meg, ha elesett.";
+        public const string StairBarred = "A lépcső nem enged, amíg az őrzője él.";
+        public const string ChestGold = "{0} aranyat találtál.";
+
+        // Story flow
+        public const string ChooseSoul = "VÁLASSZ LELKET";
+        public const string GoalLabel = "Cél";
+        public const string Begin = "Indulás";
+        public const string Back = "Vissza";
+        public const string Leave = "Távozás";
+        public const string Continue = "Tovább";
+        public const string DrawSteel = "Fegyvert ragadsz";
+        public const string BackToCity = "Vissza Üregkapuba";
+        public const string EndingTitle = "A GLOAMLORD ELESETT";
+        public const string StairUnbarred = "A lépcső szabad.";
+        public const string EliteFell = "{0} elesett. +{1} arany";
+        public const string EnemyActs = "{0}: {1}";
+
+        // Services
+        public const string RestOption = "Pihenés a tűznél ({0} arany)";
+        public const string ForgeOption = "Fegyver edzése ({0} arany)";
+        public const string AbsolutionOption = "Feloldozás rítusa, +{1} becsület ({0} arany)";
+        public const string HealOption = "Sebek bekötése ({0} arany)";
+        public const string PotionOption = "Gyógyító Főzet ({0} arany)";
+        public const string NotEnoughGold = "Nincs elég aranyad.";
+        public const string RestDone = "Életerőd és fókuszod helyreállt.";
+        public const string ForgeDone = "A fegyvered mélyebbre harap.";
+        public const string AbsolutionDone = "Valaki megint kimondja a nevedet.";
+        public const string HealDone = "A sebeid összeforrtak.";
+        public const string PotionDone = "Egy fiolával nehezebb a csomagod.";
+
+        // Abilities
+        public const string NoFocus = "Nincs elég fókuszod.";
+        public const string NoTarget = "Nincs célpont.";
+        public const string NoPotion = "Nincs több főzeted.";
+        public const string FullHealth = "Nem vagy megsebesülve.";
+        public const string RallyMessage = "Összeszeded magad.";
+        public const string PoisonMessage = "A pengéd méreggel van bevonva.";
+        public const string MendMessage = "A sebeid gyógyulnak.";
+
+        public static string EndingStats(int honor, int gold) => $"{HonorLabel}: {honor}   {GoldLabel}: {gold}";
 
         /// <summary>Compass labels every 45 degrees, starting at north and turning clockwise.</summary>
         public static readonly string[] CompassPoints = { "É", "ÉK", "K", "DK", "D", "DNY", "NY", "ÉNY" };

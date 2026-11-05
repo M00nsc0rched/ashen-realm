@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using AshenRealm.Combat;
 using AshenRealm.Core;
+using AshenRealm.Story;
 using UnityEngine;
 
 namespace AshenRealm.Interactions
@@ -18,6 +19,8 @@ namespace AshenRealm.Interactions
         [SerializeField] string prompt = GameText.OpenChest;
         [SerializeField, TextArea] string rewardMessage = GameText.ChestReward;
         [SerializeField] float healAmount = 40f;
+        [SerializeField] int goldReward;
+        [SerializeField] int potionReward;
         [SerializeField, Optional] Light rewardGlow;
 
         bool opened;
@@ -41,6 +44,12 @@ namespace AshenRealm.Interactions
 
             var health = interactor != null ? interactor.GetComponentInParent<Health>() : null;
             if (health != null && healAmount > 0f) health.Heal(healAmount);
+
+            if (GameSession.Instance != null)
+            {
+                GameSession.Instance.AddGold(goldReward);
+                GameSession.Instance.AddPotions(potionReward);
+            }
 
             GameMessages.Notify(rewardMessage);
             StartCoroutine(OpenRoutine());

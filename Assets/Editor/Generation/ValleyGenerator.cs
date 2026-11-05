@@ -18,6 +18,8 @@ namespace AshenRealm.EditorTools
         public Vector3 ChestPosition;
         public float ChestYaw;
         public Transform Root;
+        public Vector3 GatePosition;
+        public Vector3 GateArrival;
     }
 
     /// <summary>
@@ -41,6 +43,7 @@ namespace AshenRealm.EditorTools
         static readonly Vector2 SpawnCenter = new Vector2(0f, -86f);
         static readonly Vector2 HamletCenter = new Vector2(34f, -14f);
         static readonly Vector2 WindmillCenter = new Vector2(54f, 8f);
+        static readonly Vector2 GateCenter = new Vector2(0f, 92f);
 
         readonly Material worldMaterial;
         readonly Material foliageMaterial;
@@ -101,6 +104,7 @@ namespace AshenRealm.EditorTools
             BuildGraveyard();
             BuildCamp();
             BuildHamlet();
+            BuildGate(layout);
             BuildPuddles();
             BuildFences();
             ScatterTrees();
@@ -142,6 +146,7 @@ namespace AshenRealm.EditorTools
             paths.Add(CatmullRom(new[] { new Vector2(-5f, -20f), new Vector2(-16f, -14f), new Vector2(-26f, -8f), new Vector2(-31f, -6f) }));
             paths.Add(CatmullRom(new[] { new Vector2(-4f, -12f), new Vector2(8f, -15f), new Vector2(20f, -13f), new Vector2(30f, -14f), HamletCenter }));
             paths.Add(CatmullRom(new[] { HamletCenter, new Vector2(42f, -6f), new Vector2(48f, 2f), new Vector2(52f, 6f) }));
+            paths.Add(CatmullRom(new[] { new Vector2(1f, 9f), new Vector2(13f, 13f), new Vector2(17f, 30f), new Vector2(14f, 50f), new Vector2(5f, 70f), GateCenter }));
         }
 
         static Vector2[] CatmullRom(Vector2[] points)
@@ -188,6 +193,7 @@ namespace AshenRealm.EditorTools
             flats.Add((SpawnCenter, 5f, 5f, BaseHeight(SpawnCenter.x, SpawnCenter.y)));
             flats.Add((HamletCenter, 14f, 8f, BaseHeight(HamletCenter.x, HamletCenter.y)));
             flats.Add((WindmillCenter, 4f, 9f, BaseHeight(WindmillCenter.x, WindmillCenter.y) + 1.8f));
+            flats.Add((GateCenter, 8f, 9f, BaseHeight(GateCenter.x, GateCenter.y - 10f)));
 
             clearings.Add((RuinsCenter, 19f));
             clearings.Add((new Vector2(0f, 10f), 10f));   // knight patrol ground
@@ -196,6 +202,7 @@ namespace AshenRealm.EditorTools
             clearings.Add((SpawnCenter, 7f));
             clearings.Add((HamletCenter, 17f));
             clearings.Add((WindmillCenter, 7f));
+            clearings.Add((GateCenter, 11f));
         }
 
         /// <summary>Trampled ground in the hamlet square.</summary>
@@ -452,6 +459,34 @@ namespace AshenRealm.EditorTools
             var box = go.AddComponent<BoxCollider>();
             box.size = size;
             return box;
+        }
+
+        // ---- The gate to Hollowgate -------------------------------------------------------------------
+
+        void BuildGate(ValleyLayout layout)
+        {
+            Vector3 p = Ground(GateCenter.x, GateCenter.y);
+            var b = DecorChunk(p.x, p.z);
+            b.Push(p, Quaternion.identity, Vector3.one);
+            for (int i = -1; i <= 1; i += 2)
+            {
+                for (int row = 0; row < 9; row++)
+                    PropMeshes.StoneBlock(b, rng, new Vector3(i * 4.2f, 0.5f + row * 1f, 0f), new Vector3(2.4f, 1f, 2.4f), row < 2);
+                AddBoxCollider("Gate Pillar", p + new Vector3(i * 4.2f, 4.5f, 0f), Quaternion.identity, new Vector3(2.4f, 9f, 2.4f));
+                for (int row = 0; row < 6; row++)
+                    PropMeshes.StoneBlock(b, rng, new Vector3(i * 12f, 0.75f + row * 1.5f, 1f), new Vector3(14f, 1.5f, 1.6f), row < 2);
+                AddBoxCollider("Gate Wall", p + new Vector3(i * 12f, 4.5f, 1f), Quaternion.identity, new Vector3(14f, 9f, 1.6f));
+            }
+            PropMeshes.StoneBlock(b, rng, new Vector3(0f, 9.5f, 0f), new Vector3(11.5f, 1.4f, 2.6f), false);
+            b.SetColor(Pal.WoodDark, 0.35f);
+            for (int plank = 0; plank < 7; plank++)
+                b.ShadedBox(new Vector3(-2.55f + plank * 0.85f, 4.4f, 0.2f), new Vector3(0.8f, 8.8f, 0.3f), Pal.WoodDark, rng, 0.28f, 0.42f);
+            b.ShadedBox(new Vector3(0f, 2.5f, -0.02f), new Vector3(6f, 0.4f, 0.1f), Pal.SteelDark, rng, 0.3f, 0.4f);
+            b.ShadedBox(new Vector3(0f, 6.5f, -0.02f), new Vector3(6f, 0.4f, 0.1f), Pal.SteelDark, rng, 0.3f, 0.4f);
+            b.Pop();
+
+            layout.GatePosition = p;
+            layout.GateArrival = Ground(GateCenter.x, GateCenter.y - 5f) + Vector3.up * 0.1f;
         }
 
         // ---- Ruined chapel ---------------------------------------------------------------------------

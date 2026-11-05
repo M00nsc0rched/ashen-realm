@@ -5,6 +5,8 @@ using AshenRealm.AI;
 using AshenRealm.Core;
 using AshenRealm.Interactions;
 using AshenRealm.Player;
+using AshenRealm.Story;
+using AshenRealm.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -83,6 +85,68 @@ namespace AshenRealm.EditorTools
             Shot("08_ruins_interior", Ground(-5f, 23f) + Vector3.up * 1.7f, Ground(2f, 42f) + Vector3.up * 1.5f, false, false);
             Shot("09_hamlet", Ground(14f, -15f) + Vector3.up * 1.7f, Ground(36f, -14f) + Vector3.up * 2.5f, true, false);
             Shot("10_windmill_fields", Ground(34f, -30f) + Vector3.up * 1.7f, Ground(54f, 8f) + Vector3.up * 5f, false, false);
+
+            // Every class's weapons in hand: the scene only has the knight's enabled.
+            var classRig = Find<PlayerClassRig>();
+            var weaponSets = new SerializedObject(classRig).FindProperty("weaponSets");
+            void ShowClass(int index)
+            {
+                for (int s = 0; s < weaponSets.arraySize; s++)
+                    ((GameObject)weaponSets.GetArrayElementAtIndex(s).objectReferenceValue).SetActive(s / PlayerClassRig.HandsPerClass == index);
+            }
+            foreach (var definition in Catalog.Classes)
+            {
+                ShowClass((int)definition.Id);
+                Shot("10_class_" + definition.Id, Ground(0f, -30f) + Vector3.up * 1.62f, Ground(0f, 0f) + Vector3.up * 1.6f, true, false);
+            }
+            ShowClass(0);
+
+            // Each other zone in its own light: arrival, then its keeper or its people.
+            var sun = RenderSettings.sun;
+            var torch = camera.GetComponentsInChildren<Light>(true).FirstOrDefault(l => l.name == "Torch");
+            var zones = roots.SelectMany(r => r.GetComponentsInChildren<Zone>(true)).ToArray();
+            for (int i = 1; i < zones.Length; i++)
+            {
+                Zone zone = zones[i];
+                atmosphere.Apply(zone.Ambient, zone.Fog, zone.FogStart, zone.FogEnd);
+                if (sun != null) sun.enabled = !zone.Underground;
+                if (torch != null) torch.enabled = zone.Underground;
+                camera.clearFlags = zone.Underground ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
+                camera.backgroundColor = zone.Fog;
+
+                string prefix = $"{10 + i}_{zone.name.Replace("Zone ", "")}";
+                Vector3 entry = zone.Entry.position + Vector3.up * 1.62f;
+                Shot(prefix + "_a_arrival", entry, entry + zone.Entry.forward * 10f, true, i == 2);
+
+                var foes = zone.GetComponentsInChildren<EnemyAI>(true);
+                EnemyAI keeper = foes.FirstOrDefault(e => Catalog.Enemy(e.EnemyId).Rank >= EnemyRank.Guardian);
+                if (keeper != null)
+                {
+                    Vector3 k = keeper.transform.position;
+                    Vector3 from = k + keeper.transform.forward * 7f + Vector3.up * 1.62f;
+                    Shot(prefix + "_b_keeper", from, k + Vector3.up * 1.6f, true, false);
+                    for (int f = 0; f < foes.Length && f < 2; f++)
+                    {
+                        Vector3 p = foes[f].transform.position;
+                        Shot($"{prefix}_c_foe{f}", p + foes[f].transform.forward * 3.4f + Vector3.up * 1.5f, p + Vector3.up * 0.9f, false, false);
+                    }
+                }
+                else
+                {
+                    Vector3 stair = zone.Objective.position;
+                    Shot(prefix + "_b_square", zone.Exit.position + new Vector3(10f, 1.7f, -18f), stair + Vector3.up * 3f, false, false);
+                    var person = zone.GetComponentInChildren<NpcActor>(true);
+                    if (person != null)
+                        Shot(prefix + "_c_person", person.transform.position + person.transform.forward * 2.6f + Vector3.up * 1.6f, person.transform.position + Vector3.up * 1.2f, false, false);
+                }
+
+                var site = zone.GetComponentInChildren<EncounterSite>(true);
+                if (site != null)
+                    Shot(prefix + "_d_encounter", site.transform.position + new Vector3(0.8f, 1.6f, -3.2f), site.transform.position + Vector3.up * 1.1f, false, false);
+            }
+            if (sun != null) sun.enabled = true;
+            if (torch != null) torch.enabled = false;
+            camera.clearFlags = CameraClearFlags.Skybox;
 
             camTransform.SetPositionAndRotation(originalPos, originalRot);
             if (weapons != null) weapons.gameObject.SetActive(true);

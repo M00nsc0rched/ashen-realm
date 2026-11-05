@@ -8,7 +8,9 @@ using AshenRealm.Core;
 using AshenRealm.Input;
 using AshenRealm.Interactions;
 using AshenRealm.Player;
+using AshenRealm.Story;
 using AshenRealm.UI;
+using AshenRealm.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -141,8 +143,15 @@ namespace AshenRealm.EditorTools
             One<CameraEffects>();
             One<FirstPersonWeaponAnimator>();
             var knight = One<CursedKnightAI>();
-            One<KnightAnimator>();
-            var chest = One<TreasureChest>();
+            var chest = All<TreasureChest>().FirstOrDefault(c => c.transform.root.name == "Zone Valley");
+            r.Check(chest != null, "The valley chest is missing");
+            One<ZoneManager>();
+            One<GameSession>();
+            One<StoryDirector>();
+            One<DialoguePanel>();
+            One<ProjectileLibrary>();
+            One<PlayerAbilities>();
+            One<PlayerClassRig>();
             One<HUDController>();
             One<TouchJoystick>();
             One<TouchLookArea>();
@@ -191,6 +200,7 @@ namespace AshenRealm.EditorTools
 
             CheckPlacement(r, controller, knight, chest, lifecycle);
             CheckReach(r, combat, knight);
+            CheckWorld(r, All<Zone>(), All<ZonePortal>(), All<EnemyAI>(), All<NpcActor>(), All<EncounterSite>());
         }
 
         /// <summary>Every player-facing string must be drawable by the font the WebGL build embeds.</summary>
@@ -212,6 +222,9 @@ namespace AshenRealm.EditorTools
                     if (it.propertyType == SerializedPropertyType.String)
                         strings.Add(($"{PathOf(component.transform)}.{it.name}", it.stringValue));
             }
+
+            strings.AddRange(Catalog.AllStrings().Where(s => s != null).Select(s => ("Catalog", s)));
+            strings.AddRange(StoryText.AllStrings().Where(s => s != null).Select(s => ("StoryText", s)));
 
             foreach (var (where, text) in strings)
             {
@@ -336,6 +349,57 @@ namespace AshenRealm.EditorTools
                 .SelectMany(go => go.GetComponentsInChildren<BoxCollider>(true))
                 .Count(b => b.gameObject.name == "Boundary Wall");
             r.Check(walls == 4, $"Expected 4 world boundary walls, found {walls}");
+        }
+
+        /// <summary>The zones, their portals and everything that stands in them.</summary>
+        static void CheckWorld(Report r, Zone[] zones, ZonePortal[] portals, EnemyAI[] enemies, NpcActor[] npcs, EncounterSite[] encounters)
+        {
+            r.Check(zones.Length == StoryText.ZoneTitles.Length, $"Expected {StoryText.ZoneTitles.Length} zones, found {zones.Length}");
+
+            bool OnGround(Vector3 p) => Physics.Raycast(p + Vector3.up * 1.5f, Vector3.down, out RaycastHit hit, 4f, ~0, QueryTriggerInteraction.Ignore) && Mathf.Abs(hit.point.y - p.y) < 1f;
+
+            foreach (var zone in zones)
+            {
+                r.Check(!string.IsNullOrEmpty(zone.Title) && !string.IsNullOrEmpty(zone.Subtitle), $"{zone.name} has no title card");
+                r.Check(zone.Entry != null && OnGround(zone.Entry.position), $"{zone.name}: entry is not on the ground");
+                r.Check(zone.Exit != null && OnGround(zone.Exit.position), $"{zone.name}: stair arrival is not on the ground");
+                r.Check(zone.Objective != null, $"{zone.name} has no compass objective");
+                if (zone.Entry == null) continue;
+
+                // Arriving players must not stand inside a wall.
+                Vector3 feet = zone.Entry.position + Vector3.up * 0.4f;
+                var overlaps = Physics.OverlapCapsule(feet, feet + Vector3.up * 1.1f, 0.33f, ~0, QueryTriggerInteraction.Ignore);
+                r.Check(overlaps.All(c => c.GetComponent<CharacterController>() != null), $"{zone.name}: entry overlaps {string.Join(", ", overlaps.Select(c => c.name))}");
+            }
+
+            foreach (var portal in portals)
+            {
+                r.Check(portal.TargetZone >= 0 && portal.TargetZone < zones.Length, $"{portal.name} points at zone {portal.TargetZone}");
+                r.Check(!string.IsNullOrEmpty(portal.InteractionPrompt), $"{portal.name} has no prompt");
+            }
+
+            // One stair down per depth but the last, each barred by a keeper that really exists.
+            foreach (var portal in portals.Where(p => !string.IsNullOrEmpty(p.RequiredFlag) && p.RequiredFlag != StoryDirector.DeadFlag("knight")))
+                r.Check(enemies.Any(e => StoryDirector.DeadFlag(e.EnemyId) == portal.RequiredFlag), $"{portal.name}: nobody holds the flag {portal.RequiredFlag}");
+
+            foreach (var enemy in enemies)
+            {
+                r.Check(Catalog.Enemy(enemy.EnemyId) != null, $"{enemy.name}: unknown enemy id '{enemy.EnemyId}'");
+                r.Check(OnGround(enemy.transform.position), $"{enemy.name} at {enemy.transform.position} is not on the ground");
+                r.Check(enemy.GetComponent<AshenRealm.AI.ICreatureAnimator>() != null, $"{enemy.name} has no animator");
+            }
+            foreach (var definition in Catalog.Enemies)
+                r.Check(enemies.Any(e => e.EnemyId == definition.Id), $"{definition.Name} never appears in the world");
+            r.Check(enemies.Count(e => e.EnemyId == "gloamlord") == 1, "Exactly one Gloamlord");
+
+            foreach (var npc in npcs) r.Check(StoryText.Npc(npc.NpcId) != null, $"{npc.name}: unknown npc id '{npc.NpcId}'");
+            foreach (var npc in StoryText.Npcs) r.Check(npcs.Any(n => n.NpcId == npc.Id), $"{npc.Name} never appears in the world");
+            foreach (var site in encounters) r.Check(StoryText.Encounter(site.EncounterId) != null, $"{site.name}: unknown encounter '{site.EncounterId}'");
+            foreach (var encounter in StoryText.Encounters) r.Check(encounters.Any(s => s.EncounterId == encounter.Id), $"{encounter.Name} never appears in the world");
+
+            foreach (var enemy in Catalog.Enemies)
+                foreach (var move in enemy.Moves)
+                    r.Check(move.Kind != MoveKind.Bolt || (int)move.Bolt < Enum.GetValues(typeof(BoltKind)).Length, $"{enemy.Id}: bad bolt on {move.Name}");
         }
 
         static void CheckReach(Report r, PlayerCombat combat, CursedKnightAI knight)

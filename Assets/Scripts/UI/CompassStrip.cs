@@ -15,10 +15,13 @@ namespace AshenRealm.UI
         [SerializeField] float[] headings;
         [SerializeField] Graphic objectiveMarker;
         [SerializeField] Vector3 objectivePosition;
+
         [Tooltip("Degrees visible on each side of the centre.")]
         [SerializeField] float halfRange = 75f;
 
         float[] baseAlpha;
+
+        public void SetObjective(Vector3 worldPosition) => objectivePosition = worldPosition;
 
         void Awake()
         {
