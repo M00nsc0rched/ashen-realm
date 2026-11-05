@@ -302,7 +302,7 @@ namespace AshenRealm.AI
             SetState(State.Dead);
             controller.enabled = false;
             animator.PlayDeath();
-            GameMessages.Notify("The Cursed Knight falls. Its oath is finally broken.");
+            GameMessages.Notify(GameText.KnightDefeated);
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);

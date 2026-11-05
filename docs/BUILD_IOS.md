@@ -39,7 +39,7 @@ Credentials are never stored in this project. Signing is resolved by Xcode's aut
 
 ## 4. On-device checklist
 - Landscape only; HUD inside the safe area (notch / Dynamic Island / home indicator).
-- Left thumb joystick + right thumb look + STRIKE at the same time.
+- Left thumb joystick + right thumb look + TÁMADÁS (strike) at the same time.
 - RUN toggles sprint and switches off when stamina is exhausted or you stop moving.
 - Frame rate holds 30 FPS (Xcode → Debug Navigator → FPS / GPU). Profile before raising `GameBootstrap.mobileTargetFrameRate` to 60.
 - If thermals or frame time are poor: lower `Mobile_RPAsset` render scale, shadow distance (50) or disable bloom in

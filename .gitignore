@@ -75,3 +75,6 @@ Desktop.ini
 
 # Local batch-validation copies of the project
 /_BatchValidation/
+
+# Burst output written next to the project by WebGL builds
+/Data/

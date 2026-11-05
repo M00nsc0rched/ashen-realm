@@ -15,7 +15,7 @@ All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in t
    - `Assets/Scenes/Prototype_Valley.unity` (also added as the first scene in Build Settings)
    - `Assets/Art/Generated/` (meshes, palette texture, UI sprites), `Assets/Materials/`, `Assets/Prefabs/`
    - `Assets/Settings/VP_AshenValley.asset` (post-processing) and `LS_PrototypeValley.lighting`
-   - URP assets: render scale 0.65 with point upscaling (pixelated look)
+   - URP assets: render scale 1 (the pixel look comes from `PixelCamera`, which renders the world at 360 px)
 
    It is safe to run again at any time; it rebuilds the scene and updates assets in place.
    Generated files are not stored in git, so run this once after cloning.
@@ -30,26 +30,28 @@ All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in t
 > If you change anything under `Assets/Editor/`, regenerate. Do not hand-edit the generated scene.
 
 ## Controls
-| Action | Keyboard / mouse (Editor) | Touch (iPhone) | Gamepad |
+| Action | Keyboard / mouse (desktop) | Touch (phone, or touch mode) | Gamepad |
 |---|---|---|---|
 | Move | WASD / arrows | left-side floating joystick | left stick |
 | Look | mouse (click Game view to capture, Esc to release) | drag on the right side | right stick |
-| Sprint (stamina) | hold Left Shift | **RUN** toggles | left stick press |
-| Jump | Space | **JUMP** | South button |
-| Attack | left mouse (hold to keep swinging) | **STRIKE** | right trigger |
-| Block | hold right mouse | hold **BLOCK** | left trigger |
-| Interact | E | **USE** | West button |
+| Sprint (stamina) | hold Left Shift | **FUTÁS** toggles | left stick press |
+| Jump | Space | **UGRÁS** | South button |
+| Attack | left mouse while the cursor is captured (hold to keep swinging) | **TÁMADÁS** (the only way in touch mode) | right trigger |
+| Block | hold right mouse while the cursor is captured | hold **VÉDÉS** | left trigger |
+| Interact | E | **HASZNÁL** | West button |
 | Pause menu (resume, fullscreen, look speed) | Esc | ‖ button top-right | – |
 | Toggle touch controls (testing) | F1 | – | – |
 
 Touch controls appear automatically on devices and in the Device Simulator; press **F1** in the Game view to try the
-touch layout with the mouse.
+touch layout with the mouse. In touch mode the mouse never attacks: drag to look, press **TÁMADÁS** to strike.
+
+The game text is Hungarian; every in-game string lives in `Assets/Scripts/Core/GameText.cs`.
 
 ## What to try
 - Follow the dirt road north from the fenced spawn lane toward the ruined chapel.
-- The **Cursed Knight** patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,
+- The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,
   then strike. 4 sword hits defeat it.
-- Inside the chapel, aim at the **chest** at the altar and press E / USE ("Open Chest") for gold and a Healing Draught.
+- Inside the chapel, aim at the **chest** at the altar and press E / HASZNÁL ("LÁDA KINYITÁSA") for gold and a healing draught.
 - Visit the camp (east) and the sword graveyard (west); inspect the blade at the graveyard's centre.
 - If you fall in battle you rise again at the spawn after a few seconds.
 

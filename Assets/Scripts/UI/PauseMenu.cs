@@ -1,3 +1,4 @@
+using AshenRealm.Core;
 using AshenRealm.Input;
 using UnityEngine;
 using UnityEngine.UI;
@@ -70,8 +71,8 @@ namespace AshenRealm.UI
 
         void UpdateLabels(bool fullscreen)
         {
-            if (sensitivityLabel != null && input != null) sensitivityLabel.text = $"LOOK SPEED  {input.LookSensitivity:0.00}";
-            if (fullscreenLabel != null) fullscreenLabel.text = fullscreen ? "EXIT FULLSCREEN" : "FULLSCREEN";
+            if (sensitivityLabel != null && input != null) sensitivityLabel.text = $"{GameText.LookSpeed}  {GameText.Decimal(input.LookSensitivity)}";
+            if (fullscreenLabel != null) fullscreenLabel.text = fullscreen ? GameText.ExitFullscreen : GameText.Fullscreen;
         }
     }
 }

@@ -8,7 +8,7 @@ namespace AshenRealm.Interactions
     /// </summary>
     public sealed class LoreInspectable : MonoBehaviour, IInteractable
     {
-        [SerializeField] string prompt = "Inspect";
+        [SerializeField] string prompt = GameText.Inspect;
         [SerializeField, TextArea] string loreText = "";
         [SerializeField] float cooldown = 1.5f;
 

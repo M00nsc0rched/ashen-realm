@@ -15,8 +15,8 @@ namespace AshenRealm.Interactions
         [Tooltip("Lid rotation about its hinge (local X) when fully open.")]
         [SerializeField] float openAngle = 110f;
         [SerializeField] float openDuration = 0.7f;
-        [SerializeField] string prompt = "Open Chest";
-        [SerializeField, TextArea] string rewardMessage = "Found 48 gold and a Healing Draught.";
+        [SerializeField] string prompt = GameText.OpenChest;
+        [SerializeField, TextArea] string rewardMessage = GameText.ChestReward;
         [SerializeField] float healAmount = 40f;
         [SerializeField, Optional] Light rewardGlow;
 

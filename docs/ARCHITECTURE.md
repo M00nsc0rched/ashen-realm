@@ -9,8 +9,8 @@
 ## Runtime modules (`Assets/Scripts`)
 ```
 Core/          GameBootstrap (frame rate, orientation), AtmosphereController (ambient + fog at runtime),
-               GameMessages (notification channel), PixelCamera (low-res world render), LightFlicker, Rotator,
-               OptionalAttribute
+               GameMessages (notification channel), GameText (all player-facing Hungarian strings),
+               PixelCamera (low-res world render), LightFlicker, Rotator, OptionalAttribute
 Input/         IPlayerInput (gameplay-facing contract), PlayerInputHub (keyboard/mouse, gamepad, touch merge)
 Player/        FirstPersonController, Stamina, CameraEffects, PlayerLifecycle, FirstPersonWeaponAnimator
 Combat/        DamageInfo + IDamageable + IDamageFilter, Health, PlayerCombat, HitFlash, ImpactEffects
@@ -34,7 +34,18 @@ TouchJoystick / TouchLookArea / TouchButton ──Touch*()─┘                
 - Multitouch: each touch control tracks one `pointerId`. The look surface lies *behind* the buttons, so a finger that
   starts on a button can never rotate the camera. Joystick, look and buttons work simultaneously.
 - Desktop: click to capture the cursor (the capturing click does not attack), Esc releases, F1 toggles touch controls
-  for testing touch layout with the mouse. Touch mode starts automatically on mobile or on the first real touch.
+  for testing touch layout with the mouse. Touch mode starts automatically on mobile, when the browser reports a
+  touchscreen, or on the first real touch.
+- Mouse buttons are separate actions from the gamepad triggers and only fight while the cursor is captured in desktop
+  mode. In touch mode the mouse (and browsers' tap-emulated clicks) only drives the on-screen controls, so dragging to
+  look never swings the sword: the STRIKE (`TÁMADÁS`) button is the only way to attack. The playtest checks this.
+
+### Text and language
+All player-facing strings are Hungarian and live in `Core/GameText` (builders and runtime scripts reference it; the web
+page template is translated separately). The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
+U+00A0–U+017F (á é í ó ö ő ú ü ű are in; em dash, ellipsis and the minus sign are not), so the validator checks every
+`GameText` string, scene `Text` and interactable string against that range. Interaction prompts are written in upper
+case in `GameText` instead of being converted at runtime.
 
 ### Combat
 - `PlayerCombat.StartAttack` spends stamina and plays a slash; the hit resolves mid-strike (between

@@ -176,6 +176,7 @@ namespace AshenRealm.EditorTools
 
             CheckReferences(r, roots);
             CheckRenderers(r, roots);
+            CheckText(r, roots);
 
             // Gameplay tuning required by the milestone.
             if (combat != null)
@@ -190,6 +191,33 @@ namespace AshenRealm.EditorTools
 
             CheckPlacement(r, controller, knight, chest, lifecycle);
             CheckReach(r, combat, knight);
+        }
+
+        /// <summary>Every player-facing string must be drawable by the font the WebGL build embeds.</summary>
+        static void CheckText(Report r, GameObject[] roots)
+        {
+            var strings = new List<(string where, string text)>();
+            foreach (FieldInfo field in typeof(GameText).GetFields(BindingFlags.Public | BindingFlags.Static))
+            {
+                object value = field.GetValue(null);
+                if (value is string s) strings.Add(($"GameText.{field.Name}", s));
+                else if (value is string[] array) strings.AddRange(array.Select(a => ($"GameText.{field.Name}", a)));
+            }
+            foreach (var text in roots.SelectMany(go => go.GetComponentsInChildren<UnityEngine.UI.Text>(true)))
+                strings.Add((PathOf(text.transform), text.text));
+            foreach (var component in roots.SelectMany(go => go.GetComponentsInChildren<MonoBehaviour>(true)).Where(c => c is IInteractable))
+            {
+                SerializedProperty it = new SerializedObject(component).GetIterator();
+                while (it.NextVisible(true))
+                    if (it.propertyType == SerializedPropertyType.String)
+                        strings.Add(($"{PathOf(component.transform)}.{it.name}", it.stringValue));
+            }
+
+            foreach (var (where, text) in strings)
+            {
+                char bad = text.FirstOrDefault(c => !GameText.IsRenderable(c));
+                r.Check(bad == default(char), $"{where}: character U+{(int)bad:X4} is missing from the web font");
+            }
         }
 
         static float GetFloat(Object target, string field) => new SerializedObject(target).FindProperty(field).floatValue;

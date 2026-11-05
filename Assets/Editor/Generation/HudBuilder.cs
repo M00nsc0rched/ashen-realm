@@ -1,5 +1,6 @@
 using AshenRealm.AI;
 using AshenRealm.Combat;
+using AshenRealm.Core;
 using AshenRealm.Input;
 using AshenRealm.Interactions;
 using AshenRealm.Player;
@@ -220,7 +221,7 @@ namespace AshenRealm.EditorTools
             var prompt = Anchored("Interaction Prompt", safe, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -86f), new Vector2(900f, 50f));
             var promptGroup = prompt.gameObject.AddComponent<CanvasGroup>();
             promptGroup.blocksRaycasts = false;
-            var promptText = Label(prompt, "OPEN CHEST", 30, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            var promptText = Label(prompt, GameText.OpenChest, 30, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
 
             var notify = Anchored("Notification", safe, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -200f), new Vector2(1300f, 110f));
             var notifyGroup = notify.gameObject.AddComponent<CanvasGroup>();
@@ -232,13 +233,13 @@ namespace AshenRealm.EditorTools
             var enemyGroup = enemyBar.gameObject.AddComponent<CanvasGroup>();
             enemyGroup.blocksRaycasts = false;
             var enemyName = Anchored("Name", enemyBar, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -14f), new Vector2(680f, 30f));
-            Label(enemyName, "CURSED KNIGHT", 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            Label(enemyName, GameText.KnightName, 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
             var enemyFrame = Bar("Health", enemyBar, new Vector2(20f, -36f), new Vector2(640f, 12f), new Color(0.55f, 0.07f, 0.06f), false, out RectTransform enemyFill, out _, out _);
             EndCaps(enemyFrame);
 
             // ---- Desktop controls hint ----
             var hint = Anchored("Desktop Hint", safe, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(1760f, 34f));
-            Label(hint, "Click to look  ·  WASD move  ·  Shift run  ·  Space jump  ·  LMB strike  ·  RMB block  ·  E interact  ·  Esc pause  ·  F1 touch controls",
+            Label(hint, GameText.DesktopHint,
                 20, new Color(0.9f, 0.85f, 0.75f, 0.7f), TextAnchor.MiddleCenter, font, FontStyle.Normal);
             SceneWiring.Set(hint.gameObject.AddComponent<DesktopHint>(), "input", input);
 
@@ -269,12 +270,12 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(joystick, "radius", 100f);
             SceneWiring.Set(joystick, "idleAlpha", 0.6f);
 
-            TouchButtonWidget(touchRoot, "Attack", "STRIKE", PlayerButton.Attack, new Vector2(1f, 0f), new Vector2(-225f, 225f), 210f, 30, input, sprites, font);
-            TouchButtonWidget(touchRoot, "Block", "BLOCK", PlayerButton.Block, new Vector2(1f, 0f), new Vector2(-480f, 150f), 150f, 24, input, sprites, font);
-            TouchButtonWidget(touchRoot, "Jump", "JUMP", PlayerButton.Jump, new Vector2(1f, 0f), new Vector2(-150f, 470f), 130f, 22, input, sprites, font);
-            var interactButton = TouchButtonWidget(touchRoot, "Interact", "USE", PlayerButton.Interact, new Vector2(1f, 0f), new Vector2(-420f, 400f), 125f, 22, input, sprites, font);
+            TouchButtonWidget(touchRoot, "Attack", GameText.Attack, PlayerButton.Attack, new Vector2(1f, 0f), new Vector2(-225f, 225f), 210f, 30, input, sprites, font);
+            TouchButtonWidget(touchRoot, "Block", GameText.Block, PlayerButton.Block, new Vector2(1f, 0f), new Vector2(-480f, 150f), 150f, 24, input, sprites, font);
+            TouchButtonWidget(touchRoot, "Jump", GameText.Jump, PlayerButton.Jump, new Vector2(1f, 0f), new Vector2(-150f, 470f), 130f, 22, input, sprites, font);
+            var interactButton = TouchButtonWidget(touchRoot, "Interact", GameText.Use, PlayerButton.Interact, new Vector2(1f, 0f), new Vector2(-420f, 400f), 125f, 22, input, sprites, font);
             interactButton.gameObject.AddComponent<CanvasGroup>();
-            TouchButtonWidget(touchRoot, "Sprint", "RUN", PlayerButton.Sprint, new Vector2(0f, 0f), new Vector2(110f, 500f), 120f, 22, input, sprites, font);
+            TouchButtonWidget(touchRoot, "Sprint", GameText.Run, PlayerButton.Sprint, new Vector2(0f, 0f), new Vector2(110f, 500f), 120f, 22, input, sprites, font);
 
             // ---- Death overlay ----
             var death = Stretch("Death Overlay", canvasGo.transform);
@@ -283,9 +284,9 @@ namespace AshenRealm.EditorTools
             deathGroup.alpha = 0f;
             Img(death.gameObject, null, new Color(0.02f, 0.01f, 0.01f, 0.72f));
             var deathTitle = Anchored("Title", death, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 30f), new Vector2(1400f, 110f));
-            Label(deathTitle, "YOU HAVE FALLEN", 76, new Color(0.62f, 0.1f, 0.08f), TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            Label(deathTitle, GameText.DeathTitle, 76, new Color(0.62f, 0.1f, 0.08f), TextAnchor.MiddleCenter, font, FontStyle.Bold);
             var deathSub = Anchored("Subtitle", death, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -50f), new Vector2(1400f, 50f));
-            Label(deathSub, "The ash remembers. You rise again...", 28, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Italic);
+            Label(deathSub, GameText.DeathSubtitle, 28, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Italic);
 
             // ---- Pause menu (top-most) ----
             var pause = BuildPauseMenu(canvasGo.transform, input, font, sprites);
@@ -329,7 +330,7 @@ namespace AshenRealm.EditorTools
 
             var graphics = new System.Collections.Generic.List<Graphic>();
             var headings = new System.Collections.Generic.List<float>();
-            string[] names = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+            string[] names = GameText.CompassPoints;
             for (int i = 0; i < names.Length; i++)
             {
                 var label = Anchored(names[i], strip, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 6f), new Vector2(60f, 30f));
@@ -376,7 +377,7 @@ namespace AshenRealm.EditorTools
             var inner = Rect("Inner", panel, Vector2.zero, Vector2.one, new Vector2(6f, 6f), new Vector2(-6f, -6f));
             Img(inner.gameObject, null, new Color(0.17f, 0.14f, 0.12f, 0.97f));
             var title = Anchored("Title", panel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(560f, 70f));
-            Label(title, "PAUSED", 54, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            Label(title, GameText.Paused, 54, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
 
             var menu = root.gameObject.AddComponent<PauseMenu>();
             Button MenuButton(string name, string caption, Vector2 position, Vector2 size, UnityAction action, out Text label)
@@ -395,14 +396,14 @@ namespace AshenRealm.EditorTools
                 return button;
             }
 
-            MenuButton("Resume", "RESUME", new Vector2(0f, -160f), new Vector2(420f, 72f), menu.Resume, out _);
-            MenuButton("Fullscreen", "FULLSCREEN", new Vector2(0f, -250f), new Vector2(420f, 72f), menu.ToggleFullscreen, out Text fullscreenLabel);
-            MenuButton("Look Down", "-", new Vector2(-170f, -340f), new Vector2(80f, 72f), menu.SensitivityDown, out _);
-            MenuButton("Look Up", "+", new Vector2(170f, -340f), new Vector2(80f, 72f), menu.SensitivityUp, out _);
-            var sensitivity = Anchored("Look Speed", panel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -340f), new Vector2(250f, 72f));
-            var sensitivityLabel = Label(sensitivity, "LOOK SPEED 1.00", 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
+            MenuButton("Resume", GameText.Resume, new Vector2(0f, -160f), new Vector2(420f, 72f), menu.Resume, out _);
+            MenuButton("Fullscreen", GameText.Fullscreen, new Vector2(0f, -250f), new Vector2(420f, 72f), menu.ToggleFullscreen, out Text fullscreenLabel);
+            MenuButton("Look Down", "-", new Vector2(-215f, -340f), new Vector2(80f, 72f), menu.SensitivityDown, out _);
+            MenuButton("Look Up", "+", new Vector2(215f, -340f), new Vector2(80f, 72f), menu.SensitivityUp, out _);
+            var sensitivity = Anchored("Look Speed", panel, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -340f), new Vector2(330f, 72f));
+            var sensitivityLabel = Label(sensitivity, GameText.LookSpeed + "  " + GameText.Decimal(1f), 24, Parchment, TextAnchor.MiddleCenter, font, FontStyle.Bold);
             var help = Anchored("Help", panel, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 80f), new Vector2(560f, 100f));
-            Label(help, "Find the ruined chapel to the north.\nDefeat the Cursed Knight and claim what it guards.", 22,
+            Label(help, GameText.Objective, 22,
                 new Color(0.85f, 0.8f, 0.7f, 0.9f), TextAnchor.MiddleCenter, font, FontStyle.Italic);
 
             SceneWiring.Set(menu, "input", input);

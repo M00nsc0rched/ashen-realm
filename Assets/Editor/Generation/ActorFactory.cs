@@ -1,5 +1,6 @@
 using AshenRealm.AI;
 using AshenRealm.Combat;
+using AshenRealm.Core;
 using AshenRealm.Input;
 using AshenRealm.Interactions;
 using AshenRealm.Player;
@@ -267,7 +268,8 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(chest, "rewardGlow", glow);
             SceneWiring.Set(chest, "openAngle", 110f);
             SceneWiring.Set(chest, "healAmount", 40f);
-            SceneWiring.Set(chest, "rewardMessage", "Found 48 gold and a Healing Draught (+40 health).");
+            SceneWiring.Set(chest, "prompt", GameText.OpenChest);
+            SceneWiring.Set(chest, "rewardMessage", GameText.ChestReward);
             return chest;
         }
 

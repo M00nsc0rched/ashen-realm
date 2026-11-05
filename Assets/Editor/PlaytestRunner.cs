@@ -9,6 +9,8 @@ using AshenRealm.Player;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace AshenRealm.EditorTools
 {
@@ -192,6 +194,39 @@ namespace AshenRealm.EditorTools
             yield return 1.2f;
             Check(controller.IsGrounded, "Player lands after jumping");
 
+            // In touch mode a mouse press (a drag to look, or a browser's tap-emulated click) must not swing the sword.
+            var mouse = InputSystem.AddDevice<Mouse>("Playtest Mouse");
+            var settings = InputSystem.settings;
+            var focusBehaviour = settings.editorInputBehaviorInPlayMode;
+            var backgroundBehaviour = settings.backgroundBehavior;
+            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            var probe = new InputAction("Probe", InputActionType.Button, "<Mouse>/leftButton");
+            int probePresses = 0;
+            probe.performed += _ => probePresses++;
+            probe.Enable();
+            bool touchModeBefore = input.TouchMode;
+            input.SetTouchMode(true);
+            int swings = 0;
+            for (int i = 0; i < 3; i++)
+            {
+                InputSystem.QueueStateEvent(mouse, new MouseState { delta = new Vector2(40f, 0f) }.WithButton(MouseButton.Left));
+                for (float t = 0f; t < 0.3f; t += 0.05f)
+                {
+                    yield return 0.05f;
+                    if (combat.IsAttacking) swings++;
+                }
+                InputSystem.QueueStateEvent(mouse, new MouseState());
+                yield return 0.1f;
+            }
+            Check(probePresses >= 3, $"Simulated mouse presses reach Play mode ({probePresses} seen)");
+            Check(swings == 0 && !input.AttackHeld, $"Mouse presses in touch mode do not attack ({swings} swing frames)");
+            input.SetTouchMode(touchModeBefore);
+            probe.Dispose();
+            InputSystem.RemoveDevice(mouse);
+            settings.editorInputBehaviorInPlayMode = focusBehaviour;
+            settings.backgroundBehavior = backgroundBehaviour;
+
             // Block a Cursed Knight attack.
             stamina.Refill();
             int blocks = 0;
@@ -234,7 +269,7 @@ namespace AshenRealm.EditorTools
             controller.Teleport(chestFront, chest.transform.eulerAngles.y, 45f);
             yield return 0.3f;
             var interactor = controller.GetComponent<PlayerInteractor>();
-            Check(interactor.CurrentPrompt == "Open Chest", $"Aiming at the chest shows 'Open Chest' (prompt '{interactor.CurrentPrompt}')");
+            Check(interactor.CurrentPrompt == GameText.OpenChest, $"Aiming at the chest shows '{GameText.OpenChest}' (prompt '{interactor.CurrentPrompt}')");
             float healthBeforeChest = health.Current;
             input.SetTouchButton(PlayerButton.Interact, true);
             input.SetTouchButton(PlayerButton.Interact, false);

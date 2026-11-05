@@ -651,9 +651,8 @@ namespace AshenRealm.EditorTools
             loreCollider.center = new Vector3(0f, 0.35f, 0f);
             loreCollider.size = new Vector3(0.3f, 1.3f, 0.12f);
             var inspect = lore.AddComponent<LoreInspectable>();
-            SceneWiring.Set(inspect, "prompt", "Inspect Blade");
-            SceneWiring.Set(inspect, "loreText",
-                "A knight's blade, driven into the earth to the hilt. Its pommel bears a broken sun: the sigil of the Ashen Oath.");
+            SceneWiring.Set(inspect, "prompt", GameText.InspectBlade);
+            SceneWiring.Set(inspect, "loreText", GameText.BladeLore);
 
             var stone = DecorChunk(GraveyardCenter.x, GraveyardCenter.y);
             stone.Rock(Ground(GraveyardCenter.x, GraveyardCenter.y) + Vector3.down * 0.1f, new Vector3(1.4f, 0.6f, 1.4f), rng, Pal.Stone, 0.3f, 0.5f, 0.15f);

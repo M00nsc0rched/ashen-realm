@@ -7,7 +7,7 @@ namespace AshenRealm.Interactions
     /// </summary>
     public interface IInteractable
     {
-        /// <summary>Short verb phrase shown on the HUD, e.g. "Open Chest". Empty hides the prompt.</summary>
+        /// <summary>Short upper-case phrase shown on the HUD (see <see cref="Core.GameText"/>). Empty hides the prompt.</summary>
         string InteractionPrompt { get; }
         bool CanInteract(GameObject interactor);
         void Interact(GameObject interactor);

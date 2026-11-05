@@ -1,6 +1,6 @@
 # Ashen Realm — Progress
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-05_
 
 ## Environment (confirmed)
 - Unity project: `E:\Ashen Realm\AshenRealm`, Editor **6000.6.8f1** (installed via Unity Hub), URP template.
@@ -9,6 +9,24 @@ _Last updated: 2026-11-04_
 - Installed build modules: Windows Standalone, WebGL. **iOS Build Support is not installed.** Host OS is Windows,
   so a native iOS build (Xcode) cannot be performed on this machine.
 - Git: repository on `master` (E: has no file ownership, so the path is in the global `safe.directory` list).
+
+## Checkpoint F — attack input fix, Hungarian text, public repository (2026-11-05)
+User feedback: turning the view started attacks; attacking must only happen with the attack button. Game text in Hungarian.
+- [x] Cause: in touch mode (on when the browser reports a touchscreen) the left mouse button still attacked, so every
+      mouse drag on the look surface swung the sword. Mouse buttons are now separate actions that only fight while the
+      cursor is captured in desktop mode; gamepad triggers are unaffected; in touch mode only TÁMADÁS attacks.
+- [x] All player-facing text is Hungarian and lives in `Core/GameText`; the web page template is translated too.
+- [x] Measured the font the WebGL build embeds (`LegacyRuntime`, scanned from `WebGL.data`): it covers U+0020–U+007E
+      and U+00A0–U+017F (ő/ű included) but not U+2212, U+2014, U+2026. The validator now checks every string against it.
+- [x] Public repository and GitHub Pages build (see README for the links).
+
+### Checkpoint F validation (2026-11-05)
+| Check | Result |
+|---|---|
+| Compile + generate + validate (batch, real project) | 0 errors, 0 warnings; **910/910** (adds 60 text/font checks) |
+| Play-mode playtest | **27/27**; new: simulated mouse presses reach Play mode (3 seen) and cause 0 swing frames in touch mode |
+| WebGL build | Succeeded, 16.6 MB (full IL2CPP rebuild 51 min) |
+| Browser test (in-app Chromium, touch mode) | Hungarian labels render with accents (TÁMADÁS, VÉDÉS, ÉNY, TELJES KÉPERNYŐ); mouse drags and clicks turn the view without swinging or spending stamina; TÁMADÁS swings; the pause menu's objective line was still English, fixed in `HudBuilder` and rebuilt |
 
 ## Checkpoint E — web target and reference art direction (2026-11-04)
 Goal from the user: play in a web page, look like the supplied reference screenshots (pixel-art painterly 3D).

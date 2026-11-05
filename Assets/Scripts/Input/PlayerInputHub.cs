@@ -33,6 +33,8 @@ namespace AshenRealm.Input
         [SerializeField] float sprintToggleIdleCancel = 0.35f;
 
         InputAction moveAction, lookAction, gamepadLookAction, jumpAction, sprintAction, attackAction, blockAction, interactAction;
+        InputAction mouseAttackAction, mouseBlockAction;
+        InputAction[] actions;
 
         Vector2 lookAccumulator;
         Vector2 touchMove;
@@ -76,11 +78,17 @@ namespace AshenRealm.Input
         }
 
         public bool SprintHeld => !paused && (sprintToggled || (sprintAction != null && sprintAction.IsPressed()));
-        public bool BlockHeld => !paused && (touchBlockHeld || (blockAction != null && blockAction.IsPressed() && MouseActionsAllowed));
-        public bool AttackHeld => !paused && (touchAttackHeld || (attackAction != null && attackAction.IsPressed() && MouseActionsAllowed && !mouseAttackSuppressed));
+        public bool BlockHeld => !paused && (touchBlockHeld || Pressed(blockAction) || (MouseActionsAllowed && Pressed(mouseBlockAction)));
+        public bool AttackHeld => !paused && (touchAttackHeld || Pressed(attackAction) || (MouseActionsAllowed && !mouseAttackSuppressed && Pressed(mouseAttackAction)));
 
-        /// <summary>Mouse buttons drive gameplay only while the cursor is captured (prevents UI clicks from attacking).</summary>
-        bool MouseActionsAllowed => touchMode || Cursor.lockState == CursorLockMode.Locked || Application.isMobilePlatform;
+        /// <summary>
+        /// Mouse buttons fight only while the cursor is captured in desktop mode. In touch mode the mouse (and the
+        /// mouse events browsers emulate from taps) only drives the on-screen controls, so dragging to look never
+        /// attacks: there the STRIKE button is the only way to swing.
+        /// </summary>
+        bool MouseActionsAllowed => !touchMode && Cursor.lockState == CursorLockMode.Locked;
+
+        static bool Pressed(InputAction action) => action != null && action.IsPressed();
 
         void Awake()
         {
@@ -92,22 +100,20 @@ namespace AshenRealm.Input
 
         void OnEnable()
         {
-            moveAction.Enable(); lookAction.Enable(); gamepadLookAction.Enable(); jumpAction.Enable();
-            sprintAction.Enable(); attackAction.Enable(); blockAction.Enable(); interactAction.Enable();
+            foreach (var action in actions) action.Enable();
         }
 
         void OnDisable()
         {
-            moveAction.Disable(); lookAction.Disable(); gamepadLookAction.Disable(); jumpAction.Disable();
-            sprintAction.Disable(); attackAction.Disable(); blockAction.Disable(); interactAction.Disable();
+            foreach (var action in actions) action.Disable();
             ClearTouchState();
             if (!Application.isMobilePlatform) Cursor.lockState = CursorLockMode.None;
         }
 
         void OnDestroy()
         {
-            moveAction?.Dispose(); lookAction?.Dispose(); gamepadLookAction?.Dispose(); jumpAction?.Dispose();
-            sprintAction?.Dispose(); attackAction?.Dispose(); blockAction?.Dispose(); interactAction?.Dispose();
+            if (actions == null) return;
+            foreach (var action in actions) action.Dispose();
         }
 
         void CreateActions()
@@ -128,12 +134,20 @@ namespace AshenRealm.Input
             jumpAction.AddBinding("<Gamepad>/buttonSouth");
             sprintAction = new InputAction("Sprint", InputActionType.Button, "<Keyboard>/leftShift");
             sprintAction.AddBinding("<Gamepad>/leftStickPress");
-            attackAction = new InputAction("Attack", InputActionType.Button, "<Mouse>/leftButton");
-            attackAction.AddBinding("<Gamepad>/rightTrigger");
-            blockAction = new InputAction("Block", InputActionType.Button, "<Mouse>/rightButton");
-            blockAction.AddBinding("<Gamepad>/leftTrigger");
+            attackAction = new InputAction("Attack", InputActionType.Button, "<Gamepad>/rightTrigger");
+            blockAction = new InputAction("Block", InputActionType.Button, "<Gamepad>/leftTrigger");
             interactAction = new InputAction("Interact", InputActionType.Button, "<Keyboard>/e");
             interactAction.AddBinding("<Gamepad>/buttonWest");
+
+            // Mouse buttons are separate actions: they are gated by cursor capture, the gamepad triggers are not.
+            mouseAttackAction = new InputAction("MouseAttack", InputActionType.Button, "<Mouse>/leftButton");
+            mouseBlockAction = new InputAction("MouseBlock", InputActionType.Button, "<Mouse>/rightButton");
+
+            actions = new[]
+            {
+                moveAction, lookAction, gamepadLookAction, jumpAction, sprintAction,
+                attackAction, blockAction, interactAction, mouseAttackAction, mouseBlockAction,
+            };
         }
 
         void Update()
@@ -157,8 +171,9 @@ namespace AshenRealm.Input
 
             if (jumpAction.WasPressedThisFrame()) jumpPressTime = Time.time;
             if (interactAction.WasPressedThisFrame()) interactPressTime = Time.time;
-            if (attackAction.WasPressedThisFrame() && MouseActionsAllowed && !cursorCapturedThisFrame) attackPressTime = Time.time;
-            if (mouseAttackSuppressed && !attackAction.IsPressed()) mouseAttackSuppressed = false;
+            if (attackAction.WasPressedThisFrame()) attackPressTime = Time.time;
+            if (mouseAttackAction.WasPressedThisFrame() && MouseActionsAllowed && !cursorCapturedThisFrame) attackPressTime = Time.time;
+            if (mouseAttackSuppressed && !mouseAttackAction.IsPressed()) mouseAttackSuppressed = false;
 
             // A touch sprint toggle ends when the joystick has been idle for a moment.
             if (sprintToggled)

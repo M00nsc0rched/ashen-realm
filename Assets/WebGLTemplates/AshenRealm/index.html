@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en-us">
+<html lang="hu">
   <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -16,17 +16,17 @@
 
       <div id="loading">
         <div class="title">ASHEN REALM</div>
-        <div class="subtitle">a dark fantasy vertical slice</div>
+        <div class="subtitle">sötét fantasy kaland</div>
         <div class="bar"><div class="fill" id="progress"></div></div>
-        <div class="hint" id="loading-hint">Loading the valley…</div>
+        <div class="hint" id="loading-hint">A völgy betöltése…</div>
       </div>
 
       <div id="rotate">
-        <div class="title small">Turn your device</div>
-        <div class="hint">Ashen Realm is played in landscape.</div>
+        <div class="title small">Fordítsd el a készüléket</div>
+        <div class="hint">Az Ashen Realm fekvő helyzetben játszható.</div>
       </div>
 
-      <button id="fullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+      <button id="fullscreen" title="Teljes képernyő" aria-label="Teljes képernyő">⛶</button>
       <div id="banner"></div>
     </div>
 
@@ -83,7 +83,7 @@
           document.querySelector("#fullscreen").onclick = function () { instance.SetFullscreen(1); };
           canvas.focus();
         }).catch(function (message) {
-          document.querySelector("#loading-hint").textContent = "The valley could not be loaded: " + message;
+          document.querySelector("#loading-hint").textContent = "A völgyet nem sikerült betölteni: " + message;
         });
       };
       document.body.appendChild(script);

@@ -131,7 +131,7 @@ namespace AshenRealm.UI
             string prompt = interactor != null && interactor.isActiveAndEnabled ? interactor.CurrentPrompt : string.Empty;
             bool hasPrompt = !string.IsNullOrEmpty(prompt);
             if (hasPrompt)
-                promptText.text = input != null && input.TouchMode ? prompt.ToUpperInvariant() : "[E]  " + prompt.ToUpperInvariant();
+                promptText.text = input != null && input.TouchMode ? prompt : GameText.InteractKey + prompt;
             promptGroup.alpha = Mathf.MoveTowards(promptGroup.alpha, hasPrompt ? 1f : 0f, dt * 8f);
 
             crosshairScale = Mathf.Lerp(crosshairScale, hasPrompt ? 1.8f : 1f, 1f - Mathf.Exp(-15f * dt));

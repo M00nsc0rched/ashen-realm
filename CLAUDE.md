@@ -33,6 +33,10 @@ Long thin bars and a compass at the top centre, round emblem top-left, pause top
 - URP render scale must stay 1 (PixelCamera owns resolution; the validator checks it).
 - WebGL build: `Ashen Realm > Build WebGL` or `BatchTasks.GenerateValidateAndBuildWebGL` with `-buildTarget WebGL`.
   Test via `tools/serve-webgl.ps1` (http://localhost:8080). See `docs/BUILD_WEBGL.md`.
+- Game language is **Hungarian**. Every player-facing string goes in `Core/GameText` (never a literal in a builder or
+  script). The web build font covers only U+0020-U+007E and U+00A0-U+017F: no em dash, ellipsis or minus sign; the
+  validator enforces it. Write HUD prompts in upper case there (no runtime case mapping).
+- Mouse buttons only fight while the cursor is captured in desktop mode; in touch mode only the TÁMADÁS button attacks.
 - Use only first-party Unity packages. Use the modern Input System (no `UnityEngine.Input`). UI text uses legacy
   `UnityEngine.UI.Text` with the built-in `LegacyRuntime.ttf` (no TMP essentials import needed).
 - Never claim compilation, validation or an iOS build succeeded without running it and reading the log.
@@ -49,6 +53,8 @@ Long thin bars and a compass at the top centre, round emblem top-left, pause top
   -executeMethod AshenRealm.EditorTools.BatchTasks.GenerateAndValidate -logFile Logs/batch.log
 ```
 Exit codes: 0 ok, 1 generation failed, 2 validation failed. Search the log for `error CS`, `[AshenRealm]` and `FAIL:`.
+- Batch Unity needs the Unity Hub running for its license (exit 198, "No valid Unity Editor license found" otherwise).
+  The Hub is a Microsoft Store app: `explorer.exe "shell:AppsFolder\UnityTechnologies.UnityHub_2vrhnee42bhxm!UnityHub"`.
 - Runtime playtest: `-executeMethod AshenRealm.EditorTools.BatchTasks.Playtest` **without `-quit`** (exit 0 ok, 3 failed;
   results tagged `[AshenRealm][Playtest]`). Extend `PlaytestRunner` when adding gameplay.
 - Visual check: `BatchTasks.CapturePreviews` writes PNGs to `Screenshots/`; read them to review art changes.
