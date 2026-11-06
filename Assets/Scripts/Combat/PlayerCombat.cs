@@ -48,6 +48,11 @@ namespace AshenRealm.Combat
         [SerializeField] float blockStaminaPerDamage = 1.2f;
         [SerializeField] float blockMoveSpeedMultiplier = 0.55f;
 
+        // Graveborne's points in real-time numbers, scaled like the class sheets: 14 attack on the card is 25 damage here.
+        const float DamagePerPoint = 1.5f;
+        const float SpeedPerPoint = 0.02f;
+        const float AbilityPowerPerPoint = 0.04f;
+
         readonly RaycastHit[] hitBuffer = new RaycastHit[16];
         IPlayerInput input;
         float nextAttackTime;
@@ -57,18 +62,28 @@ namespace AshenRealm.Combat
         bool ranged;
         float moveMultiplier = 1f;
         float poisonUntil;
+        float classDamage = 25f;
+        float gearSpeed = 1f;
+        float lifesteal;
+        int gearMagic;
 
         public bool IsBlocking { get; private set; }
+        /// <summary>False under a roof: the weapons stay at the door, and nothing swings, blocks or casts.</summary>
+        public bool Armed { get; private set; } = true;
         public bool IsAttacking => Time.time < attackStartTime + attackDuration;
         public float Damage => damage;
         /// <summary>Sharper weapons from the forge and whatever fury or weakness the player is under.</summary>
         public float OutgoingMultiplier => (1f + 0.12f * (GameSession.Instance != null ? GameSession.Instance.WeaponLevel : 0)) * (status != null ? status.DamageMultiplier : 1f);
         public float Range => range;
+        /// <summary>What the gear adds to the class's abilities.</summary>
+        public float AbilityMultiplier => 1f + gearMagic * AbilityPowerPerPoint;
 
         /// <summary>Raised when the sword damages something: (target, damage applied).</summary>
         public event Action<IDamageable, float> HitLanded;
         /// <summary>Raised when the shield absorbs a blow: (damage absorbed).</summary>
         public event Action<float> Blocked;
+        /// <summary>Raised when the player puts the weapons down or takes them up.</summary>
+        public event Action ArmedChanged;
 
         void Awake() => input = inputSource;
 
@@ -83,12 +98,18 @@ namespace AshenRealm.Combat
         void Update()
         {
             if (input == null || (health != null && !health.IsAlive)) return;
+            if (!Armed)
+            {
+                input.ConsumeAttack();
+                controller.SpeedMultiplier = moveMultiplier * gearSpeed;
+                return;
+            }
 
             bool attacking = IsAttacking;
             IsBlocking = input.BlockHeld && !attacking && stamina.Current > 0f;
             weapons.SetBlocking(IsBlocking);
             float stance = IsBlocking ? blockMoveSpeedMultiplier : attacking ? attackMoveSpeedMultiplier : 1f;
-            controller.SpeedMultiplier = stance * moveMultiplier * (status != null && status.Stunned ? 0.35f : 1f);
+            controller.SpeedMultiplier = stance * moveMultiplier * gearSpeed * (status != null && status.Stunned ? 0.35f : 1f);
 
             if (!IsBlocking && Time.time >= nextAttackTime && stamina.Current > 0f)
             {
@@ -114,9 +135,25 @@ namespace AshenRealm.Combat
             weapons.PlaySlash(comboIndex++, attackDuration);
         }
 
+        /// <summary>Puts the weapons down at a door, or takes them up again.</summary>
+        public void SetArmed(bool armed)
+        {
+            if (Armed == armed) return;
+            Armed = armed;
+            if (!armed)
+            {
+                IsBlocking = false;
+                hitPending = false;
+                weapons.SetBlocking(false);
+            }
+            weapons.SetPutAway(!armed);
+            ArmedChanged?.Invoke();
+        }
+
         /// <summary>Applies the class's opening stats. Called once, when the class is chosen.</summary>
         public void ApplyClass(ClassDefinition definition)
         {
+            classDamage = definition.Damage;
             damage = definition.Damage;
             attackCooldown = definition.AttackCooldown;
             attackDuration = definition.AttackDuration;
@@ -124,6 +161,18 @@ namespace AshenRealm.Combat
             moveMultiplier = definition.MoveMultiplier;
             ranged = definition.Ranged;
         }
+
+        /// <summary>What the weapon in hand and the relic add. Bolts draw on magic, swings on attack.</summary>
+        public void ApplyGear(int attack, int magic, int speed, float lifestealShare)
+        {
+            damage = DamageWith(attack, magic);
+            gearSpeed = 1f + speed * SpeedPerPoint;
+            gearMagic = magic;
+            lifesteal = lifestealShare;
+        }
+
+        /// <summary>The damage of one blow with these points, before forge work or fury.</summary>
+        public float DamageWith(int attack, int magic) => classDamage + (ranged ? magic : attack) * DamagePerPoint;
 
         /// <summary>For the next few seconds every landed blow also poisons (Poison Blade).</summary>
         public void CoatBlade(float seconds) => poisonUntil = Time.time + seconds;
@@ -140,7 +189,13 @@ namespace AshenRealm.Combat
         {
             if (projectiles == null) return;
             Vector3 origin = aimOrigin.position + aimOrigin.forward * 0.8f + aimOrigin.right * 0.15f - aimOrigin.up * 0.1f;
-            projectiles.Launch(BoltKind.Fire, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true);
+            projectiles.Launch(BoltKind.Fire, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true, null, Drink);
+        }
+
+        /// <summary>The Bloodstone's share of a blow that landed.</summary>
+        void Drink(float dealt)
+        {
+            if (lifesteal > 0f) health.Heal(dealt * lifesteal);
         }
 
         /// <summary>Where the crosshair lands, so a bolt thrown from the hand flies to it.</summary>
@@ -190,6 +245,7 @@ namespace AshenRealm.Combat
                 if (cameraEffects != null) cameraEffects.AddTrauma(0.18f);
                 if (impactEffects != null) impactEffects.Emit(point, normal, ImpactEffects.Kind.Flesh);
                 HitLanded?.Invoke(damageable, applied);
+                Drink(applied);
 
                 var struck = ((Component)damageable).gameObject;
                 if (Time.time < poisonUntil && struck.TryGetComponent(out StatusEffects venom)) venom.ApplyPoison(5f, 5f);

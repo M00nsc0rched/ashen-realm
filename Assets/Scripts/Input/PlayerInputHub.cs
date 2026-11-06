@@ -1,4 +1,5 @@
 using System;
+using AshenRealm.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,7 +12,7 @@ namespace AshenRealm.Input
     [DefaultExecutionOrder(-100)]
     public sealed class PlayerInputHub : MonoBehaviour, IPlayerInput
     {
-        const string SensitivityPrefKey = "AshenRealm.LookSensitivity";
+        static string SensitivityPrefKey => GameSettings.Prefix + "LookSensitivity";
 
         [Header("Look")]
         [Tooltip("Degrees of rotation per pixel of mouse movement.")]
@@ -33,7 +34,7 @@ namespace AshenRealm.Input
         [SerializeField] float sprintToggleIdleCancel = 0.35f;
 
         InputAction moveAction, lookAction, gamepadLookAction, jumpAction, sprintAction, attackAction, blockAction, interactAction;
-        InputAction mouseAttackAction, mouseBlockAction, ability1Action, ability2Action, potionAction;
+        InputAction mouseAttackAction, mouseBlockAction, ability1Action, ability2Action, potionAction, pauseAction, backAction;
         InputAction[] actions;
 
         Vector2 lookAccumulator;
@@ -95,8 +96,7 @@ namespace AshenRealm.Input
         {
             sensitivityMultiplier = PlayerPrefs.GetFloat(SensitivityPrefKey, 1f);
             CreateActions();
-            bool startInTouch = Application.isMobilePlatform || touchControlsInEditor || Touchscreen.current != null;
-            SetTouchMode(startInTouch);
+            ApplyTouchPreference();
         }
 
         void OnEnable()
@@ -151,11 +151,14 @@ namespace AshenRealm.Input
             potionAction = new InputAction("Potion", InputActionType.Button, "<Keyboard>/f");
             potionAction.AddBinding("<Gamepad>/buttonNorth");
 
+            pauseAction = new InputAction("Pause", InputActionType.Button, "<Gamepad>/start");
+            backAction = new InputAction("Back", InputActionType.Button, "<Gamepad>/buttonEast");
+
             actions = new[]
             {
                 moveAction, lookAction, gamepadLookAction, jumpAction, sprintAction,
                 attackAction, blockAction, interactAction, mouseAttackAction, mouseBlockAction,
-                ability1Action, ability2Action, potionAction,
+                ability1Action, ability2Action, potionAction, pauseAction, backAction,
             };
         }
 
@@ -195,12 +198,14 @@ namespace AshenRealm.Input
             }
 
             // Any real touch switches to touch mode automatically (e.g. Device Simulator, touch laptops).
-            if (!touchMode && Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
+            // Not after the player hid the buttons: a controller on a phone must not bring them back at every tap.
+            if (!touchMode && GameSettings.TouchButtonsMode != GameSettings.TouchButtons.Hidden
+                && Touchscreen.current != null && Touchscreen.current.primaryTouch.press.wasPressedThisFrame)
                 SetTouchMode(true);
 
 #if UNITY_EDITOR || UNITY_STANDALONE || UNITY_WEBGL
             if (Keyboard.current != null && Keyboard.current.f1Key.wasPressedThisFrame)
-                SetTouchMode(!touchMode);
+                ChooseTouchButtons(!touchMode);
 #endif
         }
 
@@ -210,7 +215,9 @@ namespace AshenRealm.Input
         void UpdateDesktopCursor()
         {
             cursorCapturedThisFrame = false;
-            bool escape = Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame;
+            // B only steps back through open menus; in play it stays free for the game.
+            bool escape = (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                          || pauseAction.WasPressedThisFrame() || (paused && backAction.WasPressedThisFrame());
             if (Application.isMobilePlatform || touchMode)
             {
                 wasCursorLocked = false;
@@ -254,6 +261,21 @@ namespace AshenRealm.Input
             abilityPressTime[0] = abilityPressTime[1] = -1f;
             touchMove = Vector2.zero;
             touchAttackHeld = touchBlockHeld = false;
+        }
+
+        /// <summary>The player chose (settings, F1): remembered, and it outranks what the device suggests.</summary>
+        public void ChooseTouchButtons(bool shown)
+        {
+            GameSettings.TouchButtonsMode = shown ? GameSettings.TouchButtons.Shown : GameSettings.TouchButtons.Hidden;
+            ApplyTouchPreference();
+        }
+
+        /// <summary>Takes the touch mode from the stored choice, or from the device when there is none.</summary>
+        public void ApplyTouchPreference()
+        {
+            GameSettings.TouchButtons mode = GameSettings.TouchButtonsMode;
+            bool device = Application.isMobilePlatform || touchControlsInEditor || Touchscreen.current != null;
+            SetTouchMode(mode == GameSettings.TouchButtons.Shown || (mode == GameSettings.TouchButtons.Auto && device));
         }
 
         public void SetTouchMode(bool enabled)

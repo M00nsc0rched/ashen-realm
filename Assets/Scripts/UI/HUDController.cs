@@ -67,6 +67,7 @@ namespace AshenRealm.UI
         float chipValue = 1f;
         float chipDelay;
         float notificationTimer;
+        int notificationFrame = -1;
         float vignette;
         float enemyBarTimer;
         int focusRevision;
@@ -124,7 +125,9 @@ namespace AshenRealm.UI
 
         void ShowNotification(string message)
         {
-            notificationText.text = message;
+            // Two things said on one arrival share the box, or the second would wipe the first.
+            notificationText.text = Time.frameCount == notificationFrame ? $"{notificationText.text}\n{message}" : message;
+            notificationFrame = Time.frameCount;
             notificationTimer = notificationDuration;
         }
 
@@ -164,7 +167,7 @@ namespace AshenRealm.UI
         void UpdateCenter(float dt)
         {
             string prompt = interactor != null && interactor.isActiveAndEnabled ? interactor.CurrentPrompt : string.Empty;
-            bool hasPrompt = !string.IsNullOrEmpty(prompt);
+            bool hasPrompt = !string.IsNullOrEmpty(prompt) && (input == null || !input.Paused); // a panel over the world has no use for it
             if (hasPrompt)
                 promptText.text = input != null && input.TouchMode ? prompt : GameText.InteractKey + prompt;
             promptGroup.alpha = Mathf.MoveTowards(promptGroup.alpha, hasPrompt ? 1f : 0f, dt * 8f);

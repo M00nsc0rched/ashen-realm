@@ -8,7 +8,7 @@ namespace AshenRealm.Interactions
     /// One of Graveborne's honor-shaped encounters, standing in a room. The dishonoured see a dark shape where the
     /// honorable see a person: both figures are in the prefab and the session's honor picks one.
     /// </summary>
-    public sealed class EncounterSite : MonoBehaviour, IInteractable
+    public sealed class EncounterSite : MonoBehaviour, IInteractable, ISavedState
     {
         [SerializeField] string encounterId;
         [SerializeField] StoryDirector director;
@@ -18,6 +18,7 @@ namespace AshenRealm.Interactions
         bool resolved;
 
         public string EncounterId => encounterId;
+        public string SaveKey => "enc_" + encounterId;
         public string InteractionPrompt => resolved ? string.Empty : GameText.Approach;
         public bool CanInteract(GameObject interactor) => !resolved;
 
@@ -29,6 +30,12 @@ namespace AshenRealm.Interactions
 
         /// <summary>The choice is made; whoever was here is gone.</summary>
         public void Resolve()
+        {
+            ApplyCleared();
+            if (GameSession.Instance != null) GameSession.Instance.SetFlag(SaveKey);
+        }
+
+        public void ApplyCleared()
         {
             resolved = true;
             clearFigure.SetActive(false);

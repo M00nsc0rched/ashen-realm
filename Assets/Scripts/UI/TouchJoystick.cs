@@ -33,7 +33,8 @@ namespace AshenRealm.UI
 
         public void OnPointerDown(PointerEventData eventData)
         {
-            if (pointerId != NoPointer) return;
+            // While paused the layout editor owns the screen, and this zone must not jump under its drags.
+            if (pointerId != NoPointer || (input != null && input.Paused)) return;
             pointerId = eventData.pointerId;
 
             // Re-centre the base under the finger, clamped so it stays inside the zone.

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using AshenRealm.AI;
 using AshenRealm.Core;
 using AshenRealm.Interactions;
+using AshenRealm.Player;
 using AshenRealm.UI;
 using AshenRealm.World;
 using UnityEngine;
@@ -12,8 +13,11 @@ namespace AshenRealm.Story
     /// Runs the story around the fighting: choosing a class, conversations and services, encounters, guardian speeches,
     /// the rewards for what falls, the whispers of the deep and the ending. Everything that talks goes through here.
     /// </summary>
-    public sealed class StoryDirector : MonoBehaviour
+    public sealed class StoryDirector : MonoBehaviour, IShopCounter
     {
+        /// <summary>Set while a soul has had the chapel's words; a descent clears it, as a stay in the city ends in Graveborne.</summary>
+        public const string BlessedFlag = "chapel_blessed";
+
         const int ForgeBaseCost = 40;
         const int RestCost = 12;
         const int HealCost = 10;
@@ -21,20 +25,29 @@ namespace AshenRealm.Story
         const int AbsolutionHonor = 15;
         const int PotionCost = 18;
         const float WhisperMin = 45f, WhisperMax = 90f;
-        const int ValleyZone = 0;
-        const int CityZone = 1;
+        const int KnightBlessingHonor = 6;
+        const int ThiefBlessingHonor = 4;
+        const int CoinBackSouls = 6;
+        const int CoinBackGold = 40;
+
+        // Graveborne's offerings: gold given, Souls written down.
+        static readonly int[,] Offerings = { { 60, 4 }, { 150, 12 }, { 400, 36 } };
 
         [SerializeField] GameSession session;
+        [SerializeField] SoulKeeper keeper;
         [SerializeField] DialoguePanel dialogue;
         [SerializeField] ZoneManager zones;
         [SerializeField] PauseMenu pauseMenu;
+        [SerializeField] PortraitLibrary portraits;
+        [SerializeField] ShopPanel shop;
+        [SerializeField] PlayerClassRig classRig;
         [SerializeField] AshenRealm.Combat.Health playerHealth;
         [SerializeField] AshenRealm.Combat.PlayerAbilities playerAbilities;
 
         float nextWhisper;
 
-        /// <summary>True once the Gloamlord has fallen.</summary>
-        public bool Finished { get; private set; }
+        /// <summary>True once the Gloamlord has fallen; the flag makes it survive a load.</summary>
+        public bool Finished => session.HasFlag(DeadFlag("gloamlord"));
 
         void OnEnable()
         {
@@ -55,7 +68,8 @@ namespace AshenRealm.Story
             zones.Arrived += OnZoneArrived;
             nextWhisper = Time.time + WhisperMin;
             UpdateObjective();
-            ShowClassChoice();
+            keeper.Loaded += OnSoulLoaded;
+            session.EquipmentChanged += UpdateObjective;
         }
 
         void Update()
@@ -66,39 +80,22 @@ namespace AshenRealm.Story
             GameMessages.Notify(StoryText.Whispers[Random.Range(0, StoryText.Whispers.Length)]);
         }
 
-        // ---- Class choice ----------------------------------------------------------------------------
+        // ---- A new soul ------------------------------------------------------------------------------
 
-        void ShowClassChoice()
+        /// <summary>A class was taken from the row of cards.</summary>
+        public void StartSoul(CharacterClass id)
         {
-            var options = new string[Catalog.Classes.Length];
-            for (int i = 0; i < options.Length; i++)
-                options[i] = $"{Catalog.Classes[i].Name} - {Catalog.Classes[i].Role}";
-            dialogue.Show(GameText.ChooseSoul, StoryText.Prologue, options, ShowClassDetails);
-        }
-
-        void ShowClassDetails(int index)
-        {
-            ClassDefinition c = Catalog.Classes[index];
-            string body = $"{c.Backstory}\n\n{GameText.GoalLabel}: {c.Goal}\n\n" +
-                          $"{c.Ability1.Name}: {c.Ability1.Description}\n{c.Ability2.Name}: {c.Ability2.Description}";
-            dialogue.Show(c.Name, body, new[] { GameText.Begin, GameText.Back }, answer =>
+            session.ChooseClass(id);
+            keeper.Begin();
+            int testZone = ZoneFromUrl();
+            if (testZone > 0)
             {
-                if (answer != 0)
-                {
-                    ShowClassChoice();
-                    return;
-                }
-                session.ChooseClass(c.Id);
-                int testZone = ZoneFromUrl();
-                if (testZone > 0)
-                {
-                    zones.Travel(testZone, false);
-                    return;
-                }
-                zones.ShowTitle();
-                GameMessages.Notify(CurrentObjective());
-                UpdateObjective();
-            });
+                zones.Travel(testZone, false);
+                return;
+            }
+            zones.ShowTitle();
+            GameMessages.Notify(CurrentObjective());
+            UpdateObjective();
         }
 
         /// <summary>Test link: "?zone=4" starts there, so deep zones can be reviewed in the browser without playing down to them.</summary>
@@ -114,6 +111,12 @@ namespace AshenRealm.Story
 
         public void TalkTo(NpcDefinition npc)
         {
+            keeper.Discover(CodexBook.PersonId(npc.Id));
+            OpenConversation(npc);
+        }
+
+        void OpenConversation(NpcDefinition npc)
+        {
             var options = new List<string>();
             var actions = new List<System.Action>();
             void Add(string label, System.Action action)
@@ -128,9 +131,12 @@ namespace AshenRealm.Story
                     Add(string.Format(GameText.RestOption, RestCost), () => Rest(npc));
                     break;
                 case NpcService.Forge:
+                    Add(GameText.SteelOption, () => OpenShop(ItemSlot.Weapon));
                     Add(string.Format(GameText.ForgeOption, ForgeCost), () => Temper(npc));
                     break;
                 case NpcService.Chapel:
+                    Add(GameText.RelicsOption, () => OpenShop(ItemSlot.Relic));
+                    Add(GameText.OfferingOption, () => Offering(npc));
                     Add(string.Format(GameText.AbsolutionOption, AbsolutionCost, AbsolutionHonor), () => Absolve(npc));
                     Add(string.Format(GameText.HealOption, HealCost), () => Mend(npc));
                     break;
@@ -141,7 +147,22 @@ namespace AshenRealm.Story
             }
             Add(GameText.Leave, null);
 
-            dialogue.Show(npc.Name, $"{npc.Intro}\n\n{LineFor(npc)}", options.ToArray(), i => actions[i]?.Invoke());
+            string line = npc.Service == NpcService.Chapel ? Blessing() ?? LineFor(npc) : LineFor(npc);
+            dialogue.Show(npc.Name, $"{npc.Intro}\n\n{line}", options.ToArray(), i => actions[i]?.Invoke(), FaceOf(npc));
+        }
+
+        /// <summary>
+        /// Two classes get something out of walking into the chapel that the others do not: one because the order still means
+        /// something to them, one because they are the only person in Hollowgate who thinks they need to be there.
+        /// </summary>
+        string Blessing()
+        {
+            bool knight = session.Class.Id == CharacterClass.Knight;
+            if (session.HasFlag(BlessedFlag) || (!knight && session.Class.Id != CharacterClass.Gravethief)) return null;
+            session.SetFlag(BlessedFlag);
+            int gain = knight ? KnightBlessingHonor : ThiefBlessingHonor;
+            session.AddHonor(gain);
+            return $"{(knight ? StoryText.KnightBlessing : StoryText.ThiefBlessing)}\n\n{string.Format(GameText.HonorRises, gain)}";
         }
 
         string LineFor(NpcDefinition npc)
@@ -154,17 +175,20 @@ namespace AshenRealm.Story
             return classLine ?? npc.Fallback;
         }
 
+        /// <summary>How they look at this soul: the three faces follow honor, as the city's moods do in Graveborne.</summary>
+        Sprite FaceOf(NpcDefinition npc) => portraits.Face(npc.Id, session.Alignment);
+
         int ForgeCost => ForgeBaseCost + session.WeaponLevel * 30;
 
         void Paid(NpcDefinition npc, int cost, System.Action effect, string message)
         {
             if (!session.TrySpend(cost))
             {
-                dialogue.Show(npc.Name, GameText.NotEnoughGold, new[] { GameText.Leave }, _ => { });
+                dialogue.Show(npc.Name, GameText.NotEnoughGold, new[] { GameText.Leave }, _ => { }, FaceOf(npc));
                 return;
             }
             effect();
-            dialogue.Show(npc.Name, message, new[] { GameText.Leave }, _ => { });
+            dialogue.Show(npc.Name, message, new[] { GameText.Leave }, _ => { }, FaceOf(npc));
         }
 
         void Rest(NpcDefinition npc) => Paid(npc, RestCost, () =>
@@ -178,11 +202,79 @@ namespace AshenRealm.Story
         void Mend(NpcDefinition npc) => Paid(npc, HealCost, playerHealth.ResetHealth, GameText.HealDone);
         void BuyPotion(NpcDefinition npc) => Paid(npc, PotionCost, () => session.AddPotions(1), GameText.PotionDone);
 
+        // ---- The forge's steel and the chapel's relics -------------------------------------------------
+
+        /// <summary>Opens the counter of the place that sells these goods.</summary>
+        public void OpenShop(ItemSlot goods)
+        {
+            int zone = goods == ItemSlot.Weapon ? ZoneNumbers.Forge : ZoneNumbers.Chapel;
+            shop.Open(StoryText.ZoneTitles[zone], Catalog.ItemsOf(goods), this);
+        }
+
+        public string Balance => string.Format(MenuText.BalanceFormat, session.Gold, keeper.Souls);
+
+        public bool IsCarried(ItemDefinition item) => session.IsEquipped(item);
+
+        public string PriceOf(ItemDefinition item) =>
+            string.Format(item.Slot == ItemSlot.Weapon ? MenuText.PriceGoldFormat : MenuText.PriceSoulsFormat, item.Price);
+
+        /// <summary>Some goods do nothing for some classes: a sword does not sharpen a witch's bolts, and the shop says so.</summary>
+        public string EffectOf(ItemDefinition item)
+        {
+            if (IsCarried(item)) return string.Empty;
+            float now = classRig.Damage, then = classRig.DamageWith(item);
+            if (item.Slot == ItemSlot.Relic && Mathf.Approximately(now, then)) return string.Empty;
+            return string.Format(MenuText.DamageFormat, Mathf.RoundToInt(now), Mathf.RoundToInt(then));
+        }
+
+        public string Buy(ItemDefinition item)
+        {
+            bool paid = item.Slot == ItemSlot.Weapon ? session.TrySpend(item.Price) : keeper.TrySpendSouls(item.Price);
+            if (!paid) return item.Slot == ItemSlot.Weapon ? GameText.NotEnoughGold : GameText.NotEnoughSouls;
+
+            ItemDefinition replaced = session.Equip(item);
+            string result = string.Format(MenuText.BoughtFormat, item.Name);
+            if (replaced != null)
+            {
+                int coin = Catalog.TradeIn(replaced);
+                session.AddGold(coin);
+                result = string.Format(MenuText.BoughtTradedFormat, item.Name, replaced.Name, coin);
+            }
+            keeper.Save();
+            return result;
+        }
+
+        /// <summary>The Choir takes coin and enters it in the ledger as Souls, and gives a little back for a price.</summary>
+        void Offering(NpcDefinition npc)
+        {
+            var options = new List<string>();
+            for (int i = 0; i < Offerings.GetLength(0); i++)
+                options.Add(string.Format(GameText.OfferingLine, Offerings[i, 0], Offerings[i, 1]));
+            options.Add(string.Format(GameText.CoinBackLine, CoinBackSouls, CoinBackGold));
+            options.Add(GameText.Leave);
+
+            dialogue.Show(npc.Name, Balance, options.ToArray(), choice =>
+            {
+                if (choice < Offerings.GetLength(0))
+                {
+                    int souls = Offerings[choice, 1];
+                    Paid(npc, Offerings[choice, 0], () => keeper.AddSouls(souls), string.Format(GameText.OfferingDone, souls));
+                }
+                else if (choice == Offerings.GetLength(0))
+                {
+                    bool paid = keeper.TrySpendSouls(CoinBackSouls);
+                    if (paid) session.AddGold(CoinBackGold);
+                    dialogue.Show(npc.Name, paid ? GameText.CoinBackDone : GameText.NotEnoughSouls, new[] { GameText.Leave }, _ => { }, FaceOf(npc));
+                }
+            }, FaceOf(npc));
+        }
+
         // ---- Encounters ------------------------------------------------------------------------------
 
         public void StartEncounter(EncounterDefinition encounter, EncounterSite site)
         {
             EncounterVariant variant = session.SeesWarped && encounter.Warped != null ? encounter.Warped : encounter.Clear;
+            keeper.Discover(CodexBook.EncounterId(encounter.Id, variant == encounter.Warped));
             var labels = new string[variant.Choices.Length];
             for (int i = 0; i < labels.Length; i++) labels[i] = variant.Choices[i].Label;
             dialogue.Show(encounter.Name, variant.Text, labels, i => Resolve(encounter, variant.Choices[i], site));
@@ -222,6 +314,9 @@ namespace AshenRealm.Story
             int gold = Random.Range(d.GoldMin, d.GoldMax + 1);
             session.AddGold(gold);
             session.SetFlag(DeadFlag(d.Id));
+            session.SetFlag(enemy.SaveKey);
+            keeper.Discover(CodexBook.FoeId(d.Id));
+            keeper.GainSouls(d.Rank);
 
             if (d.Rank == EnemyRank.Boss)
             {
@@ -231,6 +326,7 @@ namespace AshenRealm.Story
             {
                 GameMessages.Notify($"{d.Dialogue.Defeat} {GameText.StairUnbarred}");
                 session.AddPotions(1);
+                keeper.Save();
                 UpdateObjective();
             }
             else if (d.Rank == EnemyRank.Elite)
@@ -244,32 +340,50 @@ namespace AshenRealm.Story
         void OnKnightSlain()
         {
             session.SetFlag(DeadFlag("knight"));
+            keeper.Discover(CodexBook.KnightId);
+            keeper.GainSouls(EnemyRank.Guardian);
             session.AddGold(25);
             UpdateObjective();
         }
 
         void ShowEnding(EnemyDefinition boss)
         {
-            Finished = true;
             string body = $"{boss.Dialogue.Defeat}\n\n{session.Class.Ending}\n\n{GameText.EndingStats(session.Honor, session.Gold)}";
-            dialogue.Show(GameText.EndingTitle, body, new[] { GameText.BackToCity }, _ => zones.Travel(CityZone, false));
+            keeper.Save();
+            dialogue.Show(GameText.EndingTitle, body, new[] { GameText.BackToCity }, _ => zones.Travel(ZoneNumbers.City, false));
         }
 
         // ---- Objective -------------------------------------------------------------------------------
 
-        void OnZoneArrived(Zone zone) => UpdateObjective();
+        void OnZoneArrived(Zone zone)
+        {
+            UpdateObjective();
+            if (zone.Indoors) GameMessages.Notify(GameText.WeaponsDown);
+        }
+
+        void OnSoulLoaded()
+        {
+            UpdateObjective();
+            GameMessages.Notify(CurrentObjective());
+        }
 
         void UpdateObjective()
         {
-            if (pauseMenu != null) pauseMenu.SetObjective(CurrentObjective());
+            if (pauseMenu == null) return;
+            string gear = session.Weapon == null && session.Relic == null ? string.Empty
+                : "\n\n" + string.Format(MenuText.GearFormat, session.Weapon?.Name ?? MenuText.GearNothing, session.Relic?.Name ?? MenuText.GearNothing);
+            pauseMenu.SetObjective(CurrentObjective() + gear);
         }
 
         public string CurrentObjective()
         {
             int zone = zones.CurrentIndex;
-            if (zone == ValleyZone)
+            if (zone == ZoneNumbers.Valley)
                 return session.HasFlag(DeadFlag("knight")) ? GameText.ObjectiveValleyOpen : GameText.Objective;
-            if (zone == CityZone) return GameText.ObjectiveCity;
+            if (zone == ZoneNumbers.City) return GameText.ObjectiveCity;
+            if (zone == ZoneNumbers.Tavern) return GameText.ObjectiveTavern;
+            if (zone == ZoneNumbers.Forge) return GameText.ObjectiveForge;
+            if (zone == ZoneNumbers.Chapel) return GameText.ObjectiveChapel;
             if (Finished) return GameText.ObjectiveDone;
             return GameText.ObjectiveDepth;
         }

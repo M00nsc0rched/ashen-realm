@@ -5,8 +5,8 @@ using UnityEngine;
 namespace AshenRealm.Story
 {
     /// <summary>
-    /// The state of one descent: who you are, what your name is worth, and what you are carrying. Lives for the page
-    /// session (Graveborne's saves are not ported yet).
+    /// The state of one soul: who you are, what your name is worth, and what you are carrying. SoulKeeper writes it to the
+    /// roster and reads it back.
     /// </summary>
     public sealed class GameSession : MonoBehaviour
     {
@@ -24,6 +24,10 @@ namespace AshenRealm.Story
         public int Gold { get; private set; }
         public int Potions { get; private set; } = 1;
         public int WeaponLevel { get; private set; }
+        public int Descents { get; private set; }
+        public ItemDefinition Weapon { get; private set; }
+        public ItemDefinition Relic { get; private set; }
+        public IEnumerable<string> Flags => flags;
 
         public Alignment Alignment => Honor <= MarkedAt ? Alignment.Marked : Honor >= HallowedAt ? Alignment.Hallowed : Alignment.Mortal;
         /// <summary>The dishonoured see the warped version of every encounter.</summary>
@@ -32,6 +36,8 @@ namespace AshenRealm.Story
         /// <summary>Raised whenever honor, gold, potions or weapon level change.</summary>
         public event Action Changed;
         public event Action<ClassDefinition> ClassSelected;
+        /// <summary>Raised when something bought goes into the hand or round the neck.</summary>
+        public event Action EquipmentChanged;
 
         void Awake() => Instance = this;
 
@@ -40,9 +46,31 @@ namespace AshenRealm.Story
             Class = Catalog.ClassOf(id);
             ClassChosen = true;
             Honor = Class.StartHonor;
+            Weapon = null;
+            Relic = null;
             ClassSelected?.Invoke(Class);
             Changed?.Invoke();
         }
+
+        /// <summary>Takes on a saved soul. The class event dresses the player; the keeper puts back the rest.</summary>
+        public void Restore(SoulRecord soul)
+        {
+            Class = Catalog.ClassOf(soul.Class);
+            ClassChosen = true;
+            Honor = soul.Honor;
+            Gold = soul.Gold;
+            Potions = soul.Potions;
+            WeaponLevel = soul.WeaponLevel;
+            Descents = soul.Descents;
+            Weapon = Catalog.Item(soul.WeaponId);
+            Relic = Catalog.Item(soul.RelicId);
+            flags.Clear();
+            flags.UnionWith(soul.Flags);
+            ClassSelected?.Invoke(Class);
+            Changed?.Invoke();
+        }
+
+        public void AddDescent() => Descents++;
 
         public void AddHonor(int amount)
         {
@@ -76,7 +104,29 @@ namespace AshenRealm.Story
             Changed?.Invoke();
         }
 
+        /// <summary>Takes the item up in place of what its slot held, and returns that.</summary>
+        public ItemDefinition Equip(ItemDefinition item)
+        {
+            ItemDefinition replaced;
+            if (item.Slot == ItemSlot.Weapon)
+            {
+                replaced = Weapon;
+                Weapon = item;
+            }
+            else
+            {
+                replaced = Relic;
+                Relic = item;
+            }
+            EquipmentChanged?.Invoke();
+            Changed?.Invoke();
+            return replaced;
+        }
+
+        public bool IsEquipped(ItemDefinition item) => Weapon == item || Relic == item;
+
         public void SetFlag(string flag) => flags.Add(flag);
+        public void ClearFlag(string flag) => flags.Remove(flag);
         public bool HasFlag(string flag) => flags.Contains(flag);
     }
 }

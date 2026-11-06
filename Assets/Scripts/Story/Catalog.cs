@@ -66,6 +66,81 @@ namespace AshenRealm.Story
 
         public static ClassDefinition ClassOf(CharacterClass id) => Classes[(int)id];
 
+        // ---- Class cards -----------------------------------------------------------------------------
+
+        /// <summary>
+        /// The row of the class choice, in Graveborne's order. The Necromancer and the Alchemist are earned classes there and
+        /// are not ported yet, so here they are cards without a class. The passives are the cards' text; none works in the game yet.
+        /// </summary>
+        public static readonly ClassCard[] Cards =
+        {
+            Card(CharacterClass.Knight, "CardKnight", 60, 6, 14, 12, 4, 6, "Esküvel Kötve",
+                "Élőholtak ellen pajzzsal és felszított dühvel kezded a harcot."),
+            Card(CharacterClass.Gravethief, "CardGravethief", 34, 8, 16, 6, 6, 12, "A Gégemetsző Szerencséje",
+                "Minden harcban az érme dönt: minden csapás vérzést okoz, vagy a kritikus találatok erősebben sebeznek."),
+            Card(CharacterClass.Witch, "CardWitch", 20, 25, 2, 8, 19, 3, "Felhalmozódás",
+                "Minden megnyert harc után +5 egy véletlen tulajdonságra és +5 erő egy véletlen képességre a lemerülés végéig."),
+            Card(CharacterClass.Warden, "CardWarden", 30, 9, 11, 10, 12, 7, "Utolsó Virrasztás",
+                "Lemerülésenként egyszer a halálos csapás 1 ÉP-n hagy. Két köröd van legyőzni az ellenfelet, különben meghalsz."),
+            new ClassCard
+            {
+                Art = "CardNecromancer", Name = "A Nekromanta", Role = "Az elátkozott", Honor = -20,
+                Health = 25, Focus = 30, Attack = 5, Defense = 9, Magic = 47, Speed = 10, PassiveName = "Az Átkozott Ösvény",
+                PassiveText = "Minden lemerülés elején Támadó vagy Védekező ösvényt választasz. A futamon csak annak varázslatait tanulhatod meg.",
+            },
+            new ClassCard
+            {
+                Art = "CardAlchemist", Name = "Az Alkimista", Role = "Egy másik életben csapos", Honor = 10,
+                Health = 30, Focus = 8, Attack = 0, Defense = 17, Magic = 0, Speed = 14, UsesIntellect = true, PassiveName = "Vas Szájpadlás",
+                PassiveText = "Immunis vagy a méregre, a rothadásra és a vérzésre.",
+            },
+        };
+
+        static ClassCard Card(CharacterClass id, string art, int health, int focus, int attack, int defense, int magic, int speed, string passiveName, string passiveText)
+        {
+            ClassDefinition c = ClassOf(id);
+            return new ClassCard
+            {
+                Class = c, Art = art, Name = c.Name, Role = c.Role, Honor = c.StartHonor,
+                Health = health, Focus = focus, Attack = attack, Defense = defense, Magic = magic, Speed = speed,
+                PassiveName = passiveName, PassiveText = passiveText,
+            };
+        }
+
+        // ---- Goods -----------------------------------------------------------------------------------
+
+        /// <summary>The Cold Forge's four and the Grey Chapel's three, the ones Graveborne stocks first. Prices use its formulas.</summary>
+        public static readonly ItemDefinition[] Items =
+        {
+            Steel("rusted_blade", "Rozsdás Penge", "Kicsorbult, de még harap.", attack: 3),
+            Steel("iron_sword", "Vaskard", "Becsületes acél.", attack: 6),
+            Steel("grave_dagger", "Sírtőr", "Gyors, mint a megbánás.", attack: 4, speed: 1),
+            Steel("pilgrim_staff", "Zarándokbot", "Tízezer mérföldnyi ima koptatta simára.", magic: 4, focus: 1),
+            Relic("bloodstone", "Vérkő", "A csapásaid isznak egy keveset az életből.", lifesteal: 0.15f),
+            Relic("witch_eye", "Boszorkányszem", "A láthatatlant figyeli.", magic: 5, focus: 3),
+            Relic("grave_idol", "Sírbálvány", "Kis isten kis kegyelmekért.", magic: 3, health: 8),
+        };
+
+        static ItemDefinition Steel(string id, string name, string description, int attack = 0, int magic = 0, int speed = 0, int focus = 0)
+        {
+            var item = new ItemDefinition { Id = id, Name = name, Description = description, Slot = ItemSlot.Weapon, Attack = attack, Magic = magic, Speed = speed, Focus = focus };
+            item.Price = (int)System.Math.Round(14f + item.Points * 5f);
+            return item;
+        }
+
+        static ItemDefinition Relic(string id, string name, string description, int magic = 0, int focus = 0, int health = 0, float lifesteal = 0f)
+        {
+            var item = new ItemDefinition { Id = id, Name = name, Description = description, Slot = ItemSlot.Relic, Magic = magic, Focus = focus, Health = health, Lifesteal = lifesteal };
+            item.Price = (int)System.Math.Round(20f + item.Points * 3f + (lifesteal > 0f ? 12f : 0f));
+            return item;
+        }
+
+        public static ItemDefinition Item(string id) => Items.FirstOrDefault(i => i.Id == id);
+        public static ItemDefinition[] ItemsOf(ItemSlot slot) => Items.Where(i => i.Slot == slot).ToArray();
+
+        /// <summary>The coin the seller gives for what the new thing replaces, as in Graveborne.</summary>
+        public static int TradeIn(ItemDefinition item) => 6 + (int)System.Math.Round(item.Points);
+
         // ---- Enemies ---------------------------------------------------------------------------------
 
         static EnemyMove Hit(string name, int weight, float damage) => new EnemyMove { Name = name, Kind = MoveKind.Melee, Weight = weight, Damage = damage };
@@ -196,6 +271,20 @@ namespace AshenRealm.Story
         /// <summary>Every player-facing string in this table, for the validator's font check.</summary>
         public static IEnumerable<string> AllStrings()
         {
+            foreach (var card in Cards)
+            {
+                yield return card.Name;
+                yield return card.Role;
+                yield return card.PassiveName;
+                yield return card.PassiveText;
+            }
+
+            foreach (var item in Items)
+            {
+                yield return item.Name;
+                yield return item.Description;
+            }
+
             foreach (var c in Classes)
             {
                 yield return c.Name;

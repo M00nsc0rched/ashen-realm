@@ -10,8 +10,9 @@ namespace AshenRealm.Interactions
     /// <summary>
     /// One-shot lootable chest: swings its lid open, heals the opener and posts a reward notification.
     /// </summary>
-    public sealed class TreasureChest : MonoBehaviour, IInteractable
+    public sealed class TreasureChest : MonoBehaviour, IInteractable, ISavedState
     {
+        [SerializeField] string saveKey = "";
         [SerializeField] Transform lid;
         [Tooltip("Lid rotation about its hinge (local X) when fully open.")]
         [SerializeField] float openAngle = 110f;
@@ -29,6 +30,7 @@ namespace AshenRealm.Interactions
 
         public bool IsOpen => opened;
         public string InteractionPrompt => opened ? string.Empty : prompt;
+        public string SaveKey => saveKey;
 
         void Awake()
         {
@@ -41,6 +43,7 @@ namespace AshenRealm.Interactions
         {
             if (opened) return;
             opened = true;
+            if (GameSession.Instance != null) GameSession.Instance.SetFlag(saveKey);
 
             var health = interactor != null ? interactor.GetComponentInParent<Health>() : null;
             if (health != null && healAmount > 0f) health.Heal(healAmount);
@@ -54,6 +57,12 @@ namespace AshenRealm.Interactions
             GameMessages.Notify(rewardMessage);
             StartCoroutine(OpenRoutine());
             Opened?.Invoke();
+        }
+
+        public void ApplyCleared()
+        {
+            opened = true;
+            lid.localRotation *= Quaternion.Euler(openAngle, 0f, 0f);
         }
 
         IEnumerator OpenRoutine()

@@ -15,19 +15,25 @@ namespace AshenRealm.Story
         /// <summary>Zone title cards: the valley, the city, then the five depths of the Deep Dark.</summary>
         public static readonly string[] ZoneTitles =
         {
-            "HAMUVÖLGY", "ÜREGKAPU", "A KATAKOMBÁK", "A GOMBAMÉLY", "A SÜLLYEDT KIKÖTŐ", "A PARÁZS-SZAKADÉK", "A FEHÉRVELŐ",
+            "HAMUVÖLGY", "ÜREGKAPU", "A KÖTÉL ÉS LÁMPÁS", "A HIDEG KOHÓ", "A SZÜRKE KÁPOLNA", "A KATAKOMBÁK", "A GOMBAMÉLY", "A SÜLLYEDT KIKÖTŐ", "A PARÁZS-SZAKADÉK", "A FEHÉRVELŐ",
         };
 
         public static readonly string[] ZoneSubtitles =
         {
             "Az út a város felé.",
             "Az utolsó város a Mélysötét fölött.",
+            "Munka, ital, és az egyetlen ajtó Üregkapuban, amely lefelé vezet.",
+            "Acél pénzért, és még több acél abba verve, amit már hordasz.",
+            "A Kórus őrzi a korlátot, a könyvet, és azt, ami mögötte van.",
             "1. mélység. A régi sötét - kő, só, és a türelmes holtak.",
             "2. mélység. A spórafény úgy száll, mint a hó. Itt minden türelmesen felfalja a többit.",
             "3. mélység. Mocsárrá lett vízbe fúlt kikötő - korhadt mólók és fekete víz.",
             "4. mélység. A hőség a világ repedéseiből lélegzik fel. A Kórus fanatikusai imádják ezt a helyet.",
             "5. mélység. Rakott csontfalak, imával habarcsolva. Az itteni holtak sosem fejezték be a halált.",
         };
+
+        public const string KnightBlessing = "»A rend hamu, és te mégis eljöttél. Térdelj le. A Kórusnak semmibe nem kerül kimondani a szavakat, és jól látszik, hogy neked valamibe kerül végighallgatni őket.«";
+        public const string ThiefBlessing = "»Bejöttél. Ebben a városban mindenki tudja, mi vagy, és te mégis bejöttél, és hátul álltál meg, ahol azt hitted, senki nem néz.«";
 
         public static readonly NpcDefinition[] Npcs =
         {
@@ -57,24 +63,63 @@ namespace AshenRealm.Story
             },
             new NpcDefinition
             {
-                Id = "quartermaster", Name = "Halloway őrmester", Service = NpcService.Forge,
-                Intro = "A mellette álló tábla az egyetlen hivatalos dolog, ami Üregkapuban maradt. A kohó tüze el van fojtva, de neki még van szene.",
+                Id = "quartermaster", Name = "Halloway őrmester",
+                Intro = "A mellette álló tábla az egyetlen hivatalos dolog, ami Üregkapuban maradt. A hirdetményeket maga írja, olyan kézírással, amelyet igénylőlapokhoz képeztek ki.",
                 Knight = "»Rendbéli. Akkor el tud olvasni egy hirdetményt anélkül, hogy tartanám. Vigye, amit elbír.«",
                 Gravethief = "»Nem érdekel, ki hozza be a fejet. Már nem érdekel. Olvasd a táblát.«",
                 Witch = "»Kötelességem ezeket nyilvánosan kifüggeszteni. Nem kötelességem örülni annak, ki olvassa őket.«",
                 Warden = "»A felülről harmadik hirdetmény kell magának. Az, amelyre a rendje hat éve csendben nem néz rá.«",
                 Marked = "»Maga is rajta van egy hirdetményen. Más városban ez számítana. Itt csak annyit jelent, hogy ismeri a formanyomtatványt.«",
+                Hallowed = "»Hozza a bizonyítékot, és tisztán kifizetem. Meglepődne, milyen ritka a tiszta rész.«",
                 Fallback = "»Minden hirdetmény azon a táblán valaki, aki nem jött vissza. A vérdíj az, ami a zsoldjukból maradt.«",
             },
             new NpcDefinition
             {
-                Id = "gravedigger", Name = "Vas Mabb, a Sírásó", Service = NpcService.Chapel,
-                Intro = "A piac túlsó végén dolgozza a földet, ahol a standok elfogynak. A kápolna kulcsát is ő őrzi, mert senki más nem kérte.",
+                Id = "smith", Name = "A kovács", Service = NpcService.Forge,
+                Intro = "Nem néz fel az üllőről. A tűz az egyetlen dolog Üregkapuban, ami még hallgat rá, és csak annak ég, aki fizet érte.",
+                Fallback = "»A tűz csak akkor hideg, ha senki nem fizet. Mutass pénzt, és mutasd, mit hordasz.«",
+            },
+            new NpcDefinition
+            {
+                Id = "choir", Name = "A Kórus könyvvivője", Service = NpcService.Chapel,
+                Intro = "A Kórus őrzi a korlátot, a könyvet, és azt, ami mögötte van. A könyvvivő nem fordul meg, amikor megszólítod. Tovább ír.",
+                Fallback = "»A pénz kenyeret vesz. A lélek a másik dolgot veszi. Ennél a korlátnál ne keverd össze a kettőt.«",
+            },
+            new NpcDefinition
+            {
+                Id = "gravedigger", Name = "Vas Mabb, a Sírásó",
+                Intro = "A piac túlsó végén dolgozza a földet, ahol a standok elfogynak. Nincs kerítés akörül, amit ás, és sosem volt rá szükség; Üregkapuban senkinek nem kell elmagyarázni, mi az a sarok.",
                 Knight = "»Hamuszürke. Kilencet temettem el a fajtádból. Kettőt kétszer ástam ki, mert az első gödör nem volt elég mély ahhoz, ami feljött belőle.«",
                 Gravethief = "»Az én földemben végzed, mint a többiek, és te leszel az egyetlen, aki őszinte volt afelől, miért jött. Ezért megkapod a jó sarkot.«",
                 Witch = "»A te fajtádnak nem ások. Bármit is hordasz, amikor elmész, az fent marad, és megy a tűzbe.«",
                 Warden = "»Mondd el a szavakat a névteleneknek, jó? Negyedik sor. Tizenegy éve rosszul mondom, és tudom is.«",
-                Fallback = "»Mindenkinek jut sarok. A gödröt is én ások.«",
+                Marked = "»A Kórus nem engedi az elítéltjeit megszentelt földbe. Szerencsédre itt semmi nincs megszentelve.«",
+                Hallowed = "»Kapsz követ. Nem mindenki kap követ.«",
+                Fallback = "»Az egyestől a hatosig minden sor tele van. A hetes ezé a télé. A nyolcasra ne lépj rá.«",
+            },
+            new NpcDefinition
+            {
+                Id = "crier", Name = "Wick, aki a hirdetményeket olvassa",
+                Intro = "Egy felfordított ládán áll ott, ahol régen a tömeg volt, és Halloway hirdetményeit olvassa fel az üres térnek, naponta kétszer, abban az órában, amit mondtak neki. Senki nem szólt neki, hogy hagyja abba.",
+                Knight = "»Egy rendbéli! Állj csak ott egy pillanatra, jó? Jobban hangzik, ha valaki áll előtte.«",
+                Gravethief = "»Rám nincs szükséged. Te előbb elolvasod a hirdetményeket, mint hogy Halloway kitűzné őket, és láttam is, ahogy csinálod.«",
+                Witch = "»Te olvasol. Mindenki, aki olvas, megszűnt rám szorulni, és évről évre kevesebben vagytok, ami vagy jó az üzletnek, vagy nagyon rossz.«",
+                Warden = "»Régen küldtek egy lámpást, hogy velem álljon a második felolvasáson, hogy a hátul állók is lássák a táblát. Hat éve te vagy az első.«",
+                Marked = "»A neved fent van a táblán. Délben és alkonyatkor fel kell olvasnom. Halkan olvasom.«",
+                Hallowed = "»A jó részbe tettem a nevedet, a vérdíjak után, ahol az emberek még figyelnek.«",
+                Fallback = "»Kilenc hirdetmény ma reggel. Kettő ugyanaz az ember. Egy meg egy ház, ami eldőlt.«",
+            },
+            new NpcDefinition
+            {
+                Id = "widow", Name = "A Várakozó Özvegy",
+                Intro = "A stand felsöpörve, a terítő tiszta, és négy éve nincs mit rátenni. Mégis kirakja, mögé ül, és nézi a lépcső száját.",
+                Knight = "»Ő is azt a szürkét viselte. Nem azt a páncélt - azt a szürkét. Ne mondd nekem, hogy közönséges szín, tudom, mit nézek.«",
+                Gravethief = "»Hárommal ment le meg egy tolvajjal, és a tolvaj visszajött. Szóval lehetséges. Szóval valaki mégiscsak visszajön.«",
+                Witch = "»Meg tudod hívni őket? Nem. Ne válaszolj. Egyszer megkérdeztem, és a válasz egy évembe került.«",
+                Warden = "»Ha megtalálod, ne hozd fel. A hírt hozd. Megszoktam a nem-tudást, és inkább azt, mint a másikat.«",
+                Marked = "»Azt mondják, üldöznek. Jó. Ebben a városban valakinek keresnie kellene valakit.«",
+                Hallowed = "»Te elmondanád. Ha megtalálnád, tényleg visszajönnél és elmondanád. Látom rajtad.«",
+                Fallback = "»A stand nem eladásra van. Azért van, hogy amikor feljön, legyen itt valami a miénkből, amit felismer.«",
             },
             new NpcDefinition
             {

@@ -23,15 +23,13 @@ namespace AshenRealm.Core
         public const string DeathTitle = "ELESTÉL";
         public const string DeathSubtitle = "A hamu emlékszik. Újra feltámadsz...";
 
-        // Pause menu
-        public const string Paused = "SZÜNET";
-        public const string Resume = "FOLYTATÁS";
-        public const string Fullscreen = "TELJES KÉPERNYŐ";
-        public const string ExitFullscreen = "ABLAKOS MÓD";
-        public const string LookSpeed = "ÉRZÉKENYSÉG";
+        // Objectives (shown on the pause menu)
         public const string Objective = "Az út Üregkapuba északra vezet, a romos kápolna mögött.\nGyőzd le az Átkozott Lovagot, aki elzárja.";
         public const string ObjectiveValleyOpen = "A kapu szabad. Menj északra, a kápolna mögé, Üregkapuba.";
-        public const string ObjectiveCity = "Beszélj a város lakóival, aztán menj le a Kötél és Lámpás lépcsőjén a Mélysötétbe.";
+        public const string ObjectiveForge = "A kovács acélt ad pénzért, és beléd veri, amit az acél elbír.\nAz utca a tér felé vezet vissza.";
+        public const string ObjectiveChapel = "A könyvvivő lelket vesz és lelket kér, a korlát mögött pedig ereklyék állnak.\nAz utca a tér felé vezet vissza.";
+        public const string ObjectiveCity = "A tértől keletre a Hideg Kohó, nyugatra a Szürke Kápolna, északra a Kötél és Lámpás.\nA Mélysötétbe vezető lépcső a kocsmában van.";
+        public const string ObjectiveTavern = "Beszélj a kocsma népével. A lépcső a hátsó ajtó mögött vár,\nés a Mélysötétbe visz.";
         public const string ObjectiveDepth = "Keresd meg a lépcsőt, győzd le az őrzőjét, és menj tovább lefelé.\nA legmélyén a Gloamlord vár.";
         public const string ObjectiveDone = "A Gloamlord elesett. Térj vissza Üregkapuba.";
 
@@ -62,16 +60,21 @@ namespace AshenRealm.Core
         public const string GateToCity = "ÚT ÜREGKAPUBA";
         public const string GateToValley = "VISSZA A VÖLGYBE";
         public const string StairDown = "LE A LÉPCSŐN";
+        public const string EnterTavern = "BE A KOCSMÁBA";
+        public const string EnterForge = "BE A KOHÓBA";
+        public const string EnterChapel = "BE A KÁPOLNÁBA";
+        public const string LeaveHouse = "KI AZ UTCÁRA";
+        public const string BrowseRack = "A FEGYVERÁLLVÁNY";
+        public const string BrowseRelics = "AZ EREKLYÉK";
+        public const string InspectGallows = "AZ AKASZTÓFA";
+        public const string GallowsLore = "Két sor stand, semmi rajtuk, és egy akasztófa, amit senki nem bontott le, mert a lebontása döntés lenne, és itt már senki nem hoz döntéseket.";
+        public const string WeaponsDown = "A fegyvereidet az ajtónál hagyod.";
         public const string StairUp = "FEL A LÉPCSŐN";
         public const string GateBarred = "Az Átkozott Lovag még áll. Az út csak akkor nyílik meg, ha elesett.";
         public const string StairBarred = "A lépcső nem enged, amíg az őrzője él.";
         public const string ChestGold = "{0} aranyat találtál.";
 
         // Story flow
-        public const string ChooseSoul = "VÁLASSZ LELKET";
-        public const string GoalLabel = "Cél";
-        public const string Begin = "Indulás";
-        public const string Back = "Vissza";
         public const string Leave = "Távozás";
         public const string Continue = "Tovább";
         public const string DrawSteel = "Fegyvert ragadsz";
@@ -87,6 +90,15 @@ namespace AshenRealm.Core
         public const string AbsolutionOption = "Feloldozás rítusa, +{1} becsület ({0} arany)";
         public const string HealOption = "Sebek bekötése ({0} arany)";
         public const string PotionOption = "Gyógyító Főzet ({0} arany)";
+        public const string SteelOption = "Az acél";
+        public const string RelicsOption = "A korlát mögött";
+        public const string OfferingOption = "Az adomány";
+        public const string OfferingLine = "{0} arany: {1} lélek a könyvbe";
+        public const string CoinBackLine = "Pénzt kérni vissza: {0} lélekért {1} arany";
+        public const string OfferingDone = "A Kórus elveszi a pénzt, és {0} lelket ír a könyvbe.";
+        public const string CoinBackDone = "A korlát kinyílik, és negyven arany jön vissza rajta.";
+        public const string HonorRises = "A becsületed {0} ponttal nő.";
+        public const string NotEnoughSouls = "Nincs elég lelked.";
         public const string NotEnoughGold = "Nincs elég aranyad.";
         public const string RestDone = "Életerőd és fókuszod helyreállt.";
         public const string ForgeDone = "A fegyvered mélyebbre harap.";

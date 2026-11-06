@@ -13,7 +13,7 @@ namespace AshenRealm.AI
     /// Guardians wait until confronted, so their speech always comes before the first blow.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public sealed class EnemyAI : MonoBehaviour, ICombatant
+    public sealed class EnemyAI : MonoBehaviour, ICombatant, ISavedState
     {
         public enum State { Idle, Patrol, Chase, Attack, Dead }
 
@@ -26,6 +26,7 @@ namespace AshenRealm.AI
         const float ConfrontRange = 11f;
 
         [SerializeField] string enemyId;
+        [SerializeField] string saveKey = "";
         [SerializeField] Health health;
         [SerializeField] StatusEffects status;
         [SerializeField] Component animatorComponent;
@@ -74,6 +75,7 @@ namespace AshenRealm.AI
 
         public EnemyDefinition Definition => definition;
         public string EnemyId => enemyId;
+        public string SaveKey => saveKey;
         public State CurrentState => state;
         public Health Health => health;
         public string DisplayName => definition != null ? definition.Name : enemyId;
@@ -110,6 +112,9 @@ namespace AshenRealm.AI
             stateTime = 0f;
             if (next == State.Chase) CombatFocus.Set(this);
         }
+
+        /// <summary>Slain in an earlier sitting: the body is long gone.</summary>
+        public void ApplyCleared() => gameObject.SetActive(false);
 
         /// <summary>Starts the fight (the confrontation is over, or a playtest skipped it).</summary>
         public void Engage()

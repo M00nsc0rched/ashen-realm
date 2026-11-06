@@ -101,6 +101,18 @@ namespace AshenRealm.EditorTools
             }
             ShowClass(0);
 
+            // What the forge sells, in the hand.
+            var bought = new SerializedObject(classRig).FindProperty("boughtWeapons");
+            ((GameObject)weaponSets.GetArrayElementAtIndex(0).objectReferenceValue).SetActive(false);
+            for (int s = 0; s < bought.arraySize; s++)
+            {
+                var weapon = (GameObject)bought.GetArrayElementAtIndex(s).objectReferenceValue;
+                weapon.SetActive(true);
+                Shot($"10_bought_{s}", Ground(0f, -30f) + Vector3.up * 1.62f, Ground(0f, 0f) + Vector3.up * 1.6f, true, false);
+                weapon.SetActive(false);
+            }
+            ((GameObject)weaponSets.GetArrayElementAtIndex(0).objectReferenceValue).SetActive(true);
+
             // Each other zone in its own light: arrival, then its keeper or its people.
             var sun = RenderSettings.sun;
             var torch = camera.GetComponentsInChildren<Light>(true).FirstOrDefault(l => l.name == "Torch");
@@ -109,14 +121,14 @@ namespace AshenRealm.EditorTools
             {
                 Zone zone = zones[i];
                 atmosphere.Apply(zone.Ambient, zone.Fog, zone.FogStart, zone.FogEnd);
-                if (sun != null) sun.enabled = !zone.Underground;
+                if (sun != null) sun.enabled = !zone.OutOfTheSun;
                 if (torch != null) torch.enabled = zone.Underground;
-                camera.clearFlags = zone.Underground ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
+                camera.clearFlags = zone.OutOfTheSun ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
                 camera.backgroundColor = zone.Fog;
 
                 string prefix = $"{10 + i}_{zone.name.Replace("Zone ", "")}";
                 Vector3 entry = zone.Entry.position + Vector3.up * 1.62f;
-                Shot(prefix + "_a_arrival", entry, entry + zone.Entry.forward * 10f, true, i == 2);
+                Shot(prefix + "_a_arrival", entry, entry + zone.Entry.forward * 10f, !zone.Indoors, i == 2);
 
                 var foes = zone.GetComponentsInChildren<EnemyAI>(true);
                 EnemyAI keeper = foes.FirstOrDefault(e => Catalog.Enemy(e.EnemyId).Rank >= EnemyRank.Guardian);
@@ -131,10 +143,46 @@ namespace AshenRealm.EditorTools
                         Shot($"{prefix}_c_foe{f}", p + foes[f].transform.forward * 3.4f + Vector3.up * 1.5f, p + Vector3.up * 0.9f, false, false);
                     }
                 }
+                else if (zone.Indoors)
+                {
+                    Vector3 far = zone.Objective.position + Vector3.up * 1.62f;
+                    if (i == ZoneNumbers.Tavern)
+                    {
+                        Shot(prefix + "_b_from_the_stair", zone.Exit.position + Vector3.up * 1.62f, zone.Entry.position + Vector3.up * 1.2f, false, false);
+                        Shot(prefix + "_b_hearth", zone.Entry.position + new Vector3(1f, 1.62f, 7f), far + new Vector3(-5f, -0.4f, 0f), false, false);
+                        Shot(prefix + "_b_bar", zone.Entry.position + new Vector3(-1f, 1.62f, 5f), far + new Vector3(4.5f, -0.5f, -4f), false, false);
+                    }
+                    else if (i == ZoneNumbers.Forge)
+                    {
+                        Vector3 at = zone.Entry.position;
+                        Shot(prefix + "_b_rack", at + new Vector3(1.5f, 1.62f, 5f), at + new Vector3(6.4f, 1.9f, 4.6f), false, false);
+                        Shot(prefix + "_b_hearth", at + new Vector3(1.6f, 1.62f, 3.4f), at + new Vector3(-1.8f, 1.2f, 8.8f), false, false);
+                        Shot(prefix + "_b_bench", at + new Vector3(-0.6f, 1.62f, 3.6f), at + new Vector3(-6f, 1f, 2.2f), false, false);
+                    }
+                    else
+                    {
+                        Vector3 at = zone.Entry.position;
+                        Shot(prefix + "_b_rail", at + new Vector3(0f, 2f, 10.6f), at + new Vector3(0f, 2f, 14f), false, false);
+                        Shot(prefix + "_b_relics", at + new Vector3(2.6f, 2f, 11f), at + new Vector3(3.2f, 1.5f, 13.2f), false, false);
+                        Shot(prefix + "_b_back", at + new Vector3(0f, 2f, 10.6f), at + new Vector3(0f, 1.4f, 0f), false, false);
+                    }
+                    foreach (NpcActor seated in zone.GetComponentsInChildren<NpcActor>(true))
+                        Shot($"{prefix}_c_{seated.NpcId}", seated.transform.position + seated.transform.forward * 2.8f + Vector3.up * 1.6f, seated.transform.position + Vector3.up * 1.15f, false, false);
+                }
                 else
                 {
                     Vector3 stair = zone.Objective.position;
                     Shot(prefix + "_b_square", zone.Exit.position + new Vector3(10f, 1.7f, -18f), stair + Vector3.up * 3f, false, false);
+                    if (i == ZoneNumbers.City)
+                    {
+                        Vector3 o = zone.transform.position;
+                        Shot(prefix + "_b_market", o + new Vector3(-0.8f, 1.7f, -54f), o + new Vector3(0f, 3f, 0f), false, false);
+                        Shot(prefix + "_b_gallows", o + new Vector3(4f, 1.7f, -22f), o + new Vector3(0f, 3.2f, -3f), false, false);
+                        Shot(prefix + "_b_forge_door", o + new Vector3(19f, 1.7f, 5f), o + new Vector3(28f, 2.2f, 6f), false, false);
+                        Shot(prefix + "_b_chapel_door", o + new Vector3(-15f, 1.7f, 5f), o + new Vector3(-25f, 3.4f, 6f), false, false);
+                        foreach (NpcActor standing in zone.GetComponentsInChildren<NpcActor>(true))
+                            Shot($"{prefix}_c_{standing.NpcId}", standing.transform.position + standing.transform.forward * 2.8f + Vector3.up * 1.7f, standing.transform.position + Vector3.up * 1.1f, false, false);
+                    }
                     var person = zone.GetComponentInChildren<NpcActor>(true);
                     if (person != null)
                         Shot(prefix + "_c_person", person.transform.position + person.transform.forward * 2.6f + Vector3.up * 1.6f, person.transform.position + Vector3.up * 1.2f, false, false);

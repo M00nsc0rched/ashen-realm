@@ -290,6 +290,21 @@ namespace AshenRealm.EditorTools
         }
 
         /// <summary>
+        /// Multiplies every vertex by the light falling on it, for places lit by their own fires: the shader's point lights
+        /// only reach a metre or two before their first band. Emissive faces are their own light and stay as they are.
+        /// </summary>
+        public void Bake(System.Func<Vector3, Vector3, Color> lightAt)
+        {
+            for (int i = 0; i < positions.Count; i++)
+            {
+                if (uv1[i].y > 0f) continue;
+                Color light = lightAt(positions[i], normals[i]);
+                Color c = colors[i];
+                colors[i] = new Color(c.r * light.r, c.g * light.g, c.b * light.b, c.a);
+            }
+        }
+
+        /// <summary>
         /// Appends another builder's triangles transformed by <paramref name="matrix"/> (after the current matrix).
         /// Matrices must not mirror (no negative scale), since source winding is kept.
         /// </summary>

@@ -26,7 +26,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve-webgl.ps1
 ```
 then open http://localhost:8080. (Any static server works, e.g. `python -m http.server` inside `Builds/WebGL`.)
 
-To review a deep zone without playing down to it, add `?zone=N` (1 Hollowgate, 2-6 the depths): after the class choice the
+To review a deep zone without playing down to it, add `?zone=N` (1 Hollowgate, 2 the tavern, 3 the forge, 4 the chapel, 5-9 the depths): after the class choice the
 game starts there. Guardians above it stay alive, so its stair up still works but nothing is unlocked by skipping.
 
 ## Publish
@@ -43,10 +43,15 @@ serves the `.unityweb` files without `Content-Encoding`, so the loader's decompr
 
 ## Controls in the browser
 - Desktop: click the game to capture the mouse (pointer lock). Esc releases it and opens the pause menu
-  (Resume, Fullscreen, look speed). WASD, Shift, Space, left/right mouse, E.
+  (Folytatás, Beállítások, Teljes képernyő, Főmenü). WASD, Shift, Space, left/right mouse, E.
 - When the touch buttons are showing (touchscreen laptops, F1), the mouse only turns the view; attack with **TÁMADÁS**.
 - Phones/tablets: touch controls appear automatically. Hold the device in landscape. Use the browser's
   "Add to Home Screen" for a fullscreen-like experience on iOS (Safari does not allow page fullscreen on iPhone).
+
+## Saves in the browser
+Souls and settings live in PlayerPrefs, which a WebGL build keeps in the site's IndexedDB. They belong to one browser on
+one device and one address, and clearing site data erases them. `PlayerPrefs.Save` is what writes them out, so nothing that
+must survive may skip it (`SaveStore` and `GameSettings.Flush` do it).
 
 ## Performance notes
 - The world renders at a fixed 360 px height (`PixelCamera.targetHeight`) and is upscaled with hard pixels, so cost

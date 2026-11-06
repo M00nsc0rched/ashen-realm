@@ -10,6 +10,7 @@ namespace AshenRealm.Story
     public enum MoveKind { Melee, Bolt, Heal, Buff, Ward }
     public enum BoltKind { Arrow, Fire, Shadow, Holy, Venom, Brine }
     public enum NpcService { None, Tavern, Forge, Chapel, Market }
+    public enum ItemSlot { Weapon, Relic }
 
     // Plain data records for the tables in Catalog and StoryText (grouped here on purpose: none of them is a Unity
     // object, so the one-type-per-file rule that serialization needs does not apply).
@@ -45,6 +46,45 @@ namespace AshenRealm.Story
         public bool Ranged;
         public AbilityDefinition Ability1;
         public AbilityDefinition Ability2;
+    }
+
+    /// <summary>
+    /// One card of the class choice. The numbers are the class sheet of the design; the real-time values in
+    /// <see cref="ClassDefinition"/> are scaled from it, so they are not the same figures.
+    /// </summary>
+    public sealed class ClassCard
+    {
+        /// <summary>Null while the class is not in the game: the sealed picture shows instead of the art, and it cannot be chosen.</summary>
+        public ClassDefinition Class;
+        /// <summary>Sprite name in Assets/Art/Menu/Cards, used once the class is in the game.</summary>
+        public string Art;
+        public string Name;
+        public string Role;
+        public int Honor;
+        public int Health, Focus, Attack, Defense, Magic, Speed;
+        /// <summary>The Alchemist brews on intellect, so the card's second number means that instead of focus.</summary>
+        public bool UsesIntellect;
+        public string PassiveName;
+        public string PassiveText;
+    }
+
+    /// <summary>
+    /// Something the Cold Forge or the Grey Chapel sells. The bonuses are Graveborne's points; PlayerClassRig turns them
+    /// into real-time numbers. Steel is paid for in gold, relics in Souls.
+    /// </summary>
+    public sealed class ItemDefinition
+    {
+        public string Id;
+        public string Name;
+        public string Description;
+        public ItemSlot Slot;
+        public int Attack, Magic, Speed, Focus, Health;
+        /// <summary>Share of the damage dealt that comes back as health.</summary>
+        public float Lifesteal;
+        public int Price;
+
+        /// <summary>What Graveborne counts an item as worth: one point per bonus, half for health.</summary>
+        public float Points => Attack + Magic + Speed + Focus + Health * 0.5f;
     }
 
     public sealed class EnemyMove

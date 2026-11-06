@@ -125,7 +125,7 @@ namespace AshenRealm.EditorTools
 
         /// <summary>Writes a texture to PNG and imports it with the given settings. Returns the imported asset.</summary>
         public static T WriteTexture<T>(Texture2D texture, string path, bool asSprite, FilterMode filter, bool srgb = true,
-            TextureWrapMode wrapU = TextureWrapMode.Clamp) where T : Object
+            TextureWrapMode wrapU = TextureWrapMode.Clamp, int spriteBorder = 0) where T : Object
         {
             File.WriteAllBytes(path, texture.EncodeToPNG());
             Object.DestroyImmediate(texture);
@@ -133,7 +133,11 @@ namespace AshenRealm.EditorTools
 
             var importer = (TextureImporter)AssetImporter.GetAtPath(path);
             importer.textureType = asSprite ? TextureImporterType.Sprite : TextureImporterType.Default;
-            if (asSprite) importer.spriteImportMode = SpriteImportMode.Single;
+            if (asSprite)
+            {
+                importer.spriteImportMode = SpriteImportMode.Single;
+                importer.spriteBorder = new Vector4(spriteBorder, spriteBorder, spriteBorder, spriteBorder);
+            }
             importer.sRGBTexture = srgb;
             importer.alphaIsTransparency = asSprite;
             importer.mipmapEnabled = false;

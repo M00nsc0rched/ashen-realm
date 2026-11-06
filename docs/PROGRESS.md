@@ -1,6 +1,6 @@
 # Ashen Realm — Progress
 
-_Last updated: 2026-11-05_
+_Last updated: 2026-11-06_
 
 ## Environment (confirmed)
 - Unity project: `E:\Ashen Realm\AshenRealm`, Editor **6000.6.8f1** (installed via Unity Hub), URP template.
@@ -9,6 +9,122 @@ _Last updated: 2026-11-05_
 - Installed build modules: Windows Standalone, WebGL. **iOS Build Support is not installed.** Host OS is Windows,
   so a native iOS build (Xcode) cannot be performed on this machine.
 - Git: repository on `master` (E: has no file ownership, so the path is in the global `safe.directory` list).
+
+## Checkpoint K — the Cold Forge, the Grey Chapel and Gallows Market (2026-11-06)
+- Weapons stay at the door of every house: `Zone.Indoors` puts them away through `PlayerCombat.SetArmed`, the hands go empty, nothing
+  swings, blocks or casts, the fighting touch buttons leave, and the street gives everything back.
+- Two more walkable rooms on the tavern's pattern, sharing `RoomGenerator`: `ForgeGenerator` and `ChapelGenerator`, after their concepts seen
+  from the street door. Their doors are on the street that crosses the square, east and west. Zones are now ten: 3 is the forge, 4 the
+  chapel, the depths start at 5 (`World/ZoneNumbers`), keep their layouts through `depthSeed`. `SaveStore.WorldVersion` is 3.
+- The road in from the gate is Gallows Market: two rows of stalls, the stone corner with Iron Mabb, the notice board with Wick, the Widow
+  behind her swept stall, and the gallows at the far end with climbable steps. The keep stands on the hill behind, over the tavern's roof.
+- Goods: `Catalog.Items`, Graveborne's first stock, prices by its formulas. Four weapons at the forge for gold, three relics at the chapel for Souls.
+  Bought gear is saved with the soul, the weapon replaces the right-hand model, the old piece is traded in. The `ShopPanel` shows
+  what a weapon would do for this class, because a sword does nothing for a witch's bolts.
+- The chapel also has Graveborne's offering (coin to Souls, Souls back to coin) and its once-a-descent blessing for the Knight and the Gravethief.
+  This gives Souls their first use. Halloway and Iron Mabb lost the services they were lent; both have their Graveborne words back.
+- Stand-ins to review: the smith's and the book-keeper's names and intros are mine, their lines are Graveborne's, and their portraits are cut
+  from the room paintings (one picture for all moods). Number scaling is mine: 1.5 damage per TÁM or MÁG, 2 % speed per GYO, 1.6 health per ÉP, 4 % ability power per MÁG.
+  `A Szürke Kápolna` follows Graveborne although the user called it a monastery. Absolution and healing stay at the chapel from the earlier stand-in.
+  Not ported: giving items up for Souls, and the forge's separate TÁM, VÉD, MÁG work; the existing tempering stands in for it.
+
+### Checkpoint K validation (2026-11-06)
+| Check | Result |
+|---|---|
+| Compilation | no `error CS` in the batch logs |
+| Validator | passed, 6116 checks |
+| WebGL build | succeeded, 24.0 MB |
+| Playtest | passed, 194 checks, including real aim at every door, the rack, the relics and the people, and the rail stopping the player |
+| Browser, 844x390 in the built-in pane | forge and chapel entered through `?zone=`; empty hands, fighting buttons gone, the door message, smith's and book-keeper's portraits, shop row, "not enough gold", shop closing, loading a soul, the rail, the blessing |
+| Not verified | the market in a browser (previews and playtest only), a purchase by hand in a browser (a new soul has no gold there; the playtest covers buying), walking the street doors by hand, a real phone, a physical controller, Safari, Firefox |
+
+The first browser pass found what the playtest had missed: the rail's collider stopped the crosshair, so the book-keeper could not be spoken to. The rail now sits on the layer the interactor ignores, and the playtest aims for real.
+
+## Checkpoint J — the Rope and Lantern (2026-11-06)
+- The tavern is a walkable room, on the user's choice over a painted scene: zone 2, between Hollowgate and the first depth, so zones
+  are numbered in walking order and the depths moved up one (they keep their layouts through `depthSeed`). `SaveStore.WorldVersion` is 2.
+- `TavernGenerator` lays it out after the concept seen from the street door: hearth and tables left, leaded window and banner on the
+  west wall, the long bar and casks right, the rope and lantern at the far end over the iron-bound stair door.
+- The square's north side now has a door with a sign and lanterns; the old stair arch is gone. `E` enters, the back door goes down, the
+  street door comes back, and climbing up from the first depth arrives in the tavern.
+- Aggie Voss, the Dark Wanderer and Sergeant Halloway moved inside, sitting and standing as in the concept. `PeopleMeshes` dresses all
+  six portrait characters after their paintings. Wick and the Waiting Widow are ported from Graveborne to the square, because the
+  portraits arrived for them.
+- Dialogues show the speaker's painted face, chosen by honor: wary, warm or hostile.
+- Stand-ins to review: the full-body concepts served as reference for the 3D figures and are not in the game. Front portraits are used;
+  the 3/4 sets of Aggie and the Wanderer are kept in `Vázlat_Kocsma`. The stairwell is scenery behind the door.
+
+### Checkpoint J validation (2026-11-06)
+| Check | Result |
+|---|---|
+| Validator | passed, 5780 checks |
+| WebGL build | succeeded, 22.4 MB |
+| Playtest | 138 passed, 1 failed: the test itself, which took a switched-off torch for a burning one. Fixed in Checkpoint K. |
+
+## Checkpoint I — class choice carousel (2026-11-06)
+- `Új lélek` now opens a row of six cards with the middle card's sheet beside it, after the concepts in `Vázlat_Kártyák`. It turns
+  by swipe, arrows, a tap on a neighbour, keyboard and D-pad; B or Esc steps back. `Kiválasztás` shows the class's story on the
+  sheet (the backstory, goal and abilities the old dialogue had) with the prologue under the card, and `Indulás` starts the soul.
+- Cards are normalised and shrunk by `tools/prepare-menu-art.ps1`: every frame lands on the same rectangle, 640x936, crunched.
+  The originals stay in `Vázlat_Kártyák`, outside the repository. The background is the concept's own edges with the middle
+  filled in and darkened, because the clean background sent along is the main menu's, a different picture.
+- Stand-ins to review: the card numbers are the concepts', which equal Graveborne's table, while the real-time stats stay as
+  they were (Knight ÉP 60 is 100 health, Witch FP 25 is 12 focus). The melee classes deal about three damage a second per TÁM,
+  the Witch's bolts follow MÁG, block and speed rise with VÉD and GYO. The title is `Hamvas Lovag`, not the concept's English name. Necromancer and Alchemist show the sealed picture `CardLocked` with `Zárolva` on the button, but their sheets stay readable (Graveborne hides them); the
+  passives are text only. At 4:3 the painted edges fall outside the crop and the screen is mostly dark.
+- Also fixed: on the main menu the longest class name pushed `Szint 1` onto a second line of the soul slot.
+
+### Checkpoint I validation (2026-11-06)
+Run on the `_BatchValidation` copy, whose scripts match the project.
+| Check | Result |
+|---|---|
+| Compile | no errors |
+| Validator | 5653/5653 |
+| Playtest | 127/127, including arrows, a swipe, both ends of the row, a locked card, the story and back, and a simulated gamepad |
+| WebGL build | succeeded, 21.2 MB (1 MB more than before) |
+| Browser (built-in Chromium pane, 1280x640, 844x390, 800x600) | arrows, a neighbour tap, a stepped mouse swipe, keyboard, Esc, a locked card, story and back, Indulás into the game as the Witch |
+
+Found and fixed by testing: a pressed arrow kept the selection, so the keyboard stopped turning the row; the validator counted
+the new safe area. Browser timing note: with the pane hidden the page only runs while a screenshot is taken, so stepped input needs
+a screenshot between steps, and a click with no frame after it is lost. That was the tool, not the game.
+
+Not verified: a real phone or tablet, real fingers on the swipe, a physical controller (simulated only), Safari, Firefox, and
+how heavy six crunched cards are to decode on an old phone.
+
+## Checkpoint H — main menu, settings, saves (2026-11-05)
+- The game opens on the main menu from the sketch `Vázlat_Főképernyő`: painting, title and frames cut from the sketches, the
+  Souls ledger, the roster, Új lélek, Kódex, Beállítások. The roster pages when there are several souls; a soul can be released.
+- Saves: souls in PlayerPrefs (IndexedDB on the web), autosaved on arrival, after guardians and on focus loss, with Mentés and
+  Betöltés in the settings. A load restores class, honor, gold, potions, zone, spot, health, focus and everything cleared.
+- Meta record: Souls at Graveborne's rates (spending not ported), descents, deepest depth, a real Codex of 51 entries.
+- Settings, styled after `Vázlat_Beállítások`, from the main menu and from pause: language (Magyar only for now), look speed,
+  save and load, on-screen buttons on or off with opacity, a drag editor for every control, HUD on or off with opacity.
+- Gamepad: Start pauses, B steps back, menus and dialogues take D-pad and South. Dialogues gained a fifth answer for "Vissza".
+- Stand-ins to review: `Szint` is 1 + weapon level, because levels are not ported; the sketch's Kódex total of 94 is
+  Graveborne's, here it counts what exists. The class choice is still the dialogue; `Vázlat_karakterkártya_knight` is not built yet.
+
+### Checkpoint H validation (2026-11-05)
+Run on the `_BatchValidation` copy (Unity was not open, but its Library is the one warmed for WebGL).
+| Check | Result |
+|---|---|
+| Compile | no errors; two old CS0414 warnings on the WebGL target (`GameBootstrap` frame-rate fields used only off the web) |
+| Validator | 5433/5433 |
+| Playtest | 114/114, including a simulated gamepad (Start, B, selection) and a full save, load, menu and release round |
+| WebGL build | succeeded, 20.2 MB |
+| Browser (built-in Chromium pane, 800x600 and 844x390, no console errors from the game) | menu, settings, Codex, new soul, pause, layout editor with stepped mouse events, keyboard walking with hidden buttons, release with confirmation; soul and moved buttons survive a page reload, and also a new build at the same address |
+
+Found and fixed by testing: Codex rows opened grey (buttons made inside a hidden panel), a fast drag lost ground in the layout
+editor (it added per-frame deltas; it now works from the grab point), and Igen in the release question landed exactly under
+the finger that pressed Elengedés, so a double tap would have deleted a soul (Mégse is there now). Slider handles, panel
+corners and overlapping choice labels were caught in the menu shots.
+
+Not verified:
+- Mouse capture with hidden buttons. The game asks for pointer lock correctly, but the built-in pane refuses it
+  (`WrongDocumentError`), so mouse look with hidden buttons still needs a try in real Chrome or Edge.
+- A real phone or tablet, real fingers on the layout editor, a physical controller (simulated only), Safari, Firefox.
+
+Worth knowing: a WebGL build reports a `Touchscreen` even on a desktop with no touch hardware (`navigator.maxTouchPoints` 0),
+so in `Auto` the on-screen buttons show on desktop browsers until the player picks `Gombok rejtve`.
 
 ## Checkpoint G — Graveborne integration, first pass (2026-11-05)
 - World: seven zones instead of one: the valley with a new gate north of the chapel, Hollowgate, and five generated

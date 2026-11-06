@@ -12,6 +12,7 @@ namespace AshenRealm.World
     /// <summary>
     /// Moves the player between zones behind a fade: activates the target zone, switches sun, fog and ambient, moves the
     /// respawn point and shows the zone's title card. Underground there is no sun; the player's torch is the light.
+    /// Weapons stay at the door of every house: under a roof the player goes empty-handed.
     /// </summary>
     public sealed class ZoneManager : MonoBehaviour
     {
@@ -21,6 +22,7 @@ namespace AshenRealm.World
         [SerializeField] Zone[] zones;
         [SerializeField] FirstPersonController player;
         [SerializeField] PlayerLifecycle lifecycle;
+        [SerializeField] PlayerCombat combat;
         [SerializeField] AtmosphereController atmosphere;
         [SerializeField] Light sun;
         [SerializeField] Light torch;
@@ -65,13 +67,30 @@ namespace AshenRealm.World
             titleTimer = TitleTime;
         }
 
-        public void Travel(int index, bool arriveAtExit)
+        /// <summary>Puts the player straight into a zone (loading a soul). Without an exact spot, they arrive at its entry.</summary>
+        public void Place(int index, Vector3 position, float yaw, bool exactSpot)
         {
-            if (travelling || index < 0 || index >= zones.Length) return;
-            StartCoroutine(TravelRoutine(zones[index], arriveAtExit));
+            Zone target = zones[Mathf.Clamp(index, 0, zones.Length - 1)];
+            if (target != Current)
+            {
+                Current.gameObject.SetActive(false);
+                target.gameObject.SetActive(true);
+                Enter(target);
+            }
+            if (exactSpot) player.Teleport(position, yaw);
+            else player.Teleport(target.Entry.position, target.Entry.eulerAngles.y);
+            Physics.SyncTransforms();
+            ShowTitle();
         }
 
-        IEnumerator TravelRoutine(Zone target, bool arriveAtExit)
+        /// <summary>Goes to a zone: to its entry, its exit, or a spot of the door's own when the zone has several doors.</summary>
+        public void Travel(int index, bool arriveAtExit, Transform arrivalPoint = null)
+        {
+            if (travelling || index < 0 || index >= zones.Length) return;
+            StartCoroutine(TravelRoutine(zones[index], arrivalPoint != null ? arrivalPoint : arriveAtExit ? zones[index].Exit : zones[index].Entry));
+        }
+
+        IEnumerator TravelRoutine(Zone target, Transform arrival)
         {
             travelling = true;
             player.InputEnabled = false;
@@ -86,7 +105,6 @@ namespace AshenRealm.World
             target.gameObject.SetActive(true);
             Enter(target);
 
-            Transform arrival = arriveAtExit ? target.Exit : target.Entry;
             player.Teleport(arrival.position, arrival.eulerAngles.y);
             Physics.SyncTransforms();
             ShowTitle();
@@ -107,9 +125,10 @@ namespace AshenRealm.World
             Current = zone;
             lifecycle.SetSpawnPoint(zone.Entry);
             atmosphere.Apply(zone.Ambient, zone.Fog, zone.FogStart, zone.FogEnd);
-            sun.enabled = !zone.Underground;
+            sun.enabled = !zone.OutOfTheSun;
             torch.enabled = zone.Underground;
-            worldCamera.clearFlags = zone.Underground ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
+            combat.SetArmed(!zone.Indoors);
+            worldCamera.clearFlags = zone.OutOfTheSun ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
             worldCamera.backgroundColor = zone.Fog;
             RefreshObjective();
         }

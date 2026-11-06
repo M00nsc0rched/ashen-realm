@@ -647,6 +647,54 @@ namespace AshenRealm.EditorTools
             b.ShadedBox(new Vector3(width * 0.28f, top + roofHeight * 0.75f, depth * 0.18f), new Vector3(0.65f, roofHeight + 1.0f, 0.65f), Pal.Stone, rng, 0.35f, 0.5f);
         }
 
+        /// <summary>
+        /// The street front of the Rope and Lantern, against a wall at z = 0 with the street towards -Z: an iron-bound double
+        /// door, a lantern either side and the house's sign, a coil of rope and a lantern, on a bracket.
+        /// </summary>
+        public static void TavernFront(MeshBuilder b, System.Random rng)
+        {
+            const float width = 2.2f, height = 2.9f;
+            b.ShadedBox(new Vector3(0f, 0.06f, -0.45f), new Vector3(width + 1.4f, 0.14f, 1f), Pal.Stone, rng, 0.42f, 0.5f);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                b.SetColor(Pal.WoodDark, 0.28f);
+                b.Box(new Vector3(side * (width * 0.5f + 0.17f), height * 0.5f + 0.1f, -0.1f), new Vector3(0.34f, height + 0.2f, 0.3f));
+                b.ShadedBox(new Vector3(side * width * 0.25f, height * 0.5f + 0.06f, -0.04f), new Vector3(width * 0.5f - 0.02f, height, 0.08f), Pal.WoodDark, rng, 0.36f, 0.42f);
+                b.SetColor(Pal.SteelDark, 0.3f);
+                foreach (float y in new[] { 0.55f, 1.6f, 2.6f })
+                    b.Box(new Vector3(side * width * 0.25f, y, -0.1f), new Vector3(width * 0.5f - 0.06f, 0.11f, 0.03f));
+                b.SetColor(Pal.Brass, 0.45f);
+                b.Prism(new Vector3(side * 0.16f, 1.2f, -0.12f), 0.06f, 0.06f, 0.13f, 6);
+
+                // A wall lantern on each side of the door.
+                b.SetColor(Pal.SteelDark, 0.3f);
+                b.Box(new Vector3(side * 2f, 2.9f, -0.22f), new Vector3(0.05f, 0.05f, 0.44f));
+                b.Prism(new Vector3(side * 2f, 2.72f, -0.4f), 0.14f, 0.05f, 0.14f, 6);
+                b.Box(new Vector3(side * 2f, 2.3f, -0.4f), new Vector3(0.24f, 0.05f, 0.24f));
+                b.SetColor(Pal.Lantern, 0.75f);
+                b.Box(new Vector3(side * 2f, 2.5f, -0.4f), new Vector3(0.17f, 0.36f, 0.17f));
+            }
+            b.SetColor(Pal.WoodDark, 0.3f);
+            b.Box(new Vector3(0f, height + 0.3f, -0.1f), new Vector3(width + 0.9f, 0.4f, 0.34f));
+
+            // The sign hangs from an iron arm over the street.
+            b.SetColor(Pal.SteelDark, 0.28f);
+            b.Box(new Vector3(0f, 4.15f, -0.72f), new Vector3(0.06f, 0.06f, 1.44f));
+            b.Push(new Vector3(0f, 3.86f, -0.34f), Quaternion.Euler(45f, 0f, 0f), Vector3.one);
+            b.Box(Vector3.zero, new Vector3(0.04f, 0.04f, 0.74f));
+            b.Pop();
+            foreach (float z in new[] { -1.26f, -0.42f })
+                b.Box(new Vector3(0f, 4.04f, z), new Vector3(0.03f, 0.2f, 0.03f));
+            b.ShadedBox(new Vector3(0f, 3.56f, -0.84f), new Vector3(0.08f, 0.8f, 1.1f), Pal.Wood, rng, 0.34f, 0.4f);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                b.SetColor(Pal.Thatch, 0.5f);
+                b.Prism(new Vector3(side * 0.05f, 3.74f, -1.06f), 0.13f, 0.13f, 0.03f, 8);
+                b.SetColor(Pal.Lantern, 0.6f);
+                b.Box(new Vector3(side * 0.05f, 3.52f, -0.66f), new Vector3(0.02f, 0.34f, 0.2f));
+            }
+        }
+
         /// <summary>Stone windmill tower with a conical cap. The rotating sails are built separately.</summary>
         public static void WindmillTower(MeshBuilder b, System.Random rng, float height)
         {
@@ -748,10 +796,10 @@ namespace AshenRealm.EditorTools
         }
 
         /// <summary>Irregular flat puddle (fan) slightly above the ground.</summary>
-        public static void Puddle(MeshBuilder b, System.Random rng, float radius)
+        public static void Puddle(MeshBuilder b, System.Random rng, float radius, Pal water = Pal.Water, float shade = 0.5f)
         {
             const int sides = 10;
-            b.SetColor(Pal.Water, R(rng, 0.45f, 0.55f));
+            b.SetColor(water, R(rng, shade - 0.05f, shade + 0.05f));
             var ring = new Vector3[sides];
             for (int i = 0; i < sides; i++)
             {

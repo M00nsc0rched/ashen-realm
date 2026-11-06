@@ -6,7 +6,8 @@ An original first-person dark fantasy action RPG with a pixel-art painterly look
 (desktop and mobile) and prepared for iPhone. Choose one of four classes, cross the golden valley past the Cursed Knight,
 reach Hollowgate (Üregkapu), the last city above the Deep Dark, and go down five depths to the Gloamlord's throne. The
 world, story and bestiary come from the author's game Graveborne ([docs/GRAVEBORNE.md](docs/GRAVEBORNE.md)).
-All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in the Editor: no paid or third-party assets.
+World art (meshes, pixel textures, sky, HUD sprites) is generated procedurally in the Editor. The menu art is cut from the
+author's design sketches. The one third-party asset is the Spectral font (SIL Open Font License, `Assets/Art/Fonts`).
 
 - Engine: Unity **6000.6.8f1** · URP 17.6 (custom `AshenRealm/PixelLit` shader) · Input System 1.20 · uGUI
 - Targets: **WebGL** (see [docs/BUILD_WEBGL.md](docs/BUILD_WEBGL.md)), iPhone (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md))
@@ -26,6 +27,7 @@ All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in t
    - **Ashen Realm > Validate Prototype** — static checks (references, placement, combat logic)
    - **Ashen Realm > Run Automated Playtest** — plays the slice in Play mode (move, fight, loot, die, respawn)
    - **Ashen Realm > Capture Preview Shots** — renders reference images to `Screenshots/`
+   - **Ashen Realm > Capture Menu Shots** — renders the menu screens to `Screenshots/`
 5. For the browser: **Ashen Realm > Build WebGL**, then run `tools/serve-webgl.ps1` and open http://localhost:8080.
 6. For iPhone: **Ashen Realm > Apply iOS Player Settings** (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md)).
 7. Press **Play**. (In edit mode the Game view shows the full-resolution camera; the pixel look appears in Play mode.)
@@ -44,16 +46,23 @@ All art (meshes, pixel textures, sky, UI sprites) is generated procedurally in t
 | Class abilities (cost focus) | Q, R | the two ability buttons (named after the ability) | right / left shoulder |
 | Healing potion | F | **FŐZET** | North button |
 | Interact, talk | E | **HASZNÁL** | West button |
-| Answer in a dialogue | click, or 1-4 | tap | – |
-| Pause menu (resume, fullscreen, look speed) | Esc | ‖ button top-right | – |
+| Answer in a dialogue, use a menu | click, or 1-5 in a dialogue | tap | D-pad and South button |
+| Pause menu (resume, settings, fullscreen, main menu) | Esc | ‖ button top-right | Start |
+| Back in a menu | Esc | Vissza | East button |
 | Toggle touch controls (testing) | F1 | – | – |
 
 Touch controls appear automatically on devices and in the Device Simulator; press **F1** in the Game view to try the
 touch layout with the mouse. In touch mode the mouse never attacks: drag to look, press **TÁMADÁS** to strike.
 
-The game text is Hungarian; every in-game string lives in `Assets/Scripts/Core/GameText.cs`.
+The game text is Hungarian. HUD strings live in `Assets/Scripts/Core/GameText.cs`, menu strings in `Assets/Scripts/Core/MenuText.cs`.
+
+**Beállítások** (from the main menu or the pause menu): language (Hungarian for now), look speed, save and load, on-screen
+buttons shown or hidden with their opacity and a layout editor that drags each one anywhere, HUD shown or hidden with its
+opacity. Souls save on every arrival in a zone, after each guardian and when the page loses focus; in the browser they live in
+that browser's site data.
 
 ## What to try
+- The game opens on the main menu: **Új lélek** starts a soul, the roster continues one, **Kódex** lists what you have met.
 - Choose a class. Each has its own health, weapon, starting honor and two abilities.
 - Follow the dirt road north from the fenced spawn lane toward the ruined chapel.
 - The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,

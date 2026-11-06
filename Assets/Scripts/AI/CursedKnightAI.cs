@@ -1,6 +1,7 @@
 using System;
 using AshenRealm.Combat;
 using AshenRealm.Core;
+using AshenRealm.Story;
 using UnityEngine;
 
 namespace AshenRealm.AI
@@ -10,7 +11,7 @@ namespace AshenRealm.AI
     /// Moves with a CharacterController (no NavMesh) and steers around obstacles with a simple side-step.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
-    public sealed class CursedKnightAI : MonoBehaviour, ICombatant
+    public sealed class CursedKnightAI : MonoBehaviour, ICombatant, ISavedState
     {
         public enum State { Idle, Patrol, Chase, Attack, Dead }
 
@@ -74,6 +75,9 @@ namespace AshenRealm.AI
         /// <summary>True while the knight is actively fighting the player.</summary>
         public bool IsEngaged => state == State.Chase || state == State.Attack;
         public string DisplayName => GameText.KnightName;
+        public string SaveKey => StoryDirector.DeadFlag("knight");
+
+        public void ApplyCleared() => gameObject.SetActive(false);
 
         /// <summary>The road to Hollowgate opens when the knight falls.</summary>
         public static event Action Slain;

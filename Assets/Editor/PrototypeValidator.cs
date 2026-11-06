@@ -93,6 +93,11 @@ namespace AshenRealm.EditorTools
                 GeneratedAssets.MeshFolder + "/Terrain.asset",
                 GeneratedAssets.MeshFolder + "/Ruins.asset",
                 GeneratedAssets.MeshFolder + "/WindmillSails.asset",
+                "Assets/Art/Menu/MenuBackground.jpg",
+                "Assets/Art/Menu/MenuTitle.png",
+                "Assets/Art/Menu/MenuFrame.png",
+                "Assets/Art/Menu/MenuButton.png",
+                "Assets/Art/Menu/MenuButtonGlow.png",
             };
             foreach (string path in required)
                 r.Check(AssetDatabase.LoadMainAssetAtPath(path) != null, $"Missing generated asset: {path}");
@@ -151,19 +156,33 @@ namespace AshenRealm.EditorTools
             One<DialoguePanel>();
             One<ProjectileLibrary>();
             One<PlayerAbilities>();
-            One<PlayerClassRig>();
+            var classRig = One<PlayerClassRig>();
             One<HUDController>();
             One<TouchJoystick>();
             One<TouchLookArea>();
             One<TouchControlsRoot>();
-            One<SafeAreaFitter>();
+            r.Check(All<SafeAreaFitter>().Length == 3, "The HUD, the main menu and the class choice each need a safe area");
+            One<MainMenu>();
+            CheckClassCards(r, One<ClassCarousel>());
+            PortraitLibrary portraits = One<PortraitLibrary>();
+            if (portraits != null)
+                foreach (NpcDefinition person in StoryText.Npcs.Where(n => n.Id != "merchant"))
+                    foreach (Alignment mood in Enum.GetValues(typeof(Alignment)))
+                        r.Check(portraits.Face(person.Id, mood) != null, $"{person.Name} has no {mood} portrait");
+            CheckGoods(r, One<ShopPanel>(), classRig);
+            One<SettingsPanel>();
+            One<CodexPanel>();
+            One<ConfirmPanel>();
+            One<SoulKeeper>();
+            One<HudAppearance>();
+            One<TouchLayout>();
             One<EventSystem>();
             One<InputSystemUIInputModule>();
             One<AtmosphereController>();
             One<GameBootstrap>();
             One<ImpactEffects>();
             One<Volume>();
-            One<LoreInspectable>();
+            r.Check(All<LoreInspectable>().Length == 2, "The blade in the valley and the gallows are the two things to inspect");
             var pixelCamera = One<PixelCamera>();
             One<PauseMenu>();
             One<CompassStrip>();
@@ -174,6 +193,16 @@ namespace AshenRealm.EditorTools
             var buttons = All<TouchButton>();
             foreach (PlayerButton action in Enum.GetValues(typeof(PlayerButton)))
                 r.Check(buttons.Count(b => b.Button == action) == 1, $"Expected one touch button for {action}");
+
+            // The layout editor moves every on-screen control: the buttons, pause and the joystick.
+            var handles = All<TouchLayoutHandle>();
+            r.Check(handles.Length == buttons.Length + 2, $"Expected {buttons.Length + 2} layout handles, found {handles.Length}");
+            r.Check(handles.Select(h => h.LayoutName).Distinct().Count() == handles.Length, "Layout handles need unique names");
+
+            // A saved soul remembers what it cleared by these keys.
+            string[] saveKeys = All<MonoBehaviour>().OfType<ISavedState>().Select(s => s.SaveKey).ToArray();
+            r.Check(saveKeys.All(k => !string.IsNullOrEmpty(k)), "Something that can be cleared has no save key");
+            r.Check(saveKeys.Distinct().Count() == saveKeys.Length, "Save keys must be unique");
 
             r.Check(All<Camera>().Count(c => c.CompareTag("MainCamera")) == 1, "Expected exactly one camera tagged MainCamera");
             r.Check(All<Light>().Count(l => l.type == LightType.Directional) == 1, "Expected exactly one directional light");
@@ -214,7 +243,27 @@ namespace AshenRealm.EditorTools
                 else if (value is string[] array) strings.AddRange(array.Select(a => ($"GameText.{field.Name}", a)));
             }
             foreach (var text in roots.SelectMany(go => go.GetComponentsInChildren<UnityEngine.UI.Text>(true)))
-                strings.Add((PathOf(text.transform), text.text));
+            {
+                if (text.font != null && text.font.dynamic && text.font.name.StartsWith("Spectral")) CheckSpectral(r, text.font, PathOf(text.transform), text.text);
+                else strings.Add((PathOf(text.transform), text.text));
+            }
+
+            // Menu strings can land in any of the three faces.
+            foreach (string face in new[] { "Regular", "Italic", "SemiBold" })
+            {
+                var font = AssetDatabase.LoadAssetAtPath<Font>($"Assets/Art/Fonts/Spectral-{face}.ttf");
+                if (!r.Check(font != null && font.dynamic, $"Spectral-{face} must be a dynamic font")) continue;
+                foreach (FieldInfo field in typeof(MenuText).GetFields(BindingFlags.Public | BindingFlags.Static))
+                    if (field.GetValue(null) is string menuText) CheckSpectral(r, font, $"MenuText.{field.Name}", menuText);
+                foreach (CodexEntry entry in CodexBook.Entries)
+                    CheckSpectral(r, font, $"Codex {entry.Id}", entry.Name + entry.Text);
+                foreach (ClassCard card in Catalog.Cards)
+                    CheckSpectral(r, font, $"Card {card.Art}", card.Name + card.Role + card.PassiveName + card.PassiveText);
+                foreach (ClassDefinition c in Catalog.Classes)
+                    CheckSpectral(r, font, $"Story of {c.Name}", c.Backstory + c.Goal + c.Ability1.Name + c.Ability1.Description + c.Ability2.Name + c.Ability2.Description);
+                CheckSpectral(r, font, "Prologue", StoryText.Prologue);
+            }
+
             foreach (var component in roots.SelectMany(go => go.GetComponentsInChildren<MonoBehaviour>(true)).Where(c => c is IInteractable))
             {
                 SerializedProperty it = new SerializedObject(component).GetIterator();
@@ -231,6 +280,45 @@ namespace AshenRealm.EditorTools
                 char bad = text.FirstOrDefault(c => !GameText.IsRenderable(c));
                 r.Check(bad == default(char), $"{where}: character U+{(int)bad:X4} is missing from the web font");
             }
+        }
+
+        /// <summary>The row in the scene follows the table: one card each, and no class without one.</summary>
+        static void CheckClassCards(Report r, ClassCarousel carousel)
+        {
+            if (carousel == null) return;
+            var so = new SerializedObject(carousel);
+            foreach (string field in new[] { "cards", "cardArt", "cardGlow", "dots" })
+                r.Check(so.FindProperty(field).arraySize == Catalog.Cards.Length, $"Class choice: {field} does not match the {Catalog.Cards.Length} cards");
+            r.Check(so.FindProperty("statValues").arraySize == 6, "Class choice: a card shows six stats");
+            foreach (ClassDefinition c in Catalog.Classes)
+                r.Check(Catalog.Cards.Count(card => card.Class == c) == 1, $"{c.Name} needs exactly one card");
+        }
+
+        /// <summary>Everything for sale has a picture, a price and, if it is held in the hand, a model; the shop draws with Spectral.</summary>
+        static void CheckGoods(Report r, ShopPanel shop, PlayerClassRig rig)
+        {
+            if (shop == null || rig == null) return;
+            var art = new SerializedObject(shop).FindProperty("art");
+            var pictures = new HashSet<string>();
+            for (int i = 0; i < art.arraySize; i++)
+            {
+                var sprite = art.GetArrayElementAtIndex(i).objectReferenceValue;
+                if (sprite != null) pictures.Add(sprite.name);
+            }
+            Font font = shop.GetComponentsInChildren<UnityEngine.UI.Text>(true).First(t => t.name == "Name").font;
+            foreach (ItemDefinition item in Catalog.Items)
+            {
+                r.Check(pictures.Contains(item.Id), $"{item.Name} has no picture");
+                r.Check(item.Price > 0, $"{item.Name} has no price");
+                CheckSpectral(r, font, item.Id, item.Name + item.Description + MenuText.ModsOf(item));
+            }
+            r.Check(new SerializedObject(rig).FindProperty("boughtWeapons").arraySize == Catalog.ItemsOf(ItemSlot.Weapon).Length, "Every weapon for sale needs a model in the hand");
+        }
+
+        static void CheckSpectral(Report r, Font font, string where, string text)
+        {
+            char bad = text.FirstOrDefault(c => c != '\n' && !font.HasCharacter(c));
+            r.Check(bad == default(char), $"{where}: {font.name} has no character U+{(int)bad:X4}");
         }
 
         static float GetFloat(Object target, string field) => new SerializedObject(target).FindProperty(field).floatValue;
@@ -400,6 +488,16 @@ namespace AshenRealm.EditorTools
             foreach (var enemy in Catalog.Enemies)
                 foreach (var move in enemy.Moves)
                     r.Check(move.Kind != MoveKind.Bolt || (int)move.Bolt < Enum.GetValues(typeof(BoltKind)).Length, $"{enemy.Id}: bad bolt on {move.Name}");
+
+            // Every house has a way out, and the goods can be reached from where a player can stand.
+            foreach (int house in new[] { ZoneNumbers.Tavern, ZoneNumbers.Forge, ZoneNumbers.Chapel })
+            {
+                Zone zone = zones[house];
+                r.Check(zone.Indoors && !zone.Underground, $"{zone.name} should be indoors");
+                r.Check(zone.GetComponentsInChildren<ZonePortal>(true).Any(p => p.TargetZone == ZoneNumbers.City), $"{zone.name} has no door to the street");
+            }
+            r.Check(zones[ZoneNumbers.Forge].GetComponentsInChildren<ShopFixture>(true).Any(f => f.Goods == ItemSlot.Weapon), "The forge has no rack");
+            r.Check(zones[ZoneNumbers.Chapel].GetComponentsInChildren<ShopFixture>(true).Any(f => f.Goods == ItemSlot.Relic), "The chapel has no relics");
         }
 
         static void CheckReach(Report r, PlayerCombat combat, CursedKnightAI knight)

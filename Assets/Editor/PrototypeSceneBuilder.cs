@@ -4,7 +4,9 @@ using System.Linq;
 using AshenRealm.AI;
 using AshenRealm.Combat;
 using AshenRealm.Core;
+using AshenRealm.Interactions;
 using AshenRealm.Story;
+using AshenRealm.UI;
 using AshenRealm.World;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -84,6 +86,7 @@ namespace AshenRealm.EditorTools
                 PlayerRig player = ActorFactory.CreatePlayer(layout.PlayerSpawn, layout.PlayerYaw, materials);
                 CursedKnightAI knight = ActorFactory.CreateKnight(layout.KnightSpawn, layout.KnightYaw, materials);
                 var chest = ActorFactory.CreateChest(layout.ChestPosition, layout.ChestYaw, materials);
+                SceneWiring.Set(chest, "saveKey", "chest_valley");
                 SceneWiring.Set(chest, "goldReward", 48);
                 SceneWiring.Set(chest, "potionReward", 1);
 
@@ -103,8 +106,9 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(knight, "patrolPoints", layout.PatrolPoints);
 
                 Progress("HUD, touch controls and pixel screen", 0.58f);
-                var hud = HudBuilder.Build(sprites, player.Input, player.Health, player.Stamina, player.Interactor, player.Lifecycle, player.Abilities,
-                    player.CameraEffects.transform, layout.GatePosition);
+                MenuArt menuArt = MenuBuilder.LoadArt(sprites);
+                var hud = HudBuilder.Build(sprites, menuArt, player.Input, player.Health, player.Stamina, player.Interactor, player.Lifecycle, player.Abilities,
+                    player.Combat, player.CameraEffects.transform, layout.GatePosition);
                 var pixelScreen = HudBuilder.BuildPixelScreen(materials.Composite);
                 pixelScreen.enabled = false; // PixelCamera enables it at runtime; edit mode shows the world camera directly
                 SceneWiring.Set(player.PixelCamera, "output", pixelScreen);
@@ -114,32 +118,67 @@ namespace AshenRealm.EditorTools
                 var storyGo = new GameObject("Story");
                 var session = storyGo.AddComponent<GameSession>();
                 var director = storyGo.AddComponent<StoryDirector>();
+                var keeper = storyGo.AddComponent<SoulKeeper>();
+                MenuBuilder.Build(menuArt, player.Input, player.CameraEffects.GetComponent<Camera>(), keeper, director, hud.Pause, hud.Layout);
+                SceneWiring.Set(director, "keeper", keeper);
+                SceneWiring.Set(keeper, "session", session);
+                SceneWiring.Set(keeper, "zones", zoneManager);
+                SceneWiring.Set(keeper, "player", player.Controller);
+                SceneWiring.Set(keeper, "health", player.Health);
+                SceneWiring.Set(keeper, "abilities", player.Abilities);
                 SceneWiring.Set(director, "session", session);
                 SceneWiring.Set(director, "dialogue", hud.Dialogue);
                 SceneWiring.Set(director, "zones", zoneManager);
                 SceneWiring.Set(director, "pauseMenu", hud.Pause);
+                var portraits = storyGo.AddComponent<PortraitLibrary>();
+                SceneWiring.Set(portraits, "faces", MenuBuilder.LoadPortraits());
+                SceneWiring.Set(director, "portraits", portraits);
+                SceneWiring.Set(director, "shop", hud.Shop);
+                SceneWiring.Set(director, "classRig", player.ClassRig);
                 SceneWiring.Set(director, "playerHealth", player.Health);
                 SceneWiring.Set(director, "playerAbilities", player.Abilities);
 
                 var zones = new List<Zone> { valley };
-                ActorFactory.CreatePortal("Gate To Hollowgate", layout.GatePosition, 0f, new Vector3(6f, 9f, 1f), valley.transform, zoneManager, CityZoneIndex, false,
+                ActorFactory.CreatePortal("Gate To Hollowgate", layout.GatePosition, 0f, new Vector3(6f, 9f, 1f), valley.transform, zoneManager, ZoneNumbers.City, false,
                     GameText.GateToCity, StoryDirector.DeadFlag("knight"), GameText.GateBarred);
 
                 Progress("Hollowgate", 0.62f);
-                Vector3 cityOrigin = ZoneOrigin(CityZoneIndex);
+                Vector3 cityOrigin = ZoneOrigin(ZoneNumbers.City);
                 var city = NewZone("Zone Hollowgate", cityOrigin);
                 CityLayout cityLayout = new CityGenerator(materials.World, cityOrigin, ValleyGenerator.Seed + 1).Generate(city.transform);
                 var cityEntry = Marker("City Entry", city.transform, cityLayout.Entry, cityLayout.EntryYaw);
-                var cityArrival = Marker("City Stair Arrival", city.transform, cityLayout.StairArrival, 180f);
-                var cityObjective = Marker("City Objective", city.transform, cityLayout.Stair, 0f);
+                var cityArrival = Marker("City Tavern Arrival", city.transform, cityLayout.TavernArrival, 180f);
+                var forgeArrival = Marker("City Forge Arrival", city.transform, cityLayout.ForgeArrival, 270f);
+                var chapelArrival = Marker("City Chapel Arrival", city.transform, cityLayout.ChapelArrival, 90f);
+                var cityObjective = Marker("City Objective", city.transform, cityLayout.TavernDoor, 0f);
                 foreach (var person in cityLayout.People)
-                    ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.look, city.transform, director, materials);
+                    ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.figure, city.transform, director, materials);
                 ActorFactory.CreatePortal("Gate To Valley", cityLayout.Gate, 0f, new Vector3(9f, 7f, 1f), city.transform, zoneManager, 0, true,
                     GameText.GateToValley, "", "");
-                ActorFactory.CreatePortal("Stair Down", cityLayout.Stair + new Vector3(0f, 0f, -0.4f), 0f, new Vector3(3.4f, 3.8f, 0.6f), city.transform, zoneManager, CityZoneIndex + 1, false,
-                    GameText.StairDown, "", "");
-                ConfigureZone(city, CityZoneIndex, false, new Color(0.54f, 0.5f, 0.6f), horizon, 28f, 300f, cityEntry, cityArrival, cityObjective);
+                ActorFactory.CreatePortal("Tavern Door", cityLayout.TavernDoor, 0f, new Vector3(2.6f, 3.4f, 0.6f), city.transform, zoneManager, ZoneNumbers.Tavern, false,
+                    GameText.EnterTavern, "", "");
+                ActorFactory.CreatePortal("Forge Door", cityLayout.ForgeDoor, 90f, new Vector3(2.8f, 3.4f, 0.6f), city.transform, zoneManager, ZoneNumbers.Forge, false,
+                    GameText.EnterForge, "", "");
+                ActorFactory.CreatePortal("Chapel Door", cityLayout.ChapelDoor, 90f, new Vector3(2.8f, 3.8f, 0.6f), city.transform, zoneManager, ZoneNumbers.Chapel, false,
+                    GameText.EnterChapel, "", "");
+                var gallows = new GameObject("Gallows Lore");
+                gallows.transform.SetParent(city.transform, true);
+                gallows.transform.position = cityLayout.Gallows;
+                var gallowsBox = gallows.AddComponent<BoxCollider>();
+                gallowsBox.size = new Vector3(11f, 4f, 8.6f);
+                gallowsBox.isTrigger = true;
+                var gallowsLore = gallows.AddComponent<LoreInspectable>();
+                SceneWiring.Set(gallowsLore, "prompt", GameText.InspectGallows);
+                SceneWiring.Set(gallowsLore, "loreText", GameText.GallowsLore);
+                ConfigureZone(city, ZoneNumbers.City, false, new Color(0.54f, 0.5f, 0.6f), horizon, 28f, 300f, cityEntry, cityArrival, cityObjective);
                 zones.Add(city);
+
+                Progress("The Rope and Lantern", 0.64f);
+                zones.Add(BuildTavern(materials, zoneManager, director));
+                Progress("The Cold Forge", 0.645f);
+                zones.Add(BuildForge(materials, zoneManager, director, forgeArrival));
+                Progress("The Grey Chapel", 0.65f);
+                zones.Add(BuildChapel(materials, zoneManager, director, chapelArrival));
 
                 ConfigureZone(valley, 0, false, new Color(0.6f, 0.58f, 0.64f), horizon, 30f, 320f, spawn, gateArrival, gateObjective);
 
@@ -147,7 +186,7 @@ namespace AshenRealm.EditorTools
                 BiomeStyle[] biomes = Biomes();
                 for (int i = 0; i < biomes.Length; i++)
                 {
-                    int index = CityZoneIndex + 1 + i;
+                    int index = ZoneNumbers.FirstDepth + i;
                     bool last = i == biomes.Length - 1;
                     Progress("Deep Dark: " + biomes[i].Name, 0.66f + 0.24f * i / biomes.Length);
                     zones.Add(BuildDepth(biomes[i], index, last, materials, enemies, player, projectiles, impacts, zoneManager, director));
@@ -156,6 +195,7 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(zoneManager, "zones", zones.ToArray());
                 SceneWiring.Set(zoneManager, "player", player.Controller);
                 SceneWiring.Set(zoneManager, "lifecycle", player.Lifecycle);
+                SceneWiring.Set(zoneManager, "combat", player.Combat);
                 SceneWiring.Set(zoneManager, "atmosphere", Object.FindAnyObjectByType<AtmosphereController>());
                 SceneWiring.Set(zoneManager, "sun", RenderSettings.sun);
                 SceneWiring.Set(zoneManager, "torch", player.Torch);
@@ -193,7 +233,6 @@ namespace AshenRealm.EditorTools
 
         // ---- Zones -----------------------------------------------------------------------------------
 
-        const int CityZoneIndex = 1;
         const float ZoneSpacing = 1000f;
 
         /// <summary>Zones sit far apart along X, so they never see or touch each other even while all are active in the Editor.</summary>
@@ -264,23 +303,88 @@ namespace AshenRealm.EditorTools
             },
         };
 
+        /// <summary>The Rope and Lantern: one room between the street and the stair, lit by its own fires.</summary>
+        static Zone BuildTavern(GeneratedMaterials materials, ZoneManager zoneManager, StoryDirector director)
+        {
+            Vector3 origin = ZoneOrigin(ZoneNumbers.Tavern);
+            Zone zone = NewZone("Zone Tavern", origin);
+            TavernLayout layout = new TavernGenerator(materials.World, origin, ValleyGenerator.Seed + 53).Generate(zone.transform);
+
+            var entry = Marker("Tavern Entry", zone.transform, layout.Entry, 0f);
+            var exit = Marker("Tavern Stair Arrival", zone.transform, layout.StairArrival, 180f);
+            var objective = Marker("Tavern Objective", zone.transform, layout.Stair, 0f);
+            foreach (var person in layout.People)
+                ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.figure, zone.transform, director, materials);
+
+            ActorFactory.CreatePortal("Tavern Door Out", layout.DoorOut, 0f, new Vector3(2.4f, 3.2f, 0.5f), zone.transform, zoneManager, ZoneNumbers.City, true,
+                GameText.LeaveHouse, "", "");
+            ActorFactory.CreatePortal("Stair Down", layout.Stair, 0f, new Vector3(2.8f, 3.2f, 0.5f), zone.transform, zoneManager, ZoneNumbers.FirstDepth, false,
+                GameText.StairDown, "", "");
+
+            ConfigureZone(zone, ZoneNumbers.Tavern, false, new Color(0.9f, 0.84f, 0.78f), new Color(0.06f, 0.04f, 0.03f), 13f, 40f, entry, exit, objective);
+            SceneWiring.Set(zone, "indoors", true);
+            return zone;
+        }
+
+        /// <summary>The Cold Forge: one room off the street, its goods on the wall.</summary>
+        static Zone BuildForge(GeneratedMaterials materials, ZoneManager zoneManager, StoryDirector director, Transform streetArrival)
+        {
+            Vector3 origin = ZoneOrigin(ZoneNumbers.Forge);
+            Zone zone = NewZone("Zone Forge", origin);
+            ForgeLayout layout = new ForgeGenerator(materials.World, origin, ValleyGenerator.Seed + 57).Generate(zone.transform);
+            FinishHouse(zone, layout, ZoneNumbers.Forge, new Color(0.9f, 0.84f, 0.78f), new Color(0.06f, 0.04f, 0.03f), 12f, 34f, materials, zoneManager, director, streetArrival);
+            ActorFactory.CreateShopFixture("Weapon Rack", layout.Rack, layout.RackSize, zone.transform, director, ItemSlot.Weapon, GameText.BrowseRack);
+            return zone;
+        }
+
+        /// <summary>The Grey Chapel: the nave, the rail, and what the Choir keeps behind it.</summary>
+        static Zone BuildChapel(GeneratedMaterials materials, ZoneManager zoneManager, StoryDirector director, Transform streetArrival)
+        {
+            Vector3 origin = ZoneOrigin(ZoneNumbers.Chapel);
+            Zone zone = NewZone("Zone Chapel", origin);
+            ChapelLayout layout = new ChapelGenerator(materials.World, origin, ValleyGenerator.Seed + 59).Generate(zone.transform);
+            FinishHouse(zone, layout, ZoneNumbers.Chapel, new Color(0.86f, 0.84f, 0.88f), new Color(0.05f, 0.05f, 0.07f), 16f, 46f, materials, zoneManager, director, streetArrival);
+            foreach (var relics in layout.Relics)
+                ActorFactory.CreateShopFixture("Relics", relics.centre, relics.size, zone.transform, director, ItemSlot.Relic, GameText.BrowseRelics);
+            return zone;
+        }
+
+        /// <summary>What every house off the street has: its people, its way back out, and the air under its roof.</summary>
+        static void FinishHouse(Zone zone, RoomLayout layout, int index, Color ambient, Color fog, float fogStart, float fogEnd, GeneratedMaterials materials,
+            ZoneManager zoneManager, StoryDirector director, Transform streetArrival)
+        {
+            var entry = Marker(zone.name + " Entry", zone.transform, layout.Entry, 0f);
+            var objective = Marker(zone.name + " Objective", zone.transform, layout.DoorOut, 0f);
+            foreach (var person in layout.People)
+                ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.figure, zone.transform, director, materials);
+            ActorFactory.CreatePortal(zone.name + " Door Out", layout.DoorOut, 0f, new Vector3(2.4f, 3.2f, 0.5f), zone.transform, zoneManager, ZoneNumbers.City, false,
+                GameText.LeaveHouse, "", "", streetArrival);
+            ConfigureZone(zone, index, false, ambient, fog, fogStart, fogEnd, entry, entry, objective);
+            SceneWiring.Set(zone, "indoors", true);
+        }
+
         static Zone BuildDepth(BiomeStyle biome, int index, bool last, GeneratedMaterials materials, EnemyFactory enemies, PlayerRig player,
             ProjectileLibrary projectiles, ImpactEffects impacts, ZoneManager zoneManager, StoryDirector director)
         {
+            int depthSeed = index - ZoneNumbers.FirstDepth + 2; // the depths keep the layouts they had before the houses took zone numbers
             Vector3 origin = ZoneOrigin(index);
             Zone zone = NewZone("Zone " + biome.Name, origin);
-            DungeonLayout layout = new DungeonGenerator(biome, materials.World, origin, ValleyGenerator.Seed + index * 97).Generate(zone.transform, last);
+            DungeonLayout layout = new DungeonGenerator(biome, materials.World, origin, ValleyGenerator.Seed + depthSeed * 97).Generate(zone.transform, last);
             Transform playerRoot = player.Root.transform;
 
+            int foeNumber = 0;
+            string FoeKey() => $"foe_{index}_{foeNumber++}";
             foreach (var spawn in layout.Spawns)
-                enemies.Create(spawn.id, spawn.position + Vector3.up * 0.05f, 0f, zone.transform, playerRoot, projectiles, impacts, spawn.patrol);
-            enemies.Create(biome.Keeper, layout.Keeper + Vector3.up * 0.05f, layout.KeeperYaw, zone.transform, playerRoot, projectiles, impacts, System.Array.Empty<Vector3>());
+                SceneWiring.Set(enemies.Create(spawn.id, spawn.position + Vector3.up * 0.05f, 0f, zone.transform, playerRoot, projectiles, impacts, spawn.patrol), "saveKey", FoeKey());
+            SceneWiring.Set(enemies.Create(biome.Keeper, layout.Keeper + Vector3.up * 0.05f, layout.KeeperYaw, zone.transform, playerRoot, projectiles, impacts, System.Array.Empty<Vector3>()), "saveKey", FoeKey());
 
-            int gold = 20 + index * 12;
+            int gold = 20 + depthSeed * 12;
+            int chestNumber = 0;
             foreach (Vector3 position in layout.Chests)
             {
                 var chest = ActorFactory.CreateChest(position, 180f, materials);
                 chest.transform.SetParent(zone.transform, true);
+                SceneWiring.Set(chest, "saveKey", $"chest_{index}_{chestNumber++}");
                 SceneWiring.Set(chest, "healAmount", 0f);
                 SceneWiring.Set(chest, "goldReward", gold);
                 SceneWiring.Set(chest, "potionReward", 1);
@@ -296,7 +400,8 @@ namespace AshenRealm.EditorTools
             var exit = Marker("Stair Arrival", zone.transform, layout.StairDownArrival + Vector3.up * 0.05f, 180f);
             var objective = Marker("Objective", zone.transform, layout.StairDown, 0f);
 
-            ActorFactory.CreatePortal("Stair Up", layout.StairUp + new Vector3(0f, 0f, 0.5f), 0f, new Vector3(3.4f, 3.8f, 1f), zone.transform, zoneManager, index - 1, true,
+            int above = index == ZoneNumbers.FirstDepth ? ZoneNumbers.Tavern : index - 1;
+            ActorFactory.CreatePortal("Stair Up", layout.StairUp + new Vector3(0f, 0f, 0.5f), 0f, new Vector3(3.4f, 3.8f, 1f), zone.transform, zoneManager, above, true,
                 GameText.StairUp, "", "");
             if (!last)
                 ActorFactory.CreatePortal("Stair Down", layout.StairDown + new Vector3(0f, 0f, -0.5f), 0f, new Vector3(3.4f, 3.8f, 1f), zone.transform, zoneManager, index + 1, false,

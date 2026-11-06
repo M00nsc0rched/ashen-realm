@@ -9,6 +9,9 @@ namespace AshenRealm.Interactions
     /// </summary>
     public sealed class PlayerInteractor : MonoBehaviour
     {
+        /// <summary>Unity's Ignore Raycast layer: a rail stops the feet, not the word across it.</summary>
+        public const int SeeThroughLayer = 2;
+
         [SerializeField] PlayerInputHub inputSource;
         [SerializeField] Transform aimOrigin;
         [SerializeField] float reach = 3f;
@@ -42,7 +45,8 @@ namespace AshenRealm.Interactions
         IInteractable FindTarget()
         {
             if (aimOrigin == null) return null;
-            if (!Physics.SphereCast(aimOrigin.position, probeRadius, aimOrigin.forward, out RaycastHit hit, reach, mask, QueryTriggerInteraction.Collide))
+            int layers = mask.value & ~(1 << SeeThroughLayer);
+            if (!Physics.SphereCast(aimOrigin.position, probeRadius, aimOrigin.forward, out RaycastHit hit, reach, layers, QueryTriggerInteraction.Collide))
                 return null;
             if (hit.collider.transform.IsChildOf(transform.root)) return null;
 

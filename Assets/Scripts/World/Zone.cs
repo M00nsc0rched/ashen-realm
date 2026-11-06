@@ -19,6 +19,8 @@ namespace AshenRealm.World
 
         [Header("Atmosphere")]
         [SerializeField] bool underground;
+        [Tooltip("Under a roof above ground: no sun, and the room's own fires are the light.")]
+        [SerializeField] bool indoors;
         [SerializeField] Color ambient = new Color(0.6f, 0.58f, 0.64f);
         [SerializeField] Color fog = new Color(0.5f, 0.45f, 0.4f);
         [SerializeField] float fogStart = 30f;
@@ -30,6 +32,8 @@ namespace AshenRealm.World
         public Transform Exit => exit;
         public Transform Objective => objective;
         public bool Underground => underground;
+        public bool Indoors => indoors;
+        public bool OutOfTheSun => underground || indoors;
         public Color Ambient => ambient;
         public Color Fog => fog;
         public float FogStart => fogStart;

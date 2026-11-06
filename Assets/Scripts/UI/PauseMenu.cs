@@ -1,22 +1,28 @@
 using AshenRealm.Core;
 using AshenRealm.Input;
+using AshenRealm.Story;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace AshenRealm.UI
 {
     /// <summary>
-    /// Pause overlay: freezes time and gameplay input, offers resume, fullscreen and look sensitivity.
-    /// Opened by the pause button, Esc, or the browser releasing pointer lock.
+    /// Pause overlay: freezes time and gameplay input, and leads to the settings and back to the main menu.
+    /// Opened by the pause button, Esc, a gamepad's Start, or the browser releasing pointer lock.
+    /// Every "go back" request of the game arrives here, so this is also where it finds what to close.
     /// </summary>
     public sealed class PauseMenu : MonoBehaviour
     {
         [SerializeField] PlayerInputHub input;
         [SerializeField] CanvasGroup group;
         [SerializeField, Optional] DialoguePanel dialogue;
-        [SerializeField] Text sensitivityLabel;
+        [SerializeField, Optional] ShopPanel shop;
+        [SerializeField, Optional] MainMenu mainMenu;
+        [SerializeField, Optional] SettingsPanel settings;
+        [SerializeField, Optional] SoulKeeper keeper;
         [SerializeField] Text fullscreenLabel;
         [SerializeField, Optional] Text objectiveLabel;
+        [SerializeField, Optional] Selectable firstButton;
 
         float lastToggle = -999f;
 
@@ -36,6 +42,19 @@ namespace AshenRealm.UI
 
         public void Toggle()
         {
+            if (mainMenu != null && mainMenu.IsOpen)
+            {
+                mainMenu.Back();
+                return;
+            }
+            if (settings != null && settings.HandleBack()) return;
+            if (shop != null && shop.IsOpen)
+            {
+                shop.Close();
+                lastToggle = Time.unscaledTime;
+                return;
+            }
+
             // Esc and a pointer-lock release can arrive on consecutive frames; treat them as one request.
             if (Time.unscaledTime - lastToggle < 0.3f || (dialogue != null && dialogue.IsOpen)) return;
             Apply(!IsOpen);
@@ -54,15 +73,17 @@ namespace AshenRealm.UI
             UpdateLabels(!Screen.fullScreen);
         }
 
-        public void SensitivityUp() => ChangeSensitivity(1.15f);
-        public void SensitivityDown() => ChangeSensitivity(1f / 1.15f);
-
-        void ChangeSensitivity(float factor)
+        public void OpenSettings()
         {
-            if (input == null) return;
-            input.LookSensitivity *= factor;
-            UpdateLabels(Screen.fullScreen);
+            SetVisible(false);
+            settings.Open(() =>
+            {
+                SetVisible(true);
+                MenuFocus.Enter(firstButton);
+            });
         }
+
+        public void ToMainMenu() => keeper.ReturnToMenu();
 
         void Apply(bool open)
         {
@@ -70,16 +91,26 @@ namespace AshenRealm.UI
             lastToggle = Time.unscaledTime;
             Time.timeScale = open ? 0f : 1f;
             if (input != null) input.SetPaused(open);
-            group.alpha = open ? 1f : 0f;
-            group.interactable = open;
-            group.blocksRaycasts = open;
+            SetVisible(open);
             UpdateLabels(Screen.fullScreen);
+            if (open) MenuFocus.Enter(firstButton);
+        }
+
+        void Update()
+        {
+            if (IsOpen && group.interactable) MenuFocus.Keep(firstButton);
+        }
+
+        void SetVisible(bool visible)
+        {
+            group.alpha = visible ? 1f : 0f;
+            group.interactable = visible;
+            group.blocksRaycasts = visible;
         }
 
         void UpdateLabels(bool fullscreen)
         {
-            if (sensitivityLabel != null && input != null) sensitivityLabel.text = $"{GameText.LookSpeed}  {GameText.Decimal(input.LookSensitivity)}";
-            if (fullscreenLabel != null) fullscreenLabel.text = fullscreen ? GameText.ExitFullscreen : GameText.Fullscreen;
+            if (fullscreenLabel != null) fullscreenLabel.text = fullscreen ? MenuText.ExitFullscreen : MenuText.Fullscreen;
         }
     }
 }

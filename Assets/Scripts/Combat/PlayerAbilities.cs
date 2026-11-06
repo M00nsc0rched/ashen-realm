@@ -28,10 +28,11 @@ namespace AshenRealm.Combat
         IPlayerInput input;
         ClassDefinition definition;
         float focus;
+        int gearFocus;
         readonly float[] readyAt = new float[2];
 
         public float Focus => focus;
-        public float MaxFocus => definition != null ? definition.MaxFocus : 1f;
+        public float MaxFocus => definition != null ? definition.MaxFocus + gearFocus : 1f;
         public float FocusNormalized => focus / MaxFocus;
 
         void Awake() => input = inputSource;
@@ -48,7 +49,16 @@ namespace AshenRealm.Combat
             readyAt[0] = readyAt[1] = 0f;
         }
 
+        /// <summary>What the weapon in hand and the relic add to the pool.</summary>
+        public void ApplyGear(int bonusFocus)
+        {
+            gearFocus = bonusFocus;
+            focus = Mathf.Min(focus, MaxFocus);
+        }
+
         public void AddFocus(float amount) => focus = Mathf.Min(MaxFocus, focus + amount);
+
+        public void SetFocus(float amount) => focus = Mathf.Clamp(amount, 0f, MaxFocus);
 
         /// <summary>0 when the slot is usable, 1 right after use.</summary>
         public float CooldownFraction(int slot)
@@ -79,7 +89,7 @@ namespace AshenRealm.Combat
         public bool TryUse(int slot)
         {
             AbilityDefinition ability = Slot(slot);
-            if (ability == null) return false;
+            if (ability == null || !combat.Armed) return false;
             if (Time.time < readyAt[slot]) return false;
             if (focus < ability.Cost)
             {
@@ -100,7 +110,7 @@ namespace AshenRealm.Combat
                 case AbilityEffect.ShieldBash:
                 {
                     combat.PlayAbilitySwing();
-                    GameObject foe = combat.Strike(14f, 3f, 0.55f);
+                    GameObject foe = combat.Strike(Power(14f), 3f, 0.55f);
                     if (foe != null && foe.TryGetComponent(out StatusEffects s)) s.ApplyStun(2.2f);
                     break;
                 }
@@ -111,7 +121,7 @@ namespace AshenRealm.Combat
                     break;
                 case AbilityEffect.Backstab:
                     combat.PlayAbilitySwing();
-                    combat.Strike(BackstabDamage * (FoeFacingAway() ? BackstabBehindMultiplier : 1f), 2.8f, 0.45f);
+                    combat.Strike(Power(BackstabDamage) * (FoeFacingAway() ? BackstabBehindMultiplier : 1f), 2.8f, 0.45f);
                     break;
                 case AbilityEffect.PoisonBlade:
                     combat.CoatBlade(10f);
@@ -121,15 +131,15 @@ namespace AshenRealm.Combat
                 {
                     combat.PlayAbilitySwing();
                     float before = health.Current;
-                    GameObject foe = combat.Strike(DrainDamage, 9f, 0.6f);
-                    if (foe != null) health.Heal(DrainDamage);
+                    GameObject foe = combat.Strike(Power(DrainDamage), 9f, 0.6f);
+                    if (foe != null) health.Heal(Power(DrainDamage));
                     if (foe == null && Mathf.Approximately(before, health.Current)) GameMessages.Notify(GameText.NoTarget);
                     break;
                 }
                 case AbilityEffect.Hex:
                 {
                     combat.PlayAbilitySwing();
-                    GameObject foe = combat.Strike(6f, 11f, 0.6f);
+                    GameObject foe = combat.Strike(Power(6f), 11f, 0.6f);
                     if (foe != null && foe.TryGetComponent(out StatusEffects s)) s.ApplyWeaken(9f);
                     else GameMessages.Notify(GameText.NoTarget);
                     break;
@@ -139,15 +149,17 @@ namespace AshenRealm.Combat
                     combat.PlayAbilitySwing();
                     GameObject foe = FoeInReach(3.4f);
                     bool undead = foe != null && foe.TryGetComponent(out EnemyAI ai) && ai.Definition.Undead;
-                    combat.Strike(undead ? SmiteDamage * 2f : SmiteDamage, 3.4f, 0.5f);
+                    combat.Strike(Power(undead ? SmiteDamage * 2f : SmiteDamage), 3.4f, 0.5f);
                     break;
                 }
                 case AbilityEffect.Mend:
-                    health.Heal(MendAmount);
+                    health.Heal(Power(MendAmount));
                     GameMessages.Notify(GameText.MendMessage);
                     break;
             }
         }
+
+        float Power(float amount) => amount * combat.AbilityMultiplier;
 
         public void DrinkPotion()
         {

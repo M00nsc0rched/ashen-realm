@@ -11,6 +11,8 @@ namespace AshenRealm.World
         [SerializeField] ZoneManager zones;
         [SerializeField] int targetZone;
         [SerializeField] bool arriveAtExit;
+        [Tooltip("Where the door lets out, when the zone behind it has several doors.")]
+        [SerializeField, Optional] Transform arrival;
         [SerializeField] string prompt = "";
         [Tooltip("Session flag that unbars this portal. Empty means always open.")]
         [SerializeField] string requiredFlag = "";
@@ -26,7 +28,7 @@ namespace AshenRealm.World
 
         public void Interact(GameObject interactor)
         {
-            if (Unlocked) zones.Travel(targetZone, arriveAtExit);
+            if (Unlocked) zones.Travel(targetZone, arriveAtExit, arrival);
             else GameMessages.Notify(lockedMessage);
         }
     }

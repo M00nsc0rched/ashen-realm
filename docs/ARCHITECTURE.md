@@ -26,18 +26,54 @@ World/         Zone, ZoneManager (one active zone, fade, atmosphere, respawn), Z
 ```
 Later additions: `AI/` gained `EnemyAI`, `ICreatureAnimator`, `CreatureAnimator`; `Combat/` gained `StatusEffects`,
 `PlayerAbilities`, `Projectile`, `ProjectileLibrary`, `CombatFocus`; `Player/PlayerClassRig` applies the chosen class.
-`Interactions/` gained `NpcActor` and `EncounterSite`.
+`Interactions/` gained `NpcActor` and `EncounterSite`. The menus added `Core/GameSettings` and `Core/MenuText`; `UI/MainMenu`,
+`SettingsPanel`, `CodexPanel`, `ConfirmPanel`, `ChoiceButton`, `MenuFocus`, `TouchLayout`, `TouchLayoutHandle`, `HudAppearance`;
+`Story/SoulKeeper`, `SaveStore`, `SaveData`, `CodexBook`, `ISavedState`.
 
 ### Zones
-Seven zones sit 1000 m apart along X and all stay active in the Editor, so the validator can raycast them.
+Ten zones sit 1000 m apart along X, numbered in walking order (`World/ZoneNumbers`), and all stay active in the Editor, so the validator can raycast them.
 `ZoneManager.Awake` leaves only the first one active, and `Travel` swaps them behind a fade. Sun, fog and ambient follow
 the zone; underground the sun is off and a point light on the camera is the only light. Respawning returns to the current
-zone's entry, and guardians heal when the player dies.
+zone's entry, and guardians heal when the player dies. An indoor zone (the tavern, the forge, the chapel) has neither sun nor torch: its fires and lanterns
+are baked into the vertex colours by `MeshBuilder.Bake`, with one or two real lights left on top so the fire still moves. Entering one
+calls `PlayerCombat.SetArmed(false)`: the weapon pivots go down and out of sight, attacks, blocks and abilities stop, and the fighting
+touch buttons fade. A door that needs its own spot on the far side (three houses open onto the city) carries it as `ZonePortal.arrival`.
+`PlayerInteractor` ignores Unity's Ignore Raycast layer, so a collider there stops the player but not the crosshair: the chapel's rail.
+
+### Goods
+`Catalog.Items` holds what is for sale, in Graveborne's points. `StoryDirector` is the `IShopCounter`: it takes the money (gold for steel,
+Souls for relics, through `SoulKeeper`), equips the item in `GameSession` and trades in what it replaces. `UI/ShopPanel` only shows, and
+reaches the same counter from the seller's dialogue or from a `ShopFixture` on the goods themselves. `PlayerClassRig` adds the points to
+the class's numbers and swaps the right-hand model; weapon and relic ids are saved in `SoulRecord`.
 
 ### Story flow
-`StoryDirector.Start` opens the class choice in `DialoguePanel` (time scale 0, gameplay input paused). `EnemyAI` does not
+`MainMenu` opens the game; its `Új lélek` opens `ClassCarousel`, a row of cards with the middle one's sheet beside it (time scale 0,
+gameplay input paused). The row is one float, and each card's place, size and light follow from its distance to it, so arrows, a
+swipe and a half-finished drag share one code path. `Kiválasztás` turns the sheet to the class's story, `Indulás` hands the class to
+`StoryDirector.StartSoul`. `EnemyAI` does not
 know about UI: a guardian raises `ConfrontationRequested`, the director shows its speech and answers with `Engage()`.
 `EnemyAI.Slain` pays gold and sets `dead_<id>`, which unbars the stair.
+
+### Menus and saving
+The game opens on `MainMenu`, a canvas over the paused world in the same scene, so nothing loads between it and playing;
+the world camera sleeps while it is up. `MenuBuilder` places everything in the design sketches' coordinates, and
+`tools/prepare-menu-art.ps1` cuts the title, frames and painting out of the sketches into `Assets/Art/Menu`.
+
+`SaveStore` keeps the roster and the meta record as JSON in PlayerPrefs (IndexedDB on the web, where `PlayerPrefs.Save`
+is what persists). `SoulKeeper` writes the soul in play on every arrival, after each guardian and boss, when the app
+loses focus, and on demand. A load always starts from a fresh scene: the main menu is one, and from inside the game the
+scene reloads first. So the world only ever loses what a soul cleared: each `ISavedState` (chest, foe, encounter, knight)
+has a unique key that doubles as a session flag, and loading calls `ApplyCleared` on those whose flag is set, in inactive
+zones too. Positions are trusted only while `SaveStore.WorldVersion` matches; otherwise the soul arrives at its zone's entry.
+
+The meta record outlives every soul: Souls (paid per rank and per Codex discovery, at Graveborne's rates), descents, the
+deepest depth and the Codex. `CodexBook` builds the Codex from `Catalog` and `StoryText`, so its total is always true.
+
+Settings live in `GameSettings` and apply at once through its `Changed` event: `HudAppearance` fades the status elements
+(prompts and messages stay on purpose), `TouchControlsRoot` fades the buttons, and keeps the pause button faintly visible
+on touch devices when the buttons are hidden, since it is the only way back. `TouchLayout` shows a `TouchLayoutHandle` ring
+over each control; moving the joystick moves its whole touch zone. Every "go back" request ends up in `PauseMenu.Toggle`,
+which finds what to close. `MenuFocus` gives keyboard and gamepad a selection without leaving pointers a lit button.
 
 ### Input flow
 ```
@@ -54,14 +90,16 @@ TouchJoystick / TouchLookArea / TouchButton ──Touch*()─┘                
   starts on a button can never rotate the camera. Joystick, look and buttons work simultaneously.
 - Desktop: click to capture the cursor (the capturing click does not attack), Esc releases, F1 toggles touch controls
   for testing touch layout with the mouse. Touch mode starts automatically on mobile, when the browser reports a
-  touchscreen, or on the first real touch.
+  touchscreen, or on the first real touch, unless the player chose `Gombok rejtve`: a stored choice (settings or F1)
+  outranks the device. Gamepad Start pauses, B steps back through open menus.
 - Mouse buttons are separate actions from the gamepad triggers and only fight while the cursor is captured in desktop
   mode. In touch mode the mouse (and browsers' tap-emulated clicks) only drives the on-screen controls, so dragging to
   look never swings the sword: the STRIKE (`TÁMADÁS`) button is the only way to attack. The playtest checks this.
 
 ### Text and language
-All player-facing strings are Hungarian and live in `Core/GameText` (builders and runtime scripts reference it; the web
-page template is translated separately). The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
+All player-facing strings are Hungarian. HUD strings live in `Core/GameText`, menu strings in `Core/MenuText` (builders and
+runtime scripts reference them; the web page template is translated separately). Menus draw with Spectral (three faces,
+`Assets/Art/Fonts`, SIL OFL), and the validator checks `MenuText`, the Codex and menu `Text` against the font's own glyphs. The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
 U+00A0–U+017F (á é í ó ö ő ú ü ű are in; em dash, ellipsis and the minus sign are not), so the validator checks every
 `GameText` string, scene `Text` and interactable string against that range. Interaction prompts are written in upper
 case in `GameText` instead of being converted at runtime.
@@ -92,6 +130,7 @@ for animated models later without touching gameplay. The knight rig is `Model/Hi
 | `IOSBuildConfigurator` | Menu `Ashen Realm > Apply iOS Player Settings` |
 | `PlaytestRunner` | Menu `Ashen Realm > Run Automated Playtest`; Play-mode scenario driven through the input hub |
 | `PreviewCapture` | Menu `Ashen Realm > Capture Preview Shots`; offscreen renders of key vantage points |
+| `MenuCapture` | Menu `Ashen Realm > Capture Menu Shots`; renders the menu screens at desktop and phone aspect |
 | `WebGLBuilder` | Menu `Ashen Realm > Build WebGL` → `Builds/WebGL` with the `AshenRealm` web template |
 | `BatchTasks` | `-executeMethod` entry points with exit codes |
 | `Generation/MeshBuilder` | Mesh accumulation for PixelLit: vertex colour, texture-layer UVs, wind weights, auto-oriented faces |
@@ -100,7 +139,8 @@ for animated models later without touching gameplay. The knight rig is `Model/Hi
 | `Generation/PropMeshes` | Sword, shield, pines (bough cards), autumn trees, grass/flower/wheat cards, houses, windmill, lanterns, barrels, crates, chest, camp, knight parts |
 | `Generation/ValleyGenerator` | Smooth blended terrain, paths, ruins, graveyard, camp, hamlet, windmill, puddles, scattering, chunking, colliders, bounds |
 | `Generation/ActorFactory` | Player (with pixel camera and drifting leaves), Cursed Knight and chest hierarchies |
-| `Generation/HudBuilder` | HUD canvas (top bars, compass, emblem, pause), touch controls, pause menu, pixel screen, generated UI sprites |
+| `Generation/HudBuilder` | HUD canvas (top bars, compass, emblem, pause), touch controls, layout rings, pause menu, pixel screen, generated UI sprites |
+| `Generation/MenuBuilder` | Menu canvas after the sketches: main menu, Codex, settings, confirm box, layout bar, and the shared gold widgets |
 
 ### Rendering approach (pixel-art painterly look)
 - **Low-resolution world, crisp UI.** `PixelCamera` renders the world camera into a 360 px-high render texture with point
@@ -128,8 +168,8 @@ distant mountain ring at 215–330 m.
 
 ### Web platform
 `GameBootstrap` leaves frame pacing to the browser on WebGL. Losing pointer lock (Esc in the browser) raises
-`PlayerInputHub.PauseRequested`, which opens `PauseMenu` (time scale 0, cursor released, fullscreen toggle,
-look speed). The page template caps device pixel ratio and shows a rotate-device notice on phones in portrait.
+`PlayerInputHub.PauseRequested`, which opens `PauseMenu` (time scale 0, cursor released, settings, fullscreen toggle,
+main menu). The page template caps device pixel ratio and shows a rotate-device notice on phones in portrait.
 
 ## Extending
 - New enemy: reuse `Health`, `HitFlash`, implement an AI + animator pair, add a factory method, rerun the generator.

@@ -78,6 +78,14 @@ namespace AshenRealm.Combat
             Changed?.Invoke(current, maxHealth);
         }
 
+        /// <summary>Puts a saved value back. Always leaves the owner alive: nobody loads a corpse.</summary>
+        public void SetCurrent(float value)
+        {
+            EnsureInitialized();
+            current = Mathf.Clamp(value, 1f, maxHealth);
+            Changed?.Invoke(current, maxHealth);
+        }
+
         public void ResetHealth()
         {
             EnsureInitialized();

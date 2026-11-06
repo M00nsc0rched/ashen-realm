@@ -39,6 +39,7 @@ namespace AshenRealm.EditorTools
         public StatusEffects Status;
         public PlayerAbilities Abilities;
         public Light Torch;
+        public PlayerClassRig ClassRig;
     }
 
     /// <summary>
@@ -141,6 +142,16 @@ namespace AshenRealm.EditorTools
             var mace = Held("Mace", swordPivot, PropMeshes.Mace, Vector3.one);
             var lantern = Held("Hand Lantern", shieldPivot, PropMeshes.HandLantern, Vector3.one);
 
+            // The forge's goods, in Catalog order. They take the place of the class's right-hand weapon.
+            GameObject[] bought =
+            {
+                Held("Bought Rusted Blade", swordPivot, TownMeshes.RustedBlade, Vector3.one * 0.72f),
+                Held("Bought Iron Sword", swordPivot, TownMeshes.IronSword, Vector3.one * 0.72f),
+                Held("Bought Grave Dagger", swordPivot, TownMeshes.GraveDagger, Vector3.one),
+                Held("Bought Pilgrim Staff", swordPivot, TownMeshes.PilgrimStaff, Vector3.one),
+            };
+            foreach (GameObject weapon in bought) weapon.SetActive(false);
+
             // Underground the sun is off and this is the only light; ZoneManager switches it.
             var torchGo = Child("Torch", cameraGo.transform, new Vector3(0f, 0.6f, 1.6f), Quaternion.identity).gameObject;
             var torch = torchGo.AddComponent<Light>();
@@ -169,6 +180,8 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(classRig, "combat", rig.Combat);
             SceneWiring.Set(classRig, "abilities", rig.Abilities);
             SceneWiring.Set(classRig, "weaponSets", new[] { sword, shield, daggerRight, daggerLeft, staff, castingHand, mace, lantern });
+            SceneWiring.Set(classRig, "boughtWeapons", bought);
+            rig.ClassRig = classRig;
 
             // Internal wiring (prefab-safe).
             SceneWiring.Set(rig.Controller, "inputSource", rig.Input);
@@ -333,8 +346,13 @@ namespace AshenRealm.EditorTools
             return GeneratedAssets.SaveMesh(b, name);
         }
 
-        public static NpcActor CreateNpc(string id, Vector3 position, float yaw, HumanoidStyle look, Transform parent, StoryDirector director, GeneratedMaterials materials)
+        public static NpcActor CreateNpc(string id, Vector3 position, float yaw, HumanoidStyle look, Transform parent, StoryDirector director, GeneratedMaterials materials) =>
+            CreateNpc(id, position, yaw, b => CreatureMeshes.Figure(b, look), parent, director, materials);
+
+        public static NpcActor CreateNpc(string id, Vector3 position, float yaw, System.Action<MeshBuilder> figure, Transform parent, StoryDirector director, GeneratedMaterials materials)
         {
+            var body = new MeshBuilder();
+            figure(body);
             var root = new GameObject("NPC " + id);
             root.transform.SetParent(parent, true);
             root.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
@@ -342,7 +360,7 @@ namespace AshenRealm.EditorTools
             capsule.height = 1.9f;
             capsule.radius = 0.4f;
             capsule.center = new Vector3(0f, 0.95f, 0f);
-            MeshChild("Figure", root.transform, FigureMesh(look, "Npc_" + look.Name), materials.World);
+            MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, "Person_" + id), materials.World);
             var npc = root.AddComponent<NpcActor>();
             SceneWiring.Set(npc, "npcId", id);
             SceneWiring.Set(npc, "director", director);
@@ -481,7 +499,7 @@ namespace AshenRealm.EditorTools
         }
 
         public static ZonePortal CreatePortal(string name, Vector3 position, float yaw, Vector3 size, Transform parent, ZoneManager zones, int target, bool arriveAtExit,
-            string prompt, string requiredFlag, string lockedMessage)
+            string prompt, string requiredFlag, string lockedMessage, Transform arrival = null)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, true);
@@ -494,7 +512,24 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(portal, "prompt", prompt);
             SceneWiring.Set(portal, "requiredFlag", requiredFlag);
             SceneWiring.Set(portal, "lockedMessage", lockedMessage);
+            if (arrival != null) SceneWiring.Set(portal, "arrival", arrival);
             return portal;
+        }
+
+        /// <summary>The goods themselves as something to walk up to: a box the crosshair finds, which nothing bumps into.</summary>
+        public static ShopFixture CreateShopFixture(string name, Vector3 centre, Vector3 size, Transform parent, StoryDirector director, ItemSlot goods, string prompt)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, true);
+            go.transform.position = centre;
+            var box = go.AddComponent<BoxCollider>();
+            box.size = size;
+            box.isTrigger = true;
+            var fixture = go.AddComponent<ShopFixture>();
+            SceneWiring.Set(fixture, "goods", goods);
+            SceneWiring.Set(fixture, "prompt", prompt);
+            SceneWiring.Set(fixture, "director", director);
+            return fixture;
         }
 
         /// <summary>Golden leaves and motes drifting around the player (world-space particles, follows the player).</summary>

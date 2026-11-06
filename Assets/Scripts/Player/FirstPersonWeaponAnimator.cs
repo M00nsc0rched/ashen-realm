@@ -66,6 +66,7 @@ namespace AshenRealm.Player
         int slashVariant;
         float hitStopTimer;
         bool blocking;
+        bool putAway;
         float blockWeight, sprintWeight, bobWeight, lowerWeight;
         Vector3 swayEuler;
         Vector3 swordKickPos, swordKickVel, shieldKickPos, shieldKickVel;
@@ -90,6 +91,9 @@ namespace AshenRealm.Player
         }
 
         public void SetBlocking(bool value) => blocking = value;
+
+        /// <summary>Under a roof the weapons go down out of sight, and stay there until the player leaves.</summary>
+        public void SetPutAway(bool value) => putAway = value;
 
         /// <summary>Sword connected with a body: brief hit-stop and recoil.</summary>
         public void PlayHitImpact()
@@ -129,7 +133,13 @@ namespace AshenRealm.Player
             float speed = controller != null ? controller.NormalizedSpeed : 0f;
             bobWeight = Mathf.MoveTowards(bobWeight, grounded ? Mathf.Clamp(speed, 0f, 1.6f) : 0f, dt * 5f);
             sprintWeight = Mathf.MoveTowards(sprintWeight, controller != null && controller.IsSprinting && !IsSlashing ? 1f : 0f, dt * 5f);
-            lowerWeight = Mathf.MoveTowards(lowerWeight, controller != null && !controller.InputEnabled ? 1f : 0f, dt * 2.5f);
+            lowerWeight = Mathf.MoveTowards(lowerWeight, putAway || (controller != null && !controller.InputEnabled) ? 1f : 0f, dt * 2.5f);
+            bool gone = putAway && lowerWeight >= 1f;
+            if (swordPivot.gameObject.activeSelf == gone)
+            {
+                swordPivot.gameObject.SetActive(!gone);
+                shieldPivot.gameObject.SetActive(!gone);
+            }
             blockWeight = Mathf.MoveTowards(blockWeight, blocking && !IsSlashing ? 1f : 0f, dt * blockBlendSpeed);
             float block = Smooth(blockWeight);
 
