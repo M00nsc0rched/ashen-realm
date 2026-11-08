@@ -262,14 +262,9 @@ namespace AshenRealm.EditorTools
             room.Prism(Vector3.zero, 0.14f, 0f, 0.42f, 6);
             room.Pop();
 
-            // The work on it, still hot, and the sparks off the last blow.
+            // The work is still hot. The smith emits moving sparks when his hammer lands.
             room.SetColor(Pal.Lava, 0.8f);
             room.Box(at + new Vector3(0.02f, 1.25f, 0.02f), new Vector3(0.5f, 0.035f, 0.06f));
-            for (int i = 0; i < 14; i++)
-            {
-                room.SetColor(Pal.FireYellow, R(0.6f, 0.9f));
-                room.Box(at + new Vector3(R(-0.4f, 0.5f), 1.3f + R(0f, 0.32f), R(-0.3f, 0.3f)), Vector3.one * R(0.012f, 0.022f));
-            }
             AddGlow(at + new Vector3(0.2f, 1.6f, -0.5f), FireLight * 0.8f, 4f);
             Solid("Anvil", at + Vector3.up * 0.62f, new Vector3(0.95f, 1.24f, 0.95f));
 

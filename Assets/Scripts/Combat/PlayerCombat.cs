@@ -66,6 +66,8 @@ namespace AshenRealm.Combat
         float gearSpeed = 1f;
         float lifesteal;
         int gearMagic;
+        int gearAttackPoints, gearSpeedPoints;
+        int growthAttack, growthMagic, growthDefense, growthSpeed;
 
         public bool IsBlocking { get; private set; }
         /// <summary>False under a roof: the weapons stay at the door, and nothing swings, blocks or casts.</summary>
@@ -76,7 +78,7 @@ namespace AshenRealm.Combat
         public float OutgoingMultiplier => (1f + 0.12f * (GameSession.Instance != null ? GameSession.Instance.WeaponLevel : 0)) * (status != null ? status.DamageMultiplier : 1f);
         public float Range => range;
         /// <summary>What the gear adds to the class's abilities.</summary>
-        public float AbilityMultiplier => 1f + gearMagic * AbilityPowerPerPoint;
+        public float AbilityMultiplier => Mathf.Max(0.1f, 1f + (gearMagic + growthMagic) * AbilityPowerPerPoint);
 
         /// <summary>Raised when the sword damages something: (target, damage applied).</summary>
         public event Action<IDamageable, float> HitLanded;
@@ -165,14 +167,26 @@ namespace AshenRealm.Combat
         /// <summary>What the weapon in hand and the relic add. Bolts draw on magic, swings on attack.</summary>
         public void ApplyGear(int attack, int magic, int speed, float lifestealShare)
         {
+            gearAttackPoints = attack;
+            gearSpeedPoints = speed;
             damage = DamageWith(attack, magic);
-            gearSpeed = 1f + speed * SpeedPerPoint;
+            gearSpeed = Mathf.Max(0.2f, 1f + (speed + growthSpeed) * SpeedPerPoint);
             gearMagic = magic;
             lifesteal = lifestealShare;
         }
 
+        public void ApplyProgression(int attack, int magic, int defense, int speed)
+        {
+            growthAttack = attack;
+            growthMagic = magic;
+            growthDefense = defense;
+            growthSpeed = speed;
+            damage = DamageWith(gearAttackPoints, gearMagic);
+            gearSpeed = Mathf.Max(0.2f, 1f + (gearSpeedPoints + growthSpeed) * SpeedPerPoint);
+        }
+
         /// <summary>The damage of one blow with these points, before forge work or fury.</summary>
-        public float DamageWith(int attack, int magic) => classDamage + (ranged ? magic : attack) * DamagePerPoint;
+        public float DamageWith(int attack, int magic) => Mathf.Max(1f, classDamage + (ranged ? magic + growthMagic : attack + growthAttack) * DamagePerPoint);
 
         /// <summary>For the next few seconds every landed blow also poisons (Poison Blade).</summary>
         public void CoatBlade(float seconds) => poisonUntil = Time.time + seconds;
@@ -189,7 +203,10 @@ namespace AshenRealm.Combat
         {
             if (projectiles == null) return;
             Vector3 origin = aimOrigin.position + aimOrigin.forward * 0.8f + aimOrigin.right * 0.15f - aimOrigin.up * 0.1f;
-            projectiles.Launch(BoltKind.Fire, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true, null, Drink);
+            CharacterClass id = GameSession.Instance.Class.Id;
+            BoltKind kind = id == CharacterClass.Necromancer ? BoltKind.Shadow : id == CharacterClass.Alchemist ? BoltKind.Venom : BoltKind.Fire;
+            EnemyMove effect = id == CharacterClass.Alchemist ? new EnemyMove { PoisonDps = 3f, PoisonTime = 4f } : null;
+            projectiles.Launch(kind, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true, effect, Drink);
         }
 
         /// <summary>The Bloodstone's share of a blow that landed.</summary>
@@ -262,6 +279,7 @@ namespace AshenRealm.Combat
 
         public float FilterDamage(in DamageInfo info, float amount)
         {
+            amount /= Mathf.Max(0.2f, 1f + growthDefense * 0.025f);
             if (!IsBlocking || info.Source == null) return amount; // poison ignores the shield
 
             Vector3 toAttacker = info.Source != null ? info.Source.transform.position - transform.position : -info.Direction;

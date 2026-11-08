@@ -15,7 +15,7 @@ namespace AshenRealm.EditorTools
     {
         const string OutputFolder = "Screenshots";
 
-        static readonly Vector2Int[] Sizes = { new Vector2Int(1920, 1080), new Vector2Int(1688, 780) };
+        static readonly Vector2Int[] Sizes = { new Vector2Int(1920, 1080), new Vector2Int(1688, 780), new Vector2Int(1500, 863) };
 
         [MenuItem("Ashen Realm/Capture Menu Shots", priority = 31)]
         public static void Capture()
@@ -35,7 +35,7 @@ namespace AshenRealm.EditorTools
             Directory.CreateDirectory(OutputFolder);
             foreach (Vector2Int size in Sizes)
             {
-                string suffix = size.x == 1920 ? "desktop" : "phone";
+                string suffix = size.x == 1920 ? "desktop" : size.x == 1500 ? "reference" : "phone";
                 hud.gameObject.SetActive(false);
                 foreach (string screen in new[] { "Main Menu", "Settings", "Codex", "Confirm" })
                 {
@@ -54,6 +54,18 @@ namespace AshenRealm.EditorTools
                 carousel.Confirm();
                 Render(menu, camera, size, $"menu_class_story_{suffix}");
                 carousel.Back();
+
+                var inventory = menu.GetComponentInChildren<AshenRealm.UI.InventoryPanel>(true);
+                Only(menu.transform, "Inventory", null);
+                inventory.Preview(false);
+                Render(menu, camera, size, $"menu_inventory_{suffix}");
+                inventory.Preview(true);
+                Render(menu, camera, size, $"menu_abilities_{suffix}");
+                Only(menu.transform, "Secret Stats", null);
+                int[] exampleStats = { 100, 100, 6, 6, 10, 14, 12, 4, 6, 100, 30, 1, 20, 6 };
+                var secretInputs = menu.GetComponentInChildren<AshenRealm.UI.SecretStatsPanel>(true).GetComponentsInChildren<InputField>();
+                for (int i = 0; i < secretInputs.Length; i++) secretInputs[i].text = exampleStats[i].ToString();
+                Render(menu, camera, size, $"menu_secret_stats_{suffix}");
 
                 hud.gameObject.SetActive(true);
                 menu.gameObject.SetActive(false);

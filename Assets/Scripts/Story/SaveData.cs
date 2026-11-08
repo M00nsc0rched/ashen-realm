@@ -18,10 +18,11 @@ namespace AshenRealm.Story
         public int Zone;
         public float X, Y, Z, Yaw;
         public float Health, Focus;
+        public ProgressRecord Progress;
         public List<string> Flags = new List<string>();
 
         public CharacterClass Class => (CharacterClass)ClassId;
-        public int Level => 1 + WeaponLevel;
+        public int Level => Progress != null ? Progress.Level : 1 + WeaponLevel;
     }
 
     [Serializable]
@@ -36,5 +37,15 @@ namespace AshenRealm.Story
     {
         public int Souls, Descents, Deepest;
         public List<string> Codex = new List<string>();
+        public List<int> UnlockedClasses = new List<int>();
+    }
+
+    [Serializable]
+    public sealed class ProgressRecord
+    {
+        public int Level = 1, Food = 100, Intellect = 10;
+        public int HealthBonus, FocusBonus, AttackBonus, DefenseBonus, MagicBonus, SpeedBonus;
+        public int AbilityOneTier = 1, AbilityTwoTier = 1;
+        public bool TorchEquipped;
     }
 }

@@ -3,6 +3,7 @@ using System.Collections;
 using AshenRealm.Combat;
 using AshenRealm.Core;
 using AshenRealm.Player;
+using AshenRealm.Story;
 using AshenRealm.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,7 +26,6 @@ namespace AshenRealm.World
         [SerializeField] PlayerCombat combat;
         [SerializeField] AtmosphereController atmosphere;
         [SerializeField] Light sun;
-        [SerializeField] Light torch;
         [SerializeField] Camera worldCamera;
         [SerializeField] CompassStrip compass;
         [SerializeField] CanvasGroup fade;
@@ -75,10 +75,11 @@ namespace AshenRealm.World
             {
                 Current.gameObject.SetActive(false);
                 target.gameObject.SetActive(true);
-                Enter(target);
             }
             if (exactSpot) player.Teleport(position, yaw);
             else player.Teleport(target.Entry.position, target.Entry.eulerAngles.y);
+            // Restoring flags happens before Place, even when the saved soul is already in the valley.
+            Enter(target);
             Physics.SyncTransforms();
             ShowTitle();
         }
@@ -103,9 +104,8 @@ namespace AshenRealm.World
 
             Current.gameObject.SetActive(false);
             target.gameObject.SetActive(true);
-            Enter(target);
-
             player.Teleport(arrival.position, arrival.eulerAngles.y);
+            Enter(target);
             Physics.SyncTransforms();
             ShowTitle();
 
@@ -124,9 +124,12 @@ namespace AshenRealm.World
         {
             Current = zone;
             lifecycle.SetSpawnPoint(zone.Entry);
-            atmosphere.Apply(zone.Ambient, zone.Fog, zone.FogStart, zone.FogEnd);
+            var session = GameSession.Instance;
+            if (CurrentIndex == ZoneNumbers.City && session != null) session.SetFlag("world_evening");
             sun.enabled = !zone.OutOfTheSun;
-            torch.enabled = zone.Underground;
+            atmosphere.ApplyZone(zone, player.transform, session != null && session.HasFlag("world_evening"));
+            PlayerTorch.Instance?.SetZone(zone);
+            if (CurrentIndex == ZoneNumbers.City) PlayerProgression.Instance?.OfferTorchAtDusk();
             combat.SetArmed(!zone.Indoors);
             worldCamera.clearFlags = zone.OutOfTheSun ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
             worldCamera.backgroundColor = zone.Fog;

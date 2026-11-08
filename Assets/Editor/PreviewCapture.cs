@@ -68,6 +68,9 @@ namespace AshenRealm.EditorTools
             }
 
             Save(camera, hud, composite, Path.Combine(OutputFolder, "01_spawn_first_person.png"));
+            Vector3 arrivalGround = Ground(0f, -86f);
+            Shot("01b_arrival_tunnel", arrivalGround + Vector3.up * 1.7f, new Vector3(0f, arrivalGround.y + 2.8f, -97f), false, false);
+            Shot("01c_waiting_caravan", new Vector3(-1.5f, arrivalGround.y + 1.7f, -77.5f), new Vector3(-7.4f, arrivalGround.y + 1.6f, -84.8f), false, false);
             Shot("02_road_to_ruins", Ground(0f, -4f) + Vector3.up * 1.7f, Ground(0f, 32f) + Vector3.up * 3f, false, false);
             if (knight != null)
             {
@@ -120,7 +123,7 @@ namespace AshenRealm.EditorTools
             for (int i = 1; i < zones.Length; i++)
             {
                 Zone zone = zones[i];
-                atmosphere.Apply(zone.Ambient, zone.Fog, zone.FogStart, zone.FogEnd);
+                atmosphere.ApplyZone(zone, null, i == ZoneNumbers.City);
                 if (sun != null) sun.enabled = !zone.OutOfTheSun;
                 if (torch != null) torch.enabled = zone.Underground;
                 camera.clearFlags = zone.OutOfTheSun ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
@@ -129,6 +132,36 @@ namespace AshenRealm.EditorTools
                 string prefix = $"{10 + i}_{zone.name.Replace("Zone ", "")}";
                 Vector3 entry = zone.Entry.position + Vector3.up * 1.62f;
                 Shot(prefix + "_a_arrival", entry, entry + zone.Entry.forward * 10f, !zone.Indoors, i == 2);
+
+                if (i == ZoneNumbers.FirstDepth)
+                {
+                    // The supplied strips in hand, including a second frame, without entering Play mode.
+                    var carried = Find<PlayerTorch>();
+                    var serializedTorch = new SerializedObject(carried);
+                    var mount = (Transform)serializedTorch.FindProperty("mount").objectReferenceValue;
+                    var flame = (Renderer)serializedTorch.FindProperty("flame").objectReferenceValue;
+                    var block = new MaterialPropertyBlock();
+                    mount.gameObject.SetActive(true);
+                    for (int style = 0; style < 2; style++)
+                    {
+                        ShowClass(style == 0 ? 0 : 2);
+                        int left = (style == 0 ? 0 : 2) * PlayerClassRig.HandsPerClass + 1;
+                        ((GameObject)weaponSets.GetArrayElementAtIndex(left).objectReferenceValue).SetActive(false);
+                        block.SetTexture("_MainTex", (Texture)serializedTorch.FindProperty(style == 0 ? "warmStrip" : "coldStrip").objectReferenceValue);
+                        if (torch != null) torch.color = style == 0 ? new Color(1f, 0.67f, 0.32f) : new Color(0.28f, 0.62f, 1f);
+                        foreach (int frame in new[] { 0, 4 })
+                        {
+                            block.SetFloat("_Frame", frame);
+                            flame.SetPropertyBlock(block);
+                            Shot(prefix + (style == 0 ? "_torch_warm_" : "_torch_cold_") + frame,
+                                entry, entry + zone.Entry.forward * 10f, true, false);
+                        }
+                    }
+                    mount.gameObject.SetActive(false);
+                    flame.SetPropertyBlock(null);
+                    if (torch != null) torch.color = new Color(1f, 0.67f, 0.32f);
+                    ShowClass(0);
+                }
 
                 var foes = zone.GetComponentsInChildren<EnemyAI>(true);
                 EnemyAI keeper = foes.FirstOrDefault(e => Catalog.Enemy(e.EnemyId).Rank >= EnemyRank.Guardian);
@@ -159,12 +192,19 @@ namespace AshenRealm.EditorTools
                         Shot(prefix + "_b_hearth", at + new Vector3(1.6f, 1.62f, 3.4f), at + new Vector3(-1.8f, 1.2f, 8.8f), false, false);
                         Shot(prefix + "_b_bench", at + new Vector3(-0.6f, 1.62f, 3.6f), at + new Vector3(-6f, 1f, 2.2f), false, false);
                     }
-                    else
+                    else if (i == ZoneNumbers.Chapel)
                     {
                         Vector3 at = zone.Entry.position;
                         Shot(prefix + "_b_rail", at + new Vector3(0f, 2f, 10.6f), at + new Vector3(0f, 2f, 14f), false, false);
                         Shot(prefix + "_b_relics", at + new Vector3(2.6f, 2f, 11f), at + new Vector3(3.2f, 1.5f, 13.2f), false, false);
                         Shot(prefix + "_b_back", at + new Vector3(0f, 2f, 10.6f), at + new Vector3(0f, 1.4f, 0f), false, false);
+                    }
+                    else if (i >= ZoneNumbers.FirstHome && i < ZoneNumbers.FirstHome + ZoneNumbers.HomeCount)
+                    {
+                        Vector3 at = zone.transform.position;
+                        Shot(prefix + "_b_hearth_and_table", at + new Vector3(0.8f, 1.6f, -0.8f), at + new Vector3(-2f, 1f, 1.6f), false, false);
+                        Shot(prefix + "_c_bed_and_work", at + new Vector3(-0.5f, 1.6f, 0.5f), at + new Vector3(2.6f, 1f, 0f), false, false);
+                        Shot(prefix + "_d_return_door", at + new Vector3(0f, 1.6f, 0.9f), zone.Objective.position + Vector3.up * 1.6f, false, false);
                     }
                     foreach (NpcActor seated in zone.GetComponentsInChildren<NpcActor>(true))
                         Shot($"{prefix}_c_{seated.NpcId}", seated.transform.position + seated.transform.forward * 2.8f + Vector3.up * 1.6f, seated.transform.position + Vector3.up * 1.15f, false, false);

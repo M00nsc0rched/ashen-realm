@@ -331,6 +331,11 @@ namespace AshenRealm.EditorTools
 
             // ---- Pause button: after the touch layer, so it can be dragged anywhere and still be pressed ----
             var pauseRect = Anchored("Pause Button", safe, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-80f, -80f), new Vector2(96f, 96f));
+            // Keep the same menu button above the pause backdrop, while inventory and other menu sheets still cover it.
+            var pauseCanvas = pauseRect.gameObject.AddComponent<Canvas>();
+            pauseCanvas.overrideSorting = true;
+            pauseCanvas.sortingOrder = 20;
+            pauseRect.gameObject.AddComponent<GraphicRaycaster>();
             var pauseImage = Img(pauseRect.gameObject, sprites.StoneDisc, new Color(1f, 1f, 1f, 0.85f), true);
             foreach (float x in new[] { -13f, 13f })
             {
@@ -347,6 +352,10 @@ namespace AshenRealm.EditorTools
 
             // ---- Layout editor rings: one per control, above them all, off until the editor opens ----
             var handleRoot = Stretch("Layout Handles", safe);
+            var handlesCanvas = handleRoot.gameObject.AddComponent<Canvas>();
+            handlesCanvas.overrideSorting = true;
+            handlesCanvas.sortingOrder = 25;
+            handleRoot.gameObject.AddComponent<GraphicRaycaster>();
             var handles = new System.Collections.Generic.List<TouchLayoutHandle>();
             void Movable(string layoutName, RectTransform target, RectTransform marker) =>
                 handles.Add(LayoutHandle(layoutName, handleRoot, target, marker, safe, canvas, sprites));
@@ -394,7 +403,10 @@ namespace AshenRealm.EditorTools
 
             // ---- Pause menu and dialogue (top-most) ----
             var pause = BuildPauseMenu(canvasGo.transform, input, menuArt);
-            UnityEventTools.AddPersistentListener(pauseButton.onClick, new UnityAction(pause.Toggle));
+            SceneWiring.Set(pause, "controls", touchControls);
+            var holdMenu = pauseButton.gameObject.AddComponent<HoldMenuButton>();
+            SceneWiring.Set(holdMenu, "menu", pause);
+            UnityEventTools.AddPersistentListener(pauseButton.onClick, new UnityAction(holdMenu.Click));
             var dialogue = BuildDialogue(canvasGo.transform, input, font);
             SceneWiring.Set(pause, "dialogue", dialogue);
             var shop = BuildShop(canvasGo.transform, input, menuArt);
@@ -492,17 +504,25 @@ namespace AshenRealm.EditorTools
             group.interactable = false;
             Img(root.gameObject, null, new Color(0.02f, 0.02f, 0.03f, 0.6f), true);
 
-            const float width = 680f, left = 110f, buttonWidth = 460f, buttonHeight = 82f;
-            var panel = MenuBuilder.Panel("Panel", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(width, 800f), art);
-            MenuBuilder.Write(MenuBuilder.Box("Title", panel, 0f, 24f, width, 92f), MenuText.Paused, 62, new Color(0.97f, 0.8f, 0.52f), TextAnchor.MiddleCenter, art.SemiBold);
+            const float width = 1250f, left = 442f, buttonWidth = 750f, buttonHeight = 74f;
+            var panel = MenuBuilder.Panel("Panel", root, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(width, 880f), art);
+            MenuBuilder.Write(MenuBuilder.Box("Title", panel, 0f, 20f, width, 92f), InventoryText.DescentMenu, 58, new Color(0.97f, 0.8f, 0.52f), TextAnchor.MiddleCenter, art.SemiBold);
+            var portrait = Img(MenuBuilder.Box("Soul Portrait", panel, 60f, 140f, 330f, 484f).gameObject, art.Cards[0], Color.white);
+            portrait.preserveAspect = true;
+            var portraitPresenter = portrait.gameObject.AddComponent<ClassPortrait>();
+            SceneWiring.Set(portraitPresenter, "image", portrait);
+            SceneWiring.Set(portraitPresenter, "portraits", art.Cards);
 
             var menu = root.gameObject.AddComponent<PauseMenu>();
-            var resume = MenuBuilder.GoldButton("Resume", panel, left, 136f, buttonWidth, buttonHeight, MenuText.Resume, 36, art, new UnityAction(menu.Resume), out _);
-            MenuBuilder.GoldButton("Settings", panel, left, 240f, buttonWidth, buttonHeight, MenuText.Settings, 36, art, new UnityAction(menu.OpenSettings), out _);
-            MenuBuilder.GoldButton("Fullscreen", panel, left, 344f, buttonWidth, buttonHeight, MenuText.Fullscreen, 36, art, new UnityAction(menu.ToggleFullscreen), out Text fullscreenLabel);
-            MenuBuilder.GoldButton("Main Menu", panel, left, 448f, buttonWidth, buttonHeight, MenuText.MainMenu, 36, art, new UnityAction(menu.ToMainMenu), out _);
-            var helpText = MenuBuilder.Write(MenuBuilder.Box("Objective", panel, 56f, 556f, width - 112f, 210f), GameText.Objective, 25,
+            MenuBuilder.GoldButton("Inventory", panel, left, 140f, buttonWidth, buttonHeight, InventoryText.InventoryAndSkills, 36, art, new UnityAction(menu.OpenInventory), out _);
+            MenuBuilder.GoldButton("Codex", panel, left, 229f, buttonWidth, buttonHeight, MenuText.Codex, 36, art, new UnityAction(menu.OpenCodex), out _);
+            MenuBuilder.GoldButton("Settings", panel, left, 318f, buttonWidth, buttonHeight, MenuText.Settings, 36, art, new UnityAction(menu.OpenSettings), out _);
+            MenuBuilder.GoldButton("Fullscreen", panel, left, 407f, buttonWidth, buttonHeight, MenuText.Fullscreen, 36, art, new UnityAction(menu.ToggleFullscreen), out Text fullscreenLabel);
+            MenuBuilder.GoldButton("Save", panel, left, 496f, buttonWidth, buttonHeight, InventoryText.Save, 32, art, new UnityAction(menu.SaveSoul), out _);
+            MenuBuilder.GoldButton("Main Menu", panel, left, 585f, buttonWidth, buttonHeight, MenuText.MainMenu, 36, art, new UnityAction(menu.ToMainMenu), out _);
+            var helpText = MenuBuilder.Write(MenuBuilder.Box("Objective", panel, 56f, 682f, width - 112f, 75f), GameText.Objective, 25,
                 new Color(0.88f, 0.83f, 0.72f), TextAnchor.UpperCenter, art.Italic);
+            var resume = MenuBuilder.GoldButton("Resume", panel, 60f, 778f, width - 120f, 68f, MenuText.Resume, 40, art, new UnityAction(menu.Resume), out _);
 
             SceneWiring.Set(menu, "input", input);
             SceneWiring.Set(menu, "group", group);

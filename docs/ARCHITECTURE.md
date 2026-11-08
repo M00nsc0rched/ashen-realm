@@ -29,28 +29,38 @@ Later additions: `AI/` gained `EnemyAI`, `ICreatureAnimator`, `CreatureAnimator`
 `Interactions/` gained `NpcActor` and `EncounterSite`. The menus added `Core/GameSettings` and `Core/MenuText`; `UI/MainMenu`,
 `SettingsPanel`, `CodexPanel`, `ConfirmPanel`, `ChoiceButton`, `MenuFocus`, `TouchLayout`, `TouchLayoutHandle`, `HudAppearance`;
 `Story/SoulKeeper`, `SaveStore`, `SaveData`, `CodexBook`, `ISavedState`.
+Checkpoint L adds `Player/PlayerProgression`, `PlayerTorch`; `AI/NpcIdleAnimator`; `UI/InventoryPanel`, `SecretStatsPanel`,
+`HoldMenuButton`, `ClassPortrait`; and `Core/InventoryText`.
 
 ### Zones
-Ten zones sit 1000 m apart along X, numbered in walking order (`World/ZoneNumbers`), and all stay active in the Editor, so the validator can raycast them.
+Thirteen zones sit 1000 m apart along X (`World/ZoneNumbers`) and all stay active in the Editor, so the validator can raycast them.
+Ids 0-9 retain their order (valley, city, tavern, forge, chapel, five depths); the three valley homes are appended at 10-12.
 `ZoneManager.Awake` leaves only the first one active, and `Travel` swaps them behind a fade. Sun, fog and ambient follow
-the zone; underground the sun is off and a point light on the camera is the only light. Respawning returns to the current
-zone's entry, and guardians heal when the player dies. An indoor zone (the tavern, the forge, the chapel) has neither sun nor torch: its fires and lanterns
+the zone; underground the sun is off and the equipped torch supplies local light. Respawning returns to the current
+zone's entry, and guardians heal when the player dies. An indoor zone (the tavern, forge, chapel or valley homes) has no sun: its fires and lanterns
 are baked into the vertex colours by `MeshBuilder.Bake`, with one or two real lights left on top so the fire still moves. Entering one
 calls `PlayerCombat.SetArmed(false)`: the weapon pivots go down and out of sight, attacks, blocks and abilities stop, and the fighting
-touch buttons fade. A door that needs its own spot on the far side (three houses open onto the city) carries it as `ZonePortal.arrival`.
+touch buttons fade. The independently mounted carried torch keeps the inventory choice. A door that needs its own spot on the far side
+(the public houses and the valley homes) carries it as `ZonePortal.arrival`.
 `PlayerInteractor` ignores Unity's Ignore Raycast layer, so a collider there stops the player but not the crosshair: the chapel's rail.
+
+`ArrivalGenerator` places the two wagons, waiting travellers and black tunnel at the southern road. The tunnel's invisible collider
+blocks the old route; `HamletGenerator` gives each roadside cottage a furnished room and its own return doorstep.
+`AtmosphereController` advances sunset with northward travel. City arrival stores `world_evening`, so a loaded soul or a return to the
+valley stays in evening light; `ZoneManager.Place` reapplies the atmosphere even when restoring into the current zone.
 
 ### Goods
 `Catalog.Items` holds what is for sale, in Graveborne's points. `StoryDirector` is the `IShopCounter`: it takes the money (gold for steel,
 Souls for relics, through `SoulKeeper`), equips the item in `GameSession` and trades in what it replaces. `UI/ShopPanel` only shows, and
 reaches the same counter from the seller's dialogue or from a `ShopFixture` on the goods themselves. `PlayerClassRig` adds the points to
-the class's numbers and swaps the right-hand model; weapon and relic ids are saved in `SoulRecord`.
+the class's numbers and swaps the right-hand model; `PlayerProgression` composes saved growth on top. Weapon and relic ids are saved in `SoulRecord`.
 
 ### Story flow
 `MainMenu` opens the game; its `Új lélek` opens `ClassCarousel`, a row of cards with the middle one's sheet beside it (time scale 0,
 gameplay input paused). The row is one float, and each card's place, size and light follow from its distance to it, so arrows, a
 swipe and a half-finished drag share one code path. `Kiválasztás` turns the sheet to the class's story, `Indulás` hands the class to
-`StoryDirector.StartSoul`. `EnemyAI` does not
+`StoryDirector.StartSoul`. All six classes have starting kits; availability comes from `SoulKeeper.IsClassUnlocked`, with the last two
+stored in `MetaRecord.UnlockedClasses`. `EnemyAI` does not
 know about UI: a guardian raises `ConfrontationRequested`, the director shows its speech and answers with `Engage()`.
 `EnemyAI.Slain` pays gold and sets `dead_<id>`, which unbars the stair.
 
@@ -65,9 +75,16 @@ loses focus, and on demand. A load always starts from a fresh scene: the main me
 scene reloads first. So the world only ever loses what a soul cleared: each `ISavedState` (chest, foe, encounter, knight)
 has a unique key that doubles as a session flag, and loading calls `ApplyCleared` on those whose flag is set, in inactive
 zones too. Positions are trusted only while `SaveStore.WorldVersion` matches; otherwise the soul arrives at its zone's entry.
+World version 4 keeps the depth ids stable and adds the three valley homes.
 
 The meta record outlives every soul: Souls (paid per rank and per Codex discovery, at Graveborne's rates), descents, the
-deepest depth and the Codex. `CodexBook` builds the Codex from `Catalog` and `StoryText`, so its total is always true.
+deepest depth, class unlocks and the Codex. `CodexBook` builds the Codex from `Catalog` and `StoryText`, so its total is always true.
+
+`ProgressRecord` belongs to one soul: level, stat bonuses, two ability tiers, food and torch choice. `PlayerProgression` spends Souls,
+applies the resulting combat/health/focus values and captures the record. Loading restores the session, then growth, then zone and
+current health/focus. `InventoryPanel` presents equipment and abilities; `HoldMenuButton` opens `SecretStatsPanel` after five continuous
+unscaled seconds. The hidden editor changes the same saved values and unlock ledger, rather than a separate display-only copy.
+Food is stored and editable; hunger upkeep is not implemented.
 
 Settings live in `GameSettings` and apply at once through its `Changed` event: `HudAppearance` fades the status elements
 (prompts and messages stay on purpose), `TouchControlsRoot` fades the buttons, and keeps the pause button faintly visible
@@ -97,9 +114,9 @@ TouchJoystick / TouchLookArea / TouchButton ──Touch*()─┘                
   look never swings the sword: the STRIKE (`TÁMADÁS`) button is the only way to attack. The playtest checks this.
 
 ### Text and language
-All player-facing strings are Hungarian. HUD strings live in `Core/GameText`, menu strings in `Core/MenuText` (builders and
+All player-facing strings are Hungarian. HUD strings live in `Core/GameText`, menu strings in `Core/MenuText` and `Core/InventoryText` (builders and
 runtime scripts reference them; the web page template is translated separately). Menus draw with Spectral (three faces,
-`Assets/Art/Fonts`, SIL OFL), and the validator checks `MenuText`, the Codex and menu `Text` against the font's own glyphs. The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
+`Assets/Art/Fonts`, SIL OFL), and the validator checks both menu string tables, the Codex and menu `Text` against the font's own glyphs. The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
 U+00A0–U+017F (á é í ó ö ő ú ü ű are in; em dash, ellipsis and the minus sign are not), so the validator checks every
 `GameText` string, scene `Text` and interactable string against that range. Interaction prompts are written in upper
 case in `GameText` instead of being converted at runtime.
@@ -121,6 +138,9 @@ Obstacle handling is a stuck-detector side-step, enough for the open valley.
 ### Procedural animation
 Weapons sit under `Main Camera/Weapon Rig/{Sword Pivot (Right Hand), Shield Pivot (Left Hand)}`. Swap the child meshes
 for animated models later without touching gameplay. The knight rig is `Model/Hips/{Leg L, Leg R, Torso/{Head, Arm L, Arm R, Cape}}`.
+All six classes have separate right/left hand models. `PlayerTorch` animates the supplied eight-frame warm/cold atlases with the
+`AshenRealm/TorchStrip` shader; drawing it hides the class's left-hand item. `NpcIdleAnimator` moves the figure without moving its
+interaction collider; the smith also has a hammer arm and timed particle sparks.
 
 ## Editor generation (`Assets/Editor`)
 | File | Role |
@@ -138,9 +158,11 @@ for animated models later without touching gameplay. The knight rig is `Model/Hi
 | `Generation/PixelTextures` | 20 procedural 64×64 pixel-art layers (Texture2DArray) and the painted panoramic sky |
 | `Generation/PropMeshes` | Sword, shield, pines (bough cards), autumn trees, grass/flower/wheat cards, houses, windmill, lanterns, barrels, crates, chest, camp, knight parts |
 | `Generation/ValleyGenerator` | Smooth blended terrain, paths, ruins, graveyard, camp, hamlet, windmill, puddles, scattering, chunking, colliders, bounds |
+| `Generation/ArrivalGenerator`, `HamletGenerator` | Southern tunnel and caravan; three furnished cottages with distinct household props |
 | `Generation/ActorFactory` | Player (with pixel camera and drifting leaves), Cursed Knight and chest hierarchies |
 | `Generation/HudBuilder` | HUD canvas (top bars, compass, emblem, pause), touch controls, layout rings, pause menu, pixel screen, generated UI sprites |
 | `Generation/MenuBuilder` | Menu canvas after the sketches: main menu, Codex, settings, confirm box, layout bar, and the shared gold widgets |
+| `Generation/InventoryMenuBuilder`, `TorchBuilder`, `PlayerWeaponMeshes` | Inventory/developer controls, supplied torch atlases and all six class kits |
 
 ### Rendering approach (pixel-art painterly look)
 - **Low-resolution world, crisp UI.** `PixelCamera` renders the world camera into a 360 px-high render texture with point

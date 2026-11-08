@@ -85,6 +85,7 @@ namespace AshenRealm.Story
         /// <summary>A class was taken from the row of cards.</summary>
         public void StartSoul(CharacterClass id)
         {
+            if (!keeper.IsClassUnlocked(id)) return;
             session.ChooseClass(id);
             keeper.Begin();
             int testZone = ZoneFromUrl();
@@ -169,7 +170,8 @@ namespace AshenRealm.Story
         {
             string classLine = session.Class.Id == CharacterClass.Knight ? npc.Knight
                 : session.Class.Id == CharacterClass.Gravethief ? npc.Gravethief
-                : session.Class.Id == CharacterClass.Witch ? npc.Witch : npc.Warden;
+                : session.Class.Id == CharacterClass.Witch ? npc.Witch
+                : session.Class.Id == CharacterClass.Warden ? npc.Warden : npc.Fallback;
             if (session.Alignment == Alignment.Marked && npc.Marked != null) return npc.Marked;
             if (session.Alignment == Alignment.Hallowed && npc.Hallowed != null) return npc.Hallowed;
             return classLine ?? npc.Fallback;
@@ -384,6 +386,7 @@ namespace AshenRealm.Story
             if (zone == ZoneNumbers.Tavern) return GameText.ObjectiveTavern;
             if (zone == ZoneNumbers.Forge) return GameText.ObjectiveForge;
             if (zone == ZoneNumbers.Chapel) return GameText.ObjectiveChapel;
+            if (zone >= ZoneNumbers.FirstHome) return GameText.LeaveHouse;
             if (Finished) return GameText.ObjectiveDone;
             return GameText.ObjectiveDepth;
         }

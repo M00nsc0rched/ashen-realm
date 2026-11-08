@@ -1,3 +1,4 @@
+using AshenRealm.World;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -15,12 +16,78 @@ namespace AshenRealm.Core
         [SerializeField] float fogStart = 20f;
         [SerializeField] float fogEnd = 330f;
 
+        Zone currentZone;
+        Transform traveller;
+        Material originalSky, eveningSky;
+        float eveningProgress;
+        bool eveningLocked;
+
+        public float EveningProgress => eveningProgress;
+
         public Color AmbientColor => ambientColor;
         public Color FogColor => fogColor;
         public float FogStart => fogStart;
         public float FogEnd => fogEnd;
 
         void OnEnable() => Apply();
+
+        void Update()
+        {
+            if (currentZone == null || currentZone.OutOfTheSun) return;
+            ApplyOutside();
+        }
+
+        void OnDestroy()
+        {
+            if (eveningSky == null) return;
+            if (RenderSettings.skybox == eveningSky) RenderSettings.skybox = originalSky;
+            if (Application.isPlaying) Destroy(eveningSky);
+            else DestroyImmediate(eveningSky);
+        }
+
+        /// <summary>The walk north carries sunset into evening. Visiting the city makes the change permanent for this soul.</summary>
+        public void ApplyZone(Zone zone, Transform player, bool evening)
+        {
+            currentZone = zone;
+            traveller = player;
+            eveningLocked = evening;
+            if (eveningLocked) eveningProgress = 1f;
+            if (zone.OutOfTheSun)
+                Apply(zone.Ambient, zone.Fog, zone.FogStart, zone.FogEnd);
+            else
+                ApplyOutside();
+        }
+
+        void ApplyOutside()
+        {
+            float travelled = traveller == null ? 0f : Mathf.InverseLerp(-86f, 92f, traveller.position.z);
+            eveningProgress = eveningLocked ? 1f : Mathf.Max(eveningProgress, travelled);
+            float t = Mathf.SmoothStep(0f, 1f, eveningProgress);
+            Color duskAmbient = new Color(0.49f, 0.4f, 0.43f);
+            Color nightAmbient = new Color(0.19f, 0.22f, 0.32f);
+            Color duskFog = new Color(0.56f, 0.34f, 0.3f);
+            Color nightFog = new Color(0.065f, 0.085f, 0.14f);
+            Apply(Color.Lerp(duskAmbient, nightAmbient, t), Color.Lerp(duskFog, nightFog, t), currentZone.FogStart, currentZone.FogEnd);
+            Light sun = RenderSettings.sun;
+            if (sun != null)
+            {
+                sun.transform.rotation = Quaternion.Euler(Mathf.Lerp(13f, 2f, t), 110f, 0f);
+                sun.color = Color.Lerp(new Color(1f, 0.65f, 0.36f), new Color(0.48f, 0.57f, 0.8f), t);
+                sun.intensity = Mathf.Lerp(1.35f, 0.18f, t);
+                sun.shadowStrength = Mathf.Lerp(0.85f, 0.55f, t);
+            }
+            if (eveningSky == null && RenderSettings.skybox != null)
+            {
+                originalSky = RenderSettings.skybox;
+                eveningSky = new Material(originalSky);
+                RenderSettings.skybox = eveningSky;
+            }
+            if (eveningSky != null)
+            {
+                if (eveningSky.HasProperty("_Tint")) eveningSky.SetColor("_Tint", Color.Lerp(new Color(0.65f, 0.44f, 0.4f), new Color(0.13f, 0.17f, 0.28f), t));
+                if (eveningSky.HasProperty("_Exposure")) eveningSky.SetFloat("_Exposure", Mathf.Lerp(1f, 0.5f, t));
+            }
+        }
 
         /// <summary>Switches to a zone's light and fog.</summary>
         public void Apply(Color ambient, Color fog, float start, float end)

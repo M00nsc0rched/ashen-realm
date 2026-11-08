@@ -37,12 +37,27 @@ namespace AshenRealm.Story
 
         /// <summary>A soul is in play (false on the main menu).</summary>
         public bool HasSoul => soulId != null;
+        public static SoulKeeper Instance { get; private set; }
         public MetaRecord Meta => meta;
 
         /// <summary>Raised when a saved soul has been put back in the world.</summary>
         public event Action Loaded;
 
-        void Awake() => meta = SaveStore.LoadMeta();
+        void Awake()
+        {
+            Instance = this;
+            meta = SaveStore.LoadMeta();
+            if (meta.UnlockedClasses == null) meta.UnlockedClasses = new List<int>();
+        }
+
+        public bool IsClassUnlocked(CharacterClass id) => (int)id < 4 || meta.UnlockedClasses.Contains((int)id);
+
+        public void UnlockClass(CharacterClass id)
+        {
+            if (meta.UnlockedClasses.Contains((int)id)) return;
+            meta.UnlockedClasses.Add((int)id);
+            SaveStore.SaveMeta(meta);
+        }
 
         void Start() => zones.Arrived += OnArrived;
 
@@ -111,6 +126,7 @@ namespace AshenRealm.Story
             soulId = soul.Id;
             lastZone = soul.Zone;
             session.Restore(soul);
+            player.GetComponent<PlayerProgression>().Restore(soul.Progress);
 
             foreach (ISavedState state in FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include).OfType<ISavedState>())
                 if (session.HasFlag(state.SaveKey)) state.ApplyCleared();
@@ -137,13 +153,13 @@ namespace AshenRealm.Story
 
         public void AddSouls(int amount)
         {
-            meta.Souls += amount;
+            meta.Souls = Mathf.Max(0, meta.Souls + amount);
             SaveStore.SaveMeta(meta);
         }
 
         public bool TrySpendSouls(int amount)
         {
-            if (meta.Souls < amount) return false;
+            if (amount < 0 || meta.Souls < amount) return false;
             AddSouls(-amount);
             return true;
         }
@@ -164,7 +180,8 @@ namespace AshenRealm.Story
                 session.ClearFlag(StoryDirector.BlessedFlag);
                 meta.Descents++;
             }
-            if (index >= ZoneNumbers.FirstDepth) meta.Deepest = Mathf.Max(meta.Deepest, index - ZoneNumbers.FirstDepth + 1);
+            if (index >= ZoneNumbers.FirstDepth && index < ZoneNumbers.FirstDepth + ZoneNumbers.DepthCount)
+                meta.Deepest = Mathf.Max(meta.Deepest, index - ZoneNumbers.FirstDepth + 1);
             lastZone = index;
             SaveStore.SaveMeta(meta);
             Save();
@@ -193,6 +210,7 @@ namespace AshenRealm.Story
                 Yaw = player.transform.eulerAngles.y,
                 Health = health.IsAlive ? health.Current : health.Max,
                 Focus = abilities.Focus,
+                Progress = player.GetComponent<PlayerProgression>().Capture(),
                 Flags = session.Flags.ToList(),
             };
         }

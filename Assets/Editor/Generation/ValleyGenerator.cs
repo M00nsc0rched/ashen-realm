@@ -20,6 +20,8 @@ namespace AshenRealm.EditorTools
         public Transform Root;
         public Vector3 GatePosition;
         public Vector3 GateArrival;
+        public ArrivalLayout Arrival;
+        public readonly List<(Vector3 door, Vector3 arrival, float yaw)> Homes = new List<(Vector3, Vector3, float)>();
     }
 
     /// <summary>
@@ -103,7 +105,8 @@ namespace AshenRealm.EditorTools
             BuildRuins(layout);
             BuildGraveyard();
             BuildCamp();
-            BuildHamlet();
+            BuildHamlet(layout);
+            layout.Arrival = new ArrivalGenerator(worldMaterial).Generate(root, Ground);
             BuildGate(layout);
             BuildPuddles();
             BuildFences();
@@ -191,6 +194,9 @@ namespace AshenRealm.EditorTools
             flats.Add((CampCenter, 8f, 6f, BaseHeight(CampCenter.x, CampCenter.y)));
             flats.Add((GraveyardCenter, 9f, 6f, BaseHeight(GraveyardCenter.x, GraveyardCenter.y)));
             flats.Add((SpawnCenter, 5f, 5f, BaseHeight(SpawnCenter.x, SpawnCenter.y)));
+            flats.Add((new Vector2(0f, -95f), 9f, 5f, BaseHeight(SpawnCenter.x, SpawnCenter.y)));
+            flats.Add((new Vector2(-7.4f, -84.8f), 4f, 3f, BaseHeight(SpawnCenter.x, SpawnCenter.y)));
+            flats.Add((new Vector2(7.5f, -91f), 4f, 3f, BaseHeight(SpawnCenter.x, SpawnCenter.y)));
             flats.Add((HamletCenter, 14f, 8f, BaseHeight(HamletCenter.x, HamletCenter.y)));
             flats.Add((WindmillCenter, 4f, 9f, BaseHeight(WindmillCenter.x, WindmillCenter.y) + 1.8f));
             flats.Add((GateCenter, 8f, 9f, BaseHeight(GateCenter.x, GateCenter.y - 10f)));
@@ -200,6 +206,8 @@ namespace AshenRealm.EditorTools
             clearings.Add((CampCenter, 10f));
             clearings.Add((GraveyardCenter, 10f));
             clearings.Add((SpawnCenter, 7f));
+            clearings.Add((new Vector2(0f, -94f), 13f));
+            clearings.Add((new Vector2(-7.4f, -84.8f), 7f));
             clearings.Add((HamletCenter, 17f));
             clearings.Add((WindmillCenter, 7f));
             clearings.Add((GateCenter, 11f));
@@ -961,7 +969,7 @@ namespace AshenRealm.EditorTools
 
         readonly List<Vector2> houseFootprints = new List<Vector2>();
 
-        void BuildHamlet()
+        void BuildHamlet(ValleyLayout layout)
         {
             var houses = new (Vector2 pos, float yaw, float w, float d, float h, bool tiles)[]
             {
@@ -981,6 +989,13 @@ namespace AshenRealm.EditorTools
                 chunk.Pop();
                 AddBoxCollider("House", p + Vector3.up * (0.6f + h.h) * 0.5f, rotation, new Vector3(h.w + 0.3f, 0.6f + h.h + 0.4f, h.d + 0.3f));
                 AddBoxCollider("House Roof", p + Vector3.up * (0.6f + h.h + h.d * 0.25f), rotation, new Vector3(h.w + 0.6f, h.d * 0.5f, h.d * 0.6f));
+
+                // Portals sit just in front of the painted doors; the return point faces out into the yard.
+                Vector3 door = p + rotation * new Vector3(-h.w * 0.12f, 0f, -h.d * 0.5f - 0.34f);
+                door.y = SurfaceHeight(door.x, door.z);
+                Vector3 arrival = p + rotation * new Vector3(-h.w * 0.12f, 0f, -h.d * 0.5f - 1.75f);
+                arrival.y = SurfaceHeight(arrival.x, arrival.z) + 0.1f;
+                layout.Homes.Add((door, arrival, h.yaw));
 
                 // Barrels and crates by each house.
                 for (int k = 0; k < 3; k++)

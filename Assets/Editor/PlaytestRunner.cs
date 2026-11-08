@@ -209,7 +209,7 @@ namespace AshenRealm.EditorTools
             carousel.Jump(Catalog.Cards.Length - 1);
             carousel.Next();
             Check(carousel.Selected == Catalog.Cards.Length - 1, "The row stops at its last card");
-            Check(Catalog.Cards[carousel.Selected].Class == null, "The last card is a class that is not in the game yet");
+            Check(!SoulKeeper.Instance.IsClassUnlocked((CharacterClass)carousel.Selected), "The last card starts locked in the soul ledger");
             carousel.Confirm();
             Check(carousel.IsOpen && !carousel.ShowingStory, "A class that is not in the game cannot be chosen");
             carousel.Jump(System.Array.FindIndex(Catalog.Cards, c => c.Class != null && c.Class.Id == CharacterClass.Knight));
@@ -378,8 +378,8 @@ namespace AshenRealm.EditorTools
             Check(session.HasFlag(StoryDirector.DeadFlag("knight")), "Slaying the knight is recorded");
             Check(session.Gold >= 48 + 25, $"Knight and chest paid out (gold {session.Gold})");
 
-            var gate = Object.FindAnyObjectByType<ZonePortal>();
-            Check(gate != null && gate.TargetZone == 1, "The valley has a gate to Hollowgate");
+            var gate = System.Array.Find(Object.FindObjectsByType<ZonePortal>(), portal => portal.TargetZone == ZoneNumbers.City);
+            if (!Check(gate != null, "The valley has a gate to Hollowgate")) yield break;
             gate.Interact(controller.gameObject);
             yield return 1.6f;
             Check(zones.CurrentIndex == 1 && !zones.Travelling, $"The gate leads to Hollowgate (zone {zones.CurrentIndex})");
@@ -441,6 +441,36 @@ namespace AshenRealm.EditorTools
 
             NpcActor smith = System.Array.Find(Object.FindObjectsByType<NpcActor>(), n => n.NpcId == "smith");
             if (!Check(smith != null, "The smith stands at the anvil")) yield break;
+            var workingSmith = smith.GetComponent<NpcIdleAnimator>();
+            Transform smithFigure = smith.transform.Find("Figure");
+            Transform hammerShoulder = smith.transform.Find("Figure/Hammer Shoulder");
+            var smithSparks = smith.GetComponentInChildren<ParticleSystem>();
+            if (Check(workingSmith != null && workingSmith.Working && smithFigure != null && hammerShoulder != null && smithSparks != null,
+                "The smith has an animated figure, hammer arm and live sparks"))
+            {
+                Quaternion firstHammer = hammerShoulder.localRotation;
+                Vector3 firstBreath = smithFigure.localScale;
+                bool hammerMoved = false, breathingMoved = false, sawSpark = false, sparkMoved = false;
+                var sparksBuffer = new ParticleSystem.Particle[40];
+                uint previousSpark = 0;
+                Vector3 previousSparkPosition = Vector3.zero;
+                for (int sample = 0; sample < 24; sample++)
+                {
+                    yield return 0.1f;
+                    hammerMoved |= Quaternion.Angle(firstHammer, hammerShoulder.localRotation) > 1f;
+                    breathingMoved |= Vector3.Distance(firstBreath, smithFigure.localScale) > 0.0001f;
+                    int count = smithSparks.GetParticles(sparksBuffer);
+                    if (count == 0) continue;
+                    sawSpark = true;
+                    for (int particle = 0; particle < count; particle++)
+                        if (sparksBuffer[particle].randomSeed == previousSpark)
+                            sparkMoved |= Vector3.Distance(sparksBuffer[particle].position, previousSparkPosition) > 0.001f;
+                    previousSpark = sparksBuffer[0].randomSeed;
+                    previousSparkPosition = sparksBuffer[0].position;
+                }
+                Check(hammerMoved && breathingMoved, "The smith breathes and repeatedly moves his hammer");
+                Check(sawSpark && sparkMoved, "Hammer sparks are emitted and move through the air");
+            }
             session.AddGold(300);
             smith.Interact(controller.gameObject);
             Check(dialogue.IsOpen && dialogue.Face != null && dialogue.Face.name == "smith_0", "The smith talks with his painted face");
@@ -454,7 +484,7 @@ namespace AshenRealm.EditorTools
             Check(session.Weapon == sword && session.Gold == goldBefore - sword.Price && sword.Price == 44, $"The Iron Sword costs what Graveborne asks ({session.Gold})");
             Check(Mathf.Approximately(combat.Damage, bareDamage + 9f), $"The sword bites harder ({bareDamage} to {combat.Damage})");
             Check(!shop.CanBuy, "What is already in the hand cannot be bought again");
-            Check(swordPivot.Find("Bought Iron Sword").gameObject.activeSelf && !swordPivot.Find("Sword").gameObject.activeSelf, "The bought sword replaces the class's");
+            Check(swordPivot.Find("Bought Iron Sword").gameObject.activeSelf && !swordPivot.Find("Knight Axe").gameObject.activeSelf, "The bought sword replaces the class's");
             shop.Select(2);
             goldBefore = session.Gold;
             shop.Buy();
@@ -564,7 +594,7 @@ namespace AshenRealm.EditorTools
             yield return 1.8f;
             Check(zones.CurrentIndex == ZoneNumbers.Tavern && zones.Current.Indoors && !zones.Current.Underground, $"The door leads into the tavern (zone {zones.CurrentIndex})");
             Check(RenderSettings.sun != null && !RenderSettings.sun.enabled, "No sun under the tavern's roof");
-            Check(torch != null && !torch.enabled, "No torch by the tavern's fire");
+            Check(torch != null && torch.enabled == PlayerProgression.Instance.TorchEquipped, "The tavern keeps the player's deliberate torch choice");
             Check(!combat.Armed, "The weapons stay at the tavern's door");
             NpcActor[] regulars = Object.FindObjectsByType<NpcActor>();
             Check(regulars.Length == 3, $"Three people sit in the tavern ({regulars.Length})");
@@ -581,12 +611,13 @@ namespace AshenRealm.EditorTools
             ZonePortal stair = Door(ZoneNumbers.FirstDepth);
             if (!Check(streetDoor != null && stair != null, "The tavern has a street door and the stair")) yield break;
             Check(stair.InteractionPrompt == GameText.StairDown, "The stair is open to anyone");
+            bool torchBeforeDescent = PlayerProgression.Instance.TorchEquipped;
             stair.Interact(controller.gameObject);
             yield return 1.6f;
             Check(zones.CurrentIndex == ZoneNumbers.FirstDepth && zones.Current.Underground, $"The stair leads to the first depth (zone {zones.CurrentIndex})");
             Check(Door(ZoneNumbers.Tavern) != null, "The stair up leads back into the tavern");
             Check(RenderSettings.sun != null && !RenderSettings.sun.enabled, "No sun underground");
-            Check(torch.enabled, "The torch burns underground");
+            Check(torch.enabled == torchBeforeDescent, "Descending preserves the inventory torch choice");
             Check(combat.Armed, "The weapons are back in hand on the stair");
 
             // Every foe in the depth is alive and awake; fight one with the sword.
@@ -645,7 +676,7 @@ namespace AshenRealm.EditorTools
             Check(stairDown.InteractionPrompt == GameText.StairDown, "The stair opens when the guardian falls");
 
             // Enemy bolts: a caster on the last depth shoots, and the Gloamlord's death ends the story.
-            int lastDepth = zones.ZoneCount - 1;
+            int lastDepth = ZoneNumbers.FirstDepth + ZoneNumbers.DepthCount - 1;
             zones.Travel(lastDepth, false);
             yield return 1.6f;
             Check(zones.CurrentIndex == lastDepth, $"Travel reaches the last depth (zone {zones.CurrentIndex})");
@@ -674,10 +705,11 @@ namespace AshenRealm.EditorTools
                 return t != null && t.gameObject.activeInHierarchy;
             }
             const string right = "Sword Pivot (Right Hand)", left = "Shield Pivot (Left Hand)";
-            Check(Held(right, "Sword") && Held(left, "Shield"), "The knight holds sword and shield");
+            if (PlayerProgression.Instance.TorchEquipped) PlayerProgression.Instance.ToggleTorch();
+            Check(Held(right, "Knight Axe") && Held(left, "Shield"), "The knight holds the axe and shield of his class card");
             session.ChooseClass(CharacterClass.Gravethief);
             Check(Held(right, "Dagger Right") && Held(left, "Dagger Left"), "The Gravethief holds two daggers");
-            Check(!Held(right, "Sword") && !Held(left, "Shield"), "The Gravethief does not hold the knight's weapons");
+            Check(!Held(right, "Knight Axe") && !Held(left, "Shield"), "The Gravethief does not hold the knight's weapons");
 
             // Settings, from the pause menu: everything applies at once.
             var pause = Object.FindAnyObjectByType<PauseMenu>();
@@ -741,7 +773,7 @@ namespace AshenRealm.EditorTools
             Check(layout.IsOpen, "The layout editor opens");
             TouchLayoutHandle ring = System.Array.Find(Object.FindObjectsByType<TouchLayoutHandle>(), h => h.LayoutName == "attack");
             if (!Check(ring != null, "The editor puts a ring on the attack button")) yield break;
-            Canvas hudCanvas = ring.GetComponentInParent<Canvas>();
+            Canvas hudCanvas = ring.GetComponentInParent<Canvas>().rootCanvas;
             var pointer = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = new Vector2(600f, 300f) };
             ring.OnPointerDown(pointer);
             pointer.position += new Vector2(-120f, 60f) * hudCanvas.scaleFactor;
@@ -796,7 +828,7 @@ namespace AshenRealm.EditorTools
             Check(menu.SelectedSoul != null && menu.SelectedSoul.Class == CharacterClass.Gravethief, "The roster shows the soul");
             MetaRecord meta = soulKeeper.Meta;
             Check(meta.Souls > 0 && meta.Descents == 1 && meta.Deepest == 5, $"The ledger counts souls, descents and depth ({meta.Souls}, {meta.Descents}, {meta.Deepest})");
-            Check(meta.Codex.Contains(CodexBook.PersonId("merchant")) && meta.Codex.Contains(CodexBook.FoeId("morr")) && meta.Codex.Contains(CodexBook.PlaceId(zones.ZoneCount - 1)), $"The Codex records people, foes and places ({meta.Codex.Count}/{CodexBook.Entries.Count})");
+            Check(meta.Codex.Contains(CodexBook.PersonId("merchant")) && meta.Codex.Contains(CodexBook.FoeId("morr")) && meta.Codex.Contains(CodexBook.PlaceId(lastDepth)), $"The Codex records people, foes and places ({meta.Codex.Count}/{CodexBook.Entries.Count})");
             var codex = Object.FindAnyObjectByType<CodexPanel>();
             menu.OpenCodex();
             yield return 0.4f;
@@ -846,6 +878,222 @@ namespace AshenRealm.EditorTools
             confirm.Yes();
             Check(SaveStore.LoadRoster().Souls.Count == 0 && menu.SelectedSoul == null, "Yes releases the soul");
             Check(SaveStore.LoadMeta().Souls == meta.Souls, "The ledger outlives a released soul");
+
+            // New features run on a new soul, after the original scenario's balance and save assertions.
+            menu.NewSoul();
+            carousel = Object.FindAnyObjectByType<ClassCarousel>();
+            carousel.Jump(0);
+            carousel.Confirm();
+            carousel.Confirm();
+            yield return 0.3f;
+            session = GameSession.Instance;
+            soulKeeper = SoulKeeper.Instance;
+            controller = Object.FindAnyObjectByType<FirstPersonController>();
+            combat = controller.GetComponent<PlayerCombat>();
+            abilities = controller.GetComponent<PlayerAbilities>();
+            Health inventoryHealth = controller.GetComponent<Health>();
+            var growth = PlayerProgression.Instance;
+            pause = Object.FindAnyObjectByType<PauseMenu>();
+            var inventory = Object.FindAnyObjectByType<InventoryPanel>();
+            var secret = Object.FindAnyObjectByType<SecretStatsPanel>();
+            var hold = Object.FindAnyObjectByType<HoldMenuButton>();
+            if (!Check(growth && inventory && secret && hold, "Inventory, progression and hidden hold menu exist at runtime")) yield break;
+            soulKeeper.AddSouls(50000);
+            pause.OpenInventory();
+            Check(pause.IsOpen && inventory.IsOpen && !inventory.ShowingAbilities && Time.timeScale == 0f,
+                "The pause menu opens the inventory without resuming the world");
+            inventory.ShowAbilities();
+            Check(inventory.ShowingAbilities, "The abilities tab opens");
+            string[] raisedNames = { "health", "focus", "attack", "defense", "magic", "speed" };
+            for (int stat = 0; stat < raisedNames.Length; stat++)
+            {
+                DebugStats before = growth.ReadDebug();
+                int cost = growth.UpgradeCost, purchaseSoulsBefore = soulKeeper.Souls;
+                float damageBefore = combat.Damage;
+                float mitigationBefore = combat.FilterDamage(new DamageInfo(100f, Vector3.zero, Vector3.forward, null), 100f);
+                float magicBefore = combat.AbilityMultiplier;
+                inventory.RaiseStat(stat);
+                DebugStats after = growth.ReadDebug();
+                int[] prior = { before.MaxHealth, before.MaxFocus, before.Attack, before.Defense, before.Magic, before.Speed };
+                int[] now = { after.MaxHealth, after.MaxFocus, after.Attack, after.Defense, after.Magic, after.Speed };
+                Check(now[stat] == prior[stat] + (stat == 0 ? 8 : 2) && growth.Level == before.Level + 1 && soulKeeper.Souls == purchaseSoulsBefore - cost,
+                    $"The {raisedNames[stat]} purchase raises the stat and level and pays its exact Souls price");
+                if (stat == 0) Check(Mathf.RoundToInt(inventoryHealth.Max) == after.MaxHealth, "Bought health reaches the runtime Health component");
+                if (stat == 1) Check(Mathf.RoundToInt(abilities.MaxFocus) == after.MaxFocus, "Bought focus reaches the runtime ability pool");
+                if (stat == 2) Check(combat.Damage > damageBefore, "Bought attack increases a real weapon blow");
+                if (stat == 3) Check(combat.FilterDamage(new DamageInfo(100f, Vector3.zero, Vector3.forward, null), 100f) < mitigationBefore,
+                    "Bought defense reduces incoming damage");
+                if (stat == 4) Check(combat.AbilityMultiplier > magicBefore, "Bought magic increases real ability power");
+            }
+            float grownHealth = inventoryHealth.Current, grownMaximum = inventoryHealth.Max;
+            session.Equip(Catalog.Item("iron_sword"));
+            Check(Mathf.Approximately(inventoryHealth.Current, grownHealth) && Mathf.Approximately(inventoryHealth.Max, grownMaximum),
+                "Equipping a weapon preserves health earned through growth");
+            session.Equip(Catalog.Item("grave_dagger"));
+            Check(Mathf.Approximately(inventoryHealth.Current, grownHealth) && Mathf.Approximately(inventoryHealth.Max, grownMaximum),
+                "Swapping a weapon never clamps grown health back to the base maximum");
+            for (int slot = 0; slot < 2; slot++)
+            {
+                int price = growth.AbilityUpgradeCost(slot), purchaseSoulsBefore = soulKeeper.Souls;
+                inventory.UpgradeAbility(slot);
+                Check(growth.AbilityTier(slot) == 2 && soulKeeper.Souls == purchaseSoulsBefore - price,
+                    $"Ability {slot + 1} advances a tier and pays its actual price");
+            }
+            inventory.ShowInventory();
+            Check(!inventory.ShowingAbilities, "The inventory tab comes back");
+            inventory.Close();
+            Check(!inventory.IsOpen && pause.IsOpen && Time.timeScale == 0f, "Closing the inventory returns to pause");
+            yield return 0.4f; // distinct user input, beyond the Esc/pointer-lock duplicate guard
+            GameSettings.TouchButtons savedButtonPreference = GameSettings.TouchButtonsMode;
+            GameSettings.TouchButtonsMode = GameSettings.TouchButtons.Hidden;
+            Canvas.ForceUpdateCanvases();
+            Vector2 menuButtonPoint = RectTransformUtility.WorldToScreenPoint(null, hold.transform.position);
+            var menuRay = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current) { position = menuButtonPoint };
+            var menuHits = new List<UnityEngine.EventSystems.RaycastResult>();
+            UnityEngine.EventSystems.EventSystem.current.RaycastAll(menuRay, menuHits);
+            Check(menuHits.Count > 0 && menuHits[0].gameObject == hold.gameObject,
+                "The original menu button is the top raycast target over pause even when touch buttons are hidden");
+            GameSettings.TouchButtonsMode = savedButtonPreference;
+            hold.GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+            Check(!pause.IsOpen && Time.timeScale == 1f, "A short press on the same menu button closes pause");
+            yield return 0.4f;
+
+            var holdPointer = new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current)
+                { button = UnityEngine.EventSystems.PointerEventData.InputButton.Left };
+            hold.OnPointerDown(holdPointer);
+            yield return 4.8f;
+            Check(!secret.IsOpen && hold.Holding, "A hold shorter than five seconds does not reveal the hidden menu");
+            hold.OnPointerUp(holdPointer);
+            hold.Click();
+            yield return 0.5f;
+            Check(pause.IsOpen && !secret.IsOpen, "Releasing before five seconds performs the normal pause click");
+            pause.Resume();
+            yield return 0.4f;
+            hold.OnPointerDown(holdPointer);
+            yield return 0.15f;
+            hold.OnPointerExit(holdPointer);
+            yield return 5.1f;
+            Check(!secret.IsOpen && !hold.Holding, "Leaving the menu button cancels its hold, even after five seconds pass");
+            pause.Toggle();
+            yield return 0.4f;
+            hold.OnPointerDown(holdPointer);
+            yield return 5.15f;
+            Check(secret.IsOpen && pause.IsOpen && Time.timeScale == 0f, "A real continuous five-second hold opens the hidden menu and pauses");
+            hold.OnPointerUp(holdPointer);
+            hold.Click();
+            Check(secret.IsOpen, "Releasing a completed long press does not immediately close the hidden menu");
+            var debugInputs = secret.GetComponentsInChildren<UnityEngine.UI.InputField>();
+            int[] edited = { 150, 123, 30, 17, 19, 31, 29, 23, 21, 77, -55, 9, 456, 20000 };
+            for (int i = 0; i < debugInputs.Length; i++) debugInputs[i].text = edited[i].ToString();
+            secret.Apply();
+            DebugStats editedStats = growth.ReadDebug();
+            Check(editedStats.MaxHealth == 150 && editedStats.Health == 123 && editedStats.MaxFocus == 30 && editedStats.Focus == 17,
+                "Hidden menu input updates the real health and focus pools");
+            Check(editedStats.Intellect == 19 && editedStats.Attack == 31 && editedStats.Defense == 29 && editedStats.Magic == 23 && editedStats.Speed == 21,
+                "Hidden menu input applies intellect and all four combat stats");
+            Check(editedStats.Food == 77 && editedStats.Honor == -55 && editedStats.Level == 9 && editedStats.Gold == 456 && editedStats.Souls == 20000,
+                "Hidden menu input applies food, honor, level and both currencies");
+            Check(combat.FilterDamage(new DamageInfo(100f, Vector3.zero, Vector3.forward, null), 100f) < 100f && combat.Damage > session.Class.Damage,
+                "Edited attack and defense change real outgoing and incoming damage");
+            secret.Unlock(0);
+            secret.Unlock(1);
+            Check(soulKeeper.IsClassUnlocked(CharacterClass.Necromancer) && soulKeeper.IsClassUnlocked(CharacterClass.Alchemist) &&
+                SaveStore.LoadMeta().UnlockedClasses.Contains(4) && SaveStore.LoadMeta().UnlockedClasses.Contains(5),
+                "Both secret classes unlock in persistent metadata");
+            secret.Close();
+            pause.OpenInventory();
+            inventory.ToggleTorch();
+            Check(growth.TorchEquipped && PlayerTorch.Instance.Equipped && PlayerTorch.Instance.Light.enabled,
+                "The inventory takes the animated torch into the hand");
+            inventory.Close();
+            pause.Resume();
+            int flameBefore = PlayerTorch.Instance.AnimationFrame;
+            yield return 0.15f;
+            Check(PlayerTorch.Instance.AnimationFrame != flameBefore, "The carried flame advances through its animation strip");
+            soulKeeper.Save();
+            soulKeeper.Resume(soulKeeper.LatestSoul());
+            yield return 2f;
+            growth = PlayerProgression.Instance;
+            soulKeeper = SoulKeeper.Instance;
+            session = GameSession.Instance;
+            controller = Object.FindAnyObjectByType<FirstPersonController>();
+            combat = controller.GetComponent<PlayerCombat>();
+            zones = Object.FindAnyObjectByType<ZoneManager>();
+            Check(growth.Level == 9 && growth.Attack == 31 && growth.Defense == 29 && growth.AbilityTier(0) == 2 && growth.AbilityTier(1) == 2,
+                "Growth, edited stats and upgraded abilities survive a scene reload");
+            Check(growth.MaxHealth == 150 && growth.MaxFocus == 30 && growth.Food == 77 && growth.TorchEquipped && PlayerTorch.Instance.Light.enabled,
+                "Health, focus, food and the torch choice survive loading");
+            Check(soulKeeper.IsClassUnlocked(CharacterClass.Necromancer) && soulKeeper.IsClassUnlocked(CharacterClass.Alchemist),
+                "Class unlocks survive a scene reload");
+
+            // All six kits use the models shown on their cards; saving and restoring keeps their identity.
+            string[] rightModels = { "Knight Axe", "Dagger Right", "Witch Staff", "Mace", "Necromancer Staff", "Reagent Bottle" };
+            string[] leftModels = { "Shield", "Dagger Left", "Casting Hand", "Hand Lantern", "Bone Talisman", "Alchemist Kit" };
+            for (int classId = 0; classId < 6; classId++)
+            {
+                session.ChooseClass((CharacterClass)classId);
+                Transform rig = controller.transform.Find("Camera Pivot/Main Camera/Weapon Rig");
+                Transform heldRight = rig.Find(right + "/" + rightModels[classId]);
+                Transform heldLeft = rig.Find(left + "/" + leftModels[classId]);
+                Check(heldRight != null && heldRight.gameObject.activeInHierarchy && heldLeft != null && heldLeft.gameObject.activeInHierarchy,
+                    $"Class {classId} holds its own right and left hand models");
+                soulKeeper.Save();
+                SoulRecord classSave = soulKeeper.LatestSoul();
+                soulKeeper.Load(classSave);
+                Check(session.Class.Id == (CharacterClass)classId && classSave.ClassId == classId,
+                    $"Class {classId} can save and load as itself");
+            }
+
+            zones.Place(ZoneNumbers.Valley, Vector3.zero, 0f, false);
+            yield return 0.2f;
+            var homeInteractor = controller.GetComponent<PlayerInteractor>();
+            for (int home = 0; home < ZoneNumbers.HomeCount; home++)
+            {
+                int homeIndex = ZoneNumbers.FirstHome + home;
+                ZonePortal homeDoor = System.Array.Find(Object.FindObjectsByType<ZonePortal>(), p => p.TargetZone == homeIndex);
+                Transform returnPoint = GameObject.Find("Hamlet Home " + home + " Return").transform;
+                Vector3 homeLook = homeDoor.transform.position - (returnPoint.position + Vector3.up * 1.6f);
+                Vector3 homeAngles = Quaternion.LookRotation(homeLook).eulerAngles;
+                controller.Teleport(returnPoint.position, homeAngles.y, homeAngles.x > 180f ? homeAngles.x - 360f : homeAngles.x);
+                Physics.SyncTransforms();
+                yield return 0.2f;
+                Check(ReferenceEquals(homeInteractor.Current, homeDoor), $"Hamlet house {home + 1}'s actual doorway can be aimed at");
+                homeDoor.Interact(controller.gameObject);
+                yield return 1.3f;
+                Check(zones.CurrentIndex == homeIndex && zones.Current.Indoors && !combat.Armed,
+                    $"Hamlet house {home + 1} is a walkable interior");
+                ZonePortal homeOut = System.Array.Find(Object.FindObjectsByType<ZonePortal>(), p => p.TargetZone == ZoneNumbers.Valley);
+                homeOut.Interact(controller.gameObject);
+                yield return 1.3f;
+                Check(zones.CurrentIndex == ZoneNumbers.Valley && Vector3.Distance(controller.transform.position, returnPoint.position) < 0.6f,
+                    $"Hamlet house {home + 1} returns to its own doorstep");
+            }
+            Collider closedTunnel = GameObject.Find("Closed Arrival Tunnel").GetComponent<Collider>();
+            Vector3 tunnelEye = closedTunnel.bounds.center + Vector3.forward * 5f;
+            Check(Physics.Raycast(tunnelEye, Vector3.back, out RaycastHit tunnelHit, 7f, ~0, QueryTriggerInteraction.Ignore) && tunnelHit.collider == closedTunnel,
+                "The black arrival tunnel has a physical barrier against entry");
+            Check(GameObject.Find("Caravan Driver") != null && GameObject.Find("Caravan Guard") != null && GameObject.Find("Caravan Traveller") != null,
+                "The arrival caravan waits at the closed tunnel");
+            zones.Place(ZoneNumbers.City, Vector3.zero, 0f, false);
+            yield return 0.2f;
+            Check(Object.FindAnyObjectByType<AtmosphereController>().EveningProgress >= 0.99f && RenderSettings.sun.intensity < 0.3f,
+                "Arrival in Hollowgate is evening");
+            Check(PlayerTorch.Instance.Equipped, "The arrival in the evening city puts the offered torch in hand");
+            pause = Object.FindAnyObjectByType<PauseMenu>();
+            inventory = Object.FindAnyObjectByType<InventoryPanel>();
+            pause.OpenInventory();
+            if (growth.TorchEquipped) inventory.ToggleTorch();
+            inventory.ToggleTorch();
+            Check(PlayerTorch.Instance.Equipped && PlayerTorch.Instance.Light.enabled, "The torch can be drawn on the city's evening streets");
+            inventory.Close();
+            pause.Resume();
+            zones.Place(ZoneNumbers.FirstDepth, Vector3.zero, 0f, false);
+            Check(PlayerTorch.Instance.Equipped && PlayerTorch.Instance.Light.enabled, "Descending keeps a deliberately equipped torch burning");
+            pause.OpenInventory();
+            inventory.ToggleTorch();
+            Check(!PlayerTorch.Instance.Equipped && !PlayerTorch.Instance.Light.enabled, "The inventory can put the torch away underground");
+            inventory.Close();
+            pause.Resume();
 
             ClearOwnSaveData();
         }

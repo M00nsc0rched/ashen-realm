@@ -27,6 +27,8 @@ namespace AshenRealm.Combat
 
         public void ApplyPoison(float damagePerSecond, float seconds)
         {
+            if (GetComponent<AshenRealm.Player.PlayerProgression>() != null &&
+                AshenRealm.Story.GameSession.Instance.Class.Id == AshenRealm.Story.CharacterClass.Alchemist) return;
             poisonDps = Mathf.Max(Poisoned ? poisonDps : 0f, damagePerSecond);
             poisonUntil = Mathf.Max(poisonUntil, Time.time + seconds);
             if (nextPoisonTick < Time.time) nextPoisonTick = Time.time + 1f;

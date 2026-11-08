@@ -26,7 +26,8 @@ powershell -ExecutionPolicy Bypass -File tools/serve-webgl.ps1
 ```
 then open http://localhost:8080. (Any static server works, e.g. `python -m http.server` inside `Builds/WebGL`.)
 
-To review a deep zone without playing down to it, add `?zone=N` (1 Hollowgate, 2 the tavern, 3 the forge, 4 the chapel, 5-9 the depths): after the class choice the
+To review a zone without walking to it, add `?zone=N` (1 Hollowgate, 2 the tavern, 3 the forge, 4 the chapel, 5-9 the depths,
+10-12 the valley homes): after the class choice the
 game starts there. Guardians above it stay alive, so its stair up still works but nothing is unlocked by skipping.
 
 ## Publish
@@ -40,18 +41,23 @@ The live build at https://m00nsc0rched.github.io/ashen-realm/ is served from the
 the contents of `Builds/WebGL` plus an empty `.nojekyll`. To update it after a new build, check out `gh-pages` in a
 separate folder, replace its files with the new `Builds/WebGL` contents (keep `.nojekyll`), commit and push. Pages
 serves the `.unityweb` files without `Content-Encoding`, so the loader's decompression fallback unpacks them.
+Pushing the source branch (`menus-and-houses` during Checkpoint L) does not update the playable site; publish a newly validated build separately.
 
 ## Controls in the browser
 - Desktop: click the game to capture the mouse (pointer lock). Esc releases it and opens the pause menu
-  (Folytatás, Beállítások, Teljes képernyő, Főmenü). WASD, Shift, Space, left/right mouse, E.
+  with inventory and abilities, Codex, save, settings, fullscreen and main-menu controls. WASD, Shift, Space, left/right mouse, E.
 - When the touch buttons are showing (touchscreen laptops, F1), the mouse only turns the view; attack with **TÁMADÁS**.
 - Phones/tablets: touch controls appear automatically. Hold the device in landscape. Use the browser's
   "Add to Home Screen" for a fullscreen-like experience on iOS (Safari does not allow page fullscreen on iPhone).
+- The inventory draws or puts away the torch. A continuous five-second press on the top-right HUD menu button opens the
+  developer stat editor and permanent class unlocks; a short press opens the normal descent menu.
 
 ## Saves in the browser
 Souls and settings live in PlayerPrefs, which a WebGL build keeps in the site's IndexedDB. They belong to one browser on
 one device and one address, and clearing site data erases them. `PlayerPrefs.Save` is what writes them out, so nothing that
 must survive may skip it (`SaveStore` and `GameSettings.Flush` do it).
+The soul includes level, stat upgrades, ability tiers, food, torch choice and the `world_evening` flag. Unlocked classes belong
+to the meta record. World version 4 preserves zone ids and moves older saved positions to the matching zone's safe entry.
 
 ## Performance notes
 - The world renders at a fixed 360 px height (`PixelCamera.targetHeight`) and is upscaled with hard pixels, so cost

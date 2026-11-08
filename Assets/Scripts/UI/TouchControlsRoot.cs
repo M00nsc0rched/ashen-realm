@@ -24,6 +24,7 @@ namespace AshenRealm.UI
 
         CanvasGroup group;
         bool forced;
+        bool menuOpen;
 
         void Awake() => group = GetComponent<CanvasGroup>();
 
@@ -50,6 +51,13 @@ namespace AshenRealm.UI
             Apply();
         }
 
+        /// <summary>The menu button remains reachable after desktop pointer lock has been released.</summary>
+        public void SetMenuOpen(bool value)
+        {
+            menuOpen = value;
+            Apply();
+        }
+
         void OnTouchMode(bool touchMode) => Apply();
 
         void Apply()
@@ -63,7 +71,8 @@ namespace AshenRealm.UI
 
             bool hiddenByChoice = GameSettings.TouchButtonsMode == GameSettings.TouchButtons.Hidden;
             bool touchDevice = Application.isMobilePlatform || Touchscreen.current != null;
-            pauseButton.alpha = forced ? Mathf.Max(opacity, EditorMinAlpha) : !hiddenByChoice ? opacity : touchDevice ? HiddenPauseAlpha : 0f;
+            pauseButton.alpha = menuOpen ? Mathf.Max(opacity, 0.85f) : forced ? Mathf.Max(opacity, EditorMinAlpha) :
+                !hiddenByChoice ? opacity : touchDevice ? HiddenPauseAlpha : 0f;
             pauseButton.blocksRaycasts = pauseButton.alpha > 0f;
 
             bool fighting = forced || combat.Armed;

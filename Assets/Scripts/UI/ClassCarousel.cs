@@ -39,6 +39,8 @@ namespace AshenRealm.UI
         [Header("Row")]
         [SerializeField] RectTransform[] cards;
         [SerializeField] Image[] cardArt;
+        [SerializeField] Sprite[] unlockedArt;
+        [SerializeField] Sprite lockedArt;
         [SerializeField] Image[] cardGlow;
         [SerializeField] Image[] dots;
         [SerializeField] Selectable previousButton;
@@ -123,7 +125,7 @@ namespace AshenRealm.UI
         public void Confirm()
         {
             ClassDefinition chosen = Catalog.Cards[target].Class;
-            if (chosen == null) return;
+            if (chosen == null || !Available(target)) return;
             if (!ShowingStory)
             {
                 ShowStory(chosen);
@@ -210,6 +212,7 @@ namespace AshenRealm.UI
             int middle = Mathf.Clamp(Mathf.RoundToInt(position), 0, cards.Length - 1);
             for (int i = 0; i < cards.Length; i++)
             {
+                cardArt[i].sprite = Available(i) ? unlockedArt[i] : lockedArt;
                 float distance = i - position;
                 float reach = Mathf.Abs(distance);
                 bool near = reach < 2f;
@@ -257,7 +260,7 @@ namespace AshenRealm.UI
             passiveName.text = card.PassiveName;
             passiveText.text = card.PassiveText;
 
-            bool available = card.Class != null;
+            bool available = Available(index);
             chooseLabel.text = available ? MenuText.Choose : MenuText.Locked;
             chooseLabel.color = available ? LabelOn : LabelOff;
             chooseFrame.sprite = available ? litSprite : plainSprite;
@@ -265,6 +268,13 @@ namespace AshenRealm.UI
             chooseButton.transition = available ? Selectable.Transition.SpriteSwap : Selectable.Transition.None;
 
             for (int i = 0; i < dots.Length; i++) dots[i].color = i == index ? DotOn : DotOff;
+        }
+
+        bool Available(int index)
+        {
+            ClassDefinition definition = Catalog.Cards[index].Class;
+            return definition != null && (!Application.isPlaying ? index < 4 :
+                SoulKeeper.Instance != null && SoulKeeper.Instance.IsClassUnlocked(definition.Id));
         }
 
         void UpdateArrows()

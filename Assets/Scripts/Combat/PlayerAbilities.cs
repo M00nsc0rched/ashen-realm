@@ -29,10 +29,13 @@ namespace AshenRealm.Combat
         ClassDefinition definition;
         float focus;
         int gearFocus;
+        int growthFocus;
+        int activeTier = 1;
+        readonly int[] tiers = { 1, 1 };
         readonly float[] readyAt = new float[2];
 
         public float Focus => focus;
-        public float MaxFocus => definition != null ? definition.MaxFocus + gearFocus : 1f;
+        public float MaxFocus => definition != null ? Mathf.Max(1, definition.MaxFocus + gearFocus + growthFocus) : 1f;
         public float FocusNormalized => focus / MaxFocus;
 
         void Awake() => input = inputSource;
@@ -53,6 +56,14 @@ namespace AshenRealm.Combat
         public void ApplyGear(int bonusFocus)
         {
             gearFocus = bonusFocus;
+            focus = Mathf.Min(focus, MaxFocus);
+        }
+
+        public void ApplyProgression(int bonusFocus, int firstTier, int secondTier)
+        {
+            growthFocus = bonusFocus;
+            tiers[0] = Mathf.Clamp(firstTier, 1, 3);
+            tiers[1] = Mathf.Clamp(secondTier, 1, 3);
             focus = Mathf.Min(focus, MaxFocus);
         }
 
@@ -99,6 +110,7 @@ namespace AshenRealm.Combat
 
             focus -= ability.Cost;
             readyAt[slot] = Time.time + ability.Cooldown;
+            activeTier = tiers[slot];
             Fire(ability.Effect);
             return true;
         }
@@ -115,8 +127,8 @@ namespace AshenRealm.Combat
                     break;
                 }
                 case AbilityEffect.Rally:
-                    status.ApplyFury(8f);
-                    status.ApplyRegen(5f, 6f);
+                    status.ApplyFury(8f + (activeTier - 1) * 3f);
+                    status.ApplyRegen(Power(5f), 6f);
                     GameMessages.Notify(GameText.RallyMessage);
                     break;
                 case AbilityEffect.Backstab:
@@ -124,7 +136,7 @@ namespace AshenRealm.Combat
                     combat.Strike(Power(BackstabDamage) * (FoeFacingAway() ? BackstabBehindMultiplier : 1f), 2.8f, 0.45f);
                     break;
                 case AbilityEffect.PoisonBlade:
-                    combat.CoatBlade(10f);
+                    combat.CoatBlade(10f + (activeTier - 1) * 5f);
                     GameMessages.Notify(GameText.PoisonMessage);
                     break;
                 case AbilityEffect.LifeDrain:
@@ -156,10 +168,29 @@ namespace AshenRealm.Combat
                     health.Heal(Power(MendAmount));
                     GameMessages.Notify(GameText.MendMessage);
                     break;
+                case AbilityEffect.BoneSpear:
+                    combat.PlayAbilitySwing();
+                    combat.Strike(Power(36f), 16f, 0.45f);
+                    break;
+                case AbilityEffect.BoneArmor:
+                    status.ApplyWard(8f + (activeTier - 1) * 4f);
+                    health.Heal(Power(10f));
+                    break;
+                case AbilityEffect.AcidFlask:
+                {
+                    combat.PlayAbilitySwing();
+                    GameObject foe = combat.Strike(Power(22f), 12f, 0.7f);
+                    if (foe != null && foe.TryGetComponent(out StatusEffects s)) s.ApplyPoison(Power(5f), 5f);
+                    break;
+                }
+                case AbilityEffect.HealingBrew:
+                    health.Heal(Power(28f));
+                    status.ApplyRegen(Power(3f), 5f);
+                    break;
             }
         }
 
-        float Power(float amount) => amount * combat.AbilityMultiplier;
+        float Power(float amount) => amount * combat.AbilityMultiplier * (1f + (activeTier - 1) * 0.5f);
 
         public void DrinkPotion()
         {

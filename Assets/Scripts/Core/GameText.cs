@@ -7,6 +7,11 @@ namespace AshenRealm.Core
     /// </summary>
     public static class GameText
     {
+        public const string EnterHome = "BELÉPÉS A HÁZBA";
+        public const string InspectArrivalTunnel = "A SÖTÉT ALAGÚT";
+        public const string ArrivalTunnelLore = "A hegyi út innen vezetett a völgybe. A karaván itt tett le. Odabent csak feketeség látszik; egyelőre nem térhetsz vissza.";
+        public const string InspectCaravan = "AZ ÉRKEZŐ KARAVÁN";
+        public const string CaravanLore = "Ezzel a karavánnal érkeztél. A hajtó éjszakára itt veri fel a tábort. Üregkapu kapuja északon vár.";
         // Interactions (prompts are shown as written: upper case, no runtime case mapping)
         public const string InteractKey = "[E]  ";
         public const string OpenChest = "LÁDA KINYITÁSA";

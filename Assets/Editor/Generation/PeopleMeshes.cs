@@ -4,7 +4,7 @@ namespace AshenRealm.EditorTools
 {
     /// <summary>
     /// The people of Hollowgate who have a painted portrait, as blocky pixel-art figures dressed after those paintings. They
-    /// never animate, so each is one mesh and can sit, lean or hold things freely. Feet on y = 0, facing +Z.
+    /// use a quiet living pose at runtime; the smith's working arm is a separate pivot. Feet on y = 0, facing +Z.
     /// </summary>
     internal static class PeopleMeshes
     {
@@ -363,15 +363,6 @@ namespace AshenRealm.EditorTools
             b.SetColor(Pal.SteelDark, 0.3f);
             Limb(b, new Vector3(-0.22f, 1.16f, 0.66f), new Vector3(-0.08f, 1.2f, 1.1f), 0.03f, 0.03f);
 
-            Paint(b, Pal.ClothDark, shirt * 0.92f);
-            Limb(b, new Vector3(0.36f, 1.54f, 0f), new Vector3(0.42f, 1.5f, 0.3f), 0.18f, 0.18f);
-            Paint(b, Pal.Leather, Skin);
-            Limb(b, new Vector3(0.42f, 1.5f, 0.3f), new Vector3(0.3f, 1.42f, 0.66f), 0.14f, 0.14f);
-            Hand(b, new Vector3(0.28f, 1.42f, 0.7f), Skin);
-            b.SetColor(Pal.Wood, 0.4f);
-            Limb(b, new Vector3(0.28f, 1.36f, 0.68f), new Vector3(0.22f, 1.54f, 1.02f), 0.045f, 0.045f);
-            b.ShadedBox(new Vector3(0.22f, 1.54f, 1.06f), new Vector3(0.14f, 0.26f, 0.16f), Pal.SteelDark, rng, 0.4f, 0.5f);
-
             Vector3 neck = new Vector3(0f, 1.56f, 0.05f);
             Head(b, neck, Skin);
             Paint(b, Pal.ClothDark, DarkHair);
@@ -380,6 +371,40 @@ namespace AshenRealm.EditorTools
             b.Box(neck + new Vector3(0f, 0.08f, 0.13f), new Vector3(0.25f, 0.13f, 0.07f));
             foreach (float side in new[] { -1f, 1f })
                 b.Box(neck + new Vector3(side * 0.135f, 0.16f, 0.02f), new Vector3(0.04f, 0.2f, 0.16f));
+        }
+
+        /// <summary>The right arm and hammer, local to the shoulder, so the blow is independent of the breathing body.</summary>
+        public static void SmithHammerArm(MeshBuilder b)
+        {
+            var rng = new System.Random(109);
+            b.Push(-new Vector3(0.36f, 1.54f, 0f), Quaternion.identity, Vector3.one);
+            Paint(b, Pal.ClothDark, new Color(0.46f, 0.38f, 0.3f) * 0.92f);
+            Limb(b, new Vector3(0.36f, 1.54f, 0f), new Vector3(0.42f, 1.5f, 0.3f), 0.18f, 0.18f);
+            Paint(b, Pal.Leather, Skin);
+            Limb(b, new Vector3(0.42f, 1.5f, 0.3f), new Vector3(0.3f, 1.42f, 0.66f), 0.14f, 0.14f);
+            Hand(b, new Vector3(0.28f, 1.42f, 0.7f), Skin);
+            b.SetColor(Pal.Wood, 0.4f);
+            Limb(b, new Vector3(0.28f, 1.36f, 0.68f), new Vector3(0.22f, 1.54f, 1.02f), 0.045f, 0.045f);
+            b.ShadedBox(new Vector3(0.22f, 1.54f, 1.06f), new Vector3(0.14f, 0.26f, 0.16f), Pal.SteelDark, rng, 0.4f, 0.5f);
+            b.Pop();
+        }
+
+        public static void CaravanDriver(MeshBuilder b)
+        {
+            CreatureMeshes.Figure(b, EnemyFactory.Villager("CaravanDriver", Pal.Leather, Pal.Thatch));
+            b.SetColor(Pal.Leather, 0.42f);
+            b.Box(new Vector3(0.3f, 0.7f, -0.1f), new Vector3(0.25f, 0.34f, 0.21f));
+        }
+
+        public static void CaravanGuard(MeshBuilder b)
+        {
+            CreatureMeshes.Figure(b, EnemyFactory.Villager("CaravanGuard", Pal.ClothDark, Pal.SteelDark));
+            b.Push(new Vector3(0.42f, 0.95f, 0.13f), Quaternion.Euler(0f, 0f, -8f), Vector3.one);
+            b.SetColor(Pal.WoodDark, 0.4f);
+            b.Prism(new Vector3(0f, -0.8f, 0f), 0.025f, 0.02f, 1.85f, 6);
+            b.SetColor(Pal.Steel, 0.5f);
+            b.Prism(new Vector3(0f, 1.05f, 0f), 0.075f, 0f, 0.22f, 4);
+            b.Pop();
         }
 
         // ---- The Grey Chapel --------------------------------------------------------------------------

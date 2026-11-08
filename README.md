@@ -3,7 +3,8 @@
 **Játék a böngészőben (play in the browser): https://m00nsc0rched.github.io/ashen-realm/**
 
 An original first-person dark fantasy action RPG with a pixel-art painterly look, playable in the web browser
-(desktop and mobile) and prepared for iPhone. Choose one of four classes, cross the golden valley past the Cursed Knight,
+(desktop and mobile) and prepared for iPhone. Four classes start unlocked; the Necromancer and Alchemist become playable
+when unlocked. Cross the sunset valley past the Cursed Knight,
 reach Hollowgate (Üregkapu), the last city above the Deep Dark, and go down five depths to the Gloamlord's throne. The
 world, story and bestiary come from the author's game Graveborne ([docs/GRAVEBORNE.md](docs/GRAVEBORNE.md)).
 World art (meshes, pixel textures, sky, HUD sprites) is generated procedurally in the Editor. The menu art is cut from the
@@ -47,28 +48,37 @@ author's design sketches. The one third-party asset is the Spectral font (SIL Op
 | Healing potion | F | **FŐZET** | North button |
 | Interact, talk | E | **HASZNÁL** | West button |
 | Answer in a dialogue, use a menu | click, or 1-5 in a dialogue | tap | D-pad and South button |
-| Pause menu (resume, settings, fullscreen, main menu) | Esc | ‖ button top-right | Start |
+| Descent menu (inventory, save, settings) | Esc | ‖ button top-right | Start |
 | Back in a menu | Esc | Vissza | East button |
 | Toggle touch controls (testing) | F1 | – | – |
 
 Touch controls appear automatically on devices and in the Device Simulator; press **F1** in the Game view to try the
 touch layout with the mouse. In touch mode the mouse never attacks: drag to look, press **TÁMADÁS** to strike.
 
-The game text is Hungarian. HUD strings live in `Assets/Scripts/Core/GameText.cs`, menu strings in `Assets/Scripts/Core/MenuText.cs`.
+The game text is Hungarian. HUD strings live in `Assets/Scripts/Core/GameText.cs`, menu strings in `Assets/Scripts/Core/MenuText.cs`
+and `InventoryText.cs`.
 
 **Beállítások** (from the main menu or the pause menu): language (Hungarian for now), look speed, save and load, on-screen
 buttons shown or hidden with their opacity and a layout editor that drags each one anywhere, HUD shown or hidden with its
 opacity. Souls save on every arrival in a zone, after each guardian and when the page loses focus; in the browser they live in
 that browser's site data.
 
+The pause button opens **Lemerülés menüje**. **Készlet és képességek** shows the class portrait, current stats, equipment,
+potions and the carried torch. Its **KÉPESSÉGEK** tab spends Souls on six stat upgrades and three tiers of each class ability.
+Growth and the torch choice are saved with the soul; class unlocks belong to the permanent ledger.
+
 ## What to try
 - The game opens on the main menu: **Új lélek** starts a soul, the roster continues one, **Kódex** lists what you have met.
 - Choose a class. Each has its own health, weapon, starting honor and two abilities.
+- Look south at the dark, closed mountain tunnel and the waiting caravan that brought you here.
+- Visit the three furnished cottages beside the valley road; each door returns to its own doorstep.
 - Follow the dirt road north from the fenced spawn lane toward the ruined chapel.
 - The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,
   then strike. 4 sword hits defeat it, and the gate behind the chapel opens.
 - Inside the chapel, aim at the **chest** at the altar and press E / HASZNÁL ("LÁDA KINYITÁSA") for gold and a healing draught.
 - In **Üregkapu**, talk to the Dark Wanderer and the townsfolk. Temper your weapon, buy potions, buy back your honor.
+- Sunset fades along the road. By the city it is evening; returning to the valley keeps that light. The first city arrival
+  takes out your torch, which the inventory can put away or draw again. The townsfolk breathe and turn; the smith works his hammer.
 - The tavern door is the stair down. Every depth has packs, a named terror, chests and encounters whose text changes
   with your honor. A Legendary Guardian bars each stair; the Gloamlord waits at the bottom.
 - If you fall in battle you rise again at the zone's entry after a few seconds.
@@ -79,6 +89,9 @@ that browser's site data.
   -executeMethod AshenRealm.EditorTools.BatchTasks.GenerateAndValidate -logFile Logs/batch.log
 ```
 Exit code 0 = generated and validated. The project must not be open in another Editor instance.
+
+Developer control: hold the top-right HUD menu button continuously for five seconds to open the hidden stat editor.
+It edits the current soul and can permanently unlock the Necromancer and Alchemist. A short click still opens the normal menu.
 
 ## Documentation
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — systems, data flow, generation pipeline

@@ -30,6 +30,21 @@ namespace AshenRealm.EditorTools
         /// <summary>Runs the Play-mode playtest. Do NOT pass -quit: the runner exits itself (0 ok, 3 failed).</summary>
         public static void Playtest() => PlaytestRunner.Start(true);
 
+        /// <summary>Runs generation, static validation and the full runtime scenario in one Editor session; omit -quit.</summary>
+        public static void GenerateValidateAndPlaytest()
+        {
+            if (!PrototypeSceneBuilder.Generate()) { EditorApplication.Exit(1); return; }
+            if (PrototypeValidator.Run(out _).Count != 0) { EditorApplication.Exit(2); return; }
+            PlaytestRunner.Start(true);
+        }
+
+        public static void CaptureAll()
+        {
+            PreviewCapture.Capture();
+            MenuCapture.Capture();
+            EditorApplication.Exit(0);
+        }
+
         /// <summary>Generates the scene and renders the menu screens to Screenshots/.</summary>
         public static void GenerateAndCaptureMenus()
         {

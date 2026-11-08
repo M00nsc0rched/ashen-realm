@@ -93,6 +93,14 @@ namespace AshenRealm.EditorTools
                 GeneratedAssets.MeshFolder + "/Terrain.asset",
                 GeneratedAssets.MeshFolder + "/Ruins.asset",
                 GeneratedAssets.MeshFolder + "/WindmillSails.asset",
+                GeneratedAssets.MeshFolder + "/Arrival_Road.asset",
+                GeneratedAssets.MeshFolder + "/Hamlet_Home_0.asset",
+                GeneratedAssets.MeshFolder + "/Hamlet_Home_1.asset",
+                GeneratedAssets.MeshFolder + "/Hamlet_Home_2.asset",
+                GeneratedAssets.MeshFolder + "/Player_TorchStrip.asset",
+                GeneratedAssets.MaterialFolder + "/M_CarriedTorch.mat",
+                "Assets/Art/Menu/Torch/TorchWarm.png",
+                "Assets/Art/Menu/Torch/TorchCold.png",
                 "Assets/Art/Menu/MenuBackground.jpg",
                 "Assets/Art/Menu/MenuTitle.png",
                 "Assets/Art/Menu/MenuFrame.png",
@@ -114,6 +122,11 @@ namespace AshenRealm.EditorTools
             var foliage = AssetDatabase.LoadAssetAtPath<Material>(GeneratedAssets.MaterialFolder + "/M_Foliage.mat");
             if (foliage != null)
                 r.Check(foliage.IsKeywordEnabled("_ALPHATEST_ON") && foliage.IsKeywordEnabled("_WIND_ON"), "M_Foliage must enable alpha clip and wind");
+
+            var torchMaterial = AssetDatabase.LoadAssetAtPath<Material>(GeneratedAssets.MaterialFolder + "/M_CarriedTorch.mat");
+            if (torchMaterial != null)
+                r.Check(torchMaterial.shader != null && torchMaterial.shader.name == "AshenRealm/TorchStrip" && torchMaterial.shader.isSupported,
+                    "The carried torch must use the supported eight-frame TorchStrip shader");
 
             foreach (var urp in UniversalAssets())
                 r.Check(Mathf.Approximately(urp.renderScale, 1f), $"{urp.name} render scale must be 1 (PixelCamera controls resolution)");
@@ -157,6 +170,9 @@ namespace AshenRealm.EditorTools
             One<ProjectileLibrary>();
             One<PlayerAbilities>();
             var classRig = One<PlayerClassRig>();
+            One<PlayerProgression>();
+            var carriedTorch = One<PlayerTorch>();
+            CheckPlayerKits(r, classRig, carriedTorch);
             One<HUDController>();
             One<TouchJoystick>();
             One<TouchLookArea>();
@@ -171,6 +187,10 @@ namespace AshenRealm.EditorTools
                         r.Check(portraits.Face(person.Id, mood) != null, $"{person.Name} has no {mood} portrait");
             CheckGoods(r, One<ShopPanel>(), classRig);
             One<SettingsPanel>();
+            var inventory = One<InventoryPanel>();
+            var secret = One<SecretStatsPanel>();
+            var holdMenu = One<HoldMenuButton>();
+            CheckInventory(r, inventory, secret, holdMenu);
             One<CodexPanel>();
             One<ConfirmPanel>();
             One<SoulKeeper>();
@@ -182,9 +202,12 @@ namespace AshenRealm.EditorTools
             One<GameBootstrap>();
             One<ImpactEffects>();
             One<Volume>();
-            r.Check(All<LoreInspectable>().Length == 2, "The blade in the valley and the gallows are the two things to inspect");
+            r.Check(All<LoreInspectable>().Length == 4, "The blade, gallows, arrival tunnel and caravan must be inspectable");
             var pixelCamera = One<PixelCamera>();
-            One<PauseMenu>();
+            var pause = One<PauseMenu>();
+            if (pause != null)
+                foreach (string field in new[] { "inventory", "secret", "keeper", "codex" })
+                    r.Check(new SerializedObject(pause).FindProperty(field).objectReferenceValue != null, $"The descent menu needs its {field}");
             One<CompassStrip>();
             One<Rotator>();
             if (pixelCamera != null)
@@ -208,6 +231,17 @@ namespace AshenRealm.EditorTools
             r.Check(All<Light>().Count(l => l.type == LightType.Directional) == 1, "Expected exactly one directional light");
             r.Check(RenderSettings.fog, "Fog is disabled in the scene");
             r.Check(RenderSettings.skybox != null, "Scene has no skybox material");
+
+            foreach (Zone zone in All<Zone>())
+            {
+                var permanentLights = zone.GetComponentsInChildren<Light>(true).Where(l => l.type == LightType.Point && l.intensity > 0f).ToArray();
+                r.Check(permanentLights.Length <= 3, $"{zone.name}: more than three permanent point lights");
+                r.Check(permanentLights.All(l => l.shadows == LightShadows.None), $"{zone.name}: local lights must not cast realtime shadows");
+            }
+            var worldMaterials = All<Zone>().SelectMany(z => z.GetComponentsInChildren<MeshRenderer>(true))
+                .Select(m => m.sharedMaterial).Where(m => m != null).Distinct().ToArray();
+            r.Check(worldMaterials.Length <= 2 && worldMaterials.All(m => m.shader != null && m.shader.name == "AshenRealm/PixelLit"),
+                "The generated world must stay within two PixelLit materials; the carried torch has its own viewmodel shader");
 
             if (controller != null)
                 r.Check(controller.CompareTag("Player"), "Player root is not tagged 'Player'");
@@ -253,8 +287,14 @@ namespace AshenRealm.EditorTools
             {
                 var font = AssetDatabase.LoadAssetAtPath<Font>($"Assets/Art/Fonts/Spectral-{face}.ttf");
                 if (!r.Check(font != null && font.dynamic, $"Spectral-{face} must be a dynamic font")) continue;
-                foreach (FieldInfo field in typeof(MenuText).GetFields(BindingFlags.Public | BindingFlags.Static))
-                    if (field.GetValue(null) is string menuText) CheckSpectral(r, font, $"MenuText.{field.Name}", menuText);
+                foreach (Type textSource in new[] { typeof(MenuText), typeof(InventoryText) })
+                    foreach (FieldInfo field in textSource.GetFields(BindingFlags.Public | BindingFlags.Static))
+                    {
+                        object value = field.GetValue(null);
+                        if (value is string menuText) CheckSpectral(r, font, $"{textSource.Name}.{field.Name}", menuText);
+                        else if (value is string[] labels)
+                            foreach (string label in labels) CheckSpectral(r, font, $"{textSource.Name}.{field.Name}", label);
+                    }
                 foreach (CodexEntry entry in CodexBook.Entries)
                     CheckSpectral(r, font, $"Codex {entry.Id}", entry.Name + entry.Text);
                 foreach (ClassCard card in Catalog.Cards)
@@ -292,6 +332,79 @@ namespace AshenRealm.EditorTools
             r.Check(so.FindProperty("statValues").arraySize == 6, "Class choice: a card shows six stats");
             foreach (ClassDefinition c in Catalog.Classes)
                 r.Check(Catalog.Cards.Count(card => card.Class == c) == 1, $"{c.Name} needs exactly one card");
+        }
+
+        static void CheckPlayerKits(Report r, PlayerClassRig rig, PlayerTorch torch)
+        {
+            r.Check(Catalog.Classes.Length == 6 && Catalog.Cards.Length == 6, "All six class definitions and cards must be available");
+            if (rig != null)
+            {
+                var models = new SerializedObject(rig).FindProperty("weaponSets");
+                r.Check(models.arraySize == Catalog.Classes.Length * PlayerClassRig.HandsPerClass,
+                    "Each of the six classes needs a distinct model for both hands");
+                var seen = new HashSet<GameObject>();
+                for (int i = 0; i < models.arraySize; i++)
+                {
+                    var model = models.GetArrayElementAtIndex(i).objectReferenceValue as GameObject;
+                    r.Check(model != null && seen.Add(model), $"Class weapon {i} is missing or shares another class's model root");
+                    if (model != null)
+                        r.Check(model.GetComponentsInChildren<MeshFilter>(true).Any(f => f.sharedMesh != null && f.sharedMesh.vertexCount > 0),
+                            $"Class weapon {i} has no visible geometry");
+                }
+            }
+            if (torch == null) return;
+            var settings = new SerializedObject(torch);
+            foreach (string field in new[] { "warmStrip", "coldStrip" })
+            {
+                var strip = settings.FindProperty(field).objectReferenceValue as Texture2D;
+                r.Check(strip != null && strip.width / 8f >= 128f && strip.width > strip.height,
+                    $"Carried torch {field} must contain eight horizontal frames");
+                if (strip == null) continue;
+                var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(strip)) as TextureImporter;
+                r.Check(importer != null && !importer.mipmapEnabled && importer.filterMode == FilterMode.Point &&
+                    importer.wrapMode == TextureWrapMode.Clamp && importer.alphaIsTransparency,
+                    $"Carried torch {field} must preserve transparent, crisp frame edges");
+            }
+            r.Check(torch.Light != null && torch.Light.shadows == LightShadows.None && torch.Light.range <= 24f,
+                "The carried torch needs one local light without realtime shadows");
+        }
+
+        static void CheckInventory(Report r, InventoryPanel inventory, SecretStatsPanel secret, HoldMenuButton hold)
+        {
+            void Count(Object target, string field, int expected)
+            {
+                SerializedProperty array = new SerializedObject(target).FindProperty(field);
+                r.Check(array != null && array.isArray && array.arraySize == expected, $"{target.name}.{field} must have {expected} entries");
+            }
+            if (inventory != null)
+            {
+                Count(inventory, "portraits", Catalog.Classes.Length);
+                Count(inventory, "statistics", 10);
+                Count(inventory, "statButtons", 6);
+                foreach (string field in new[] { "abilityLabels", "abilityDescriptions", "upgradeLabels", "upgradeButtons" }) Count(inventory, field, 2);
+                var so = new SerializedObject(inventory);
+                r.Check(so.FindProperty("inventoryPage").objectReferenceValue != so.FindProperty("abilitiesPage").objectReferenceValue,
+                    "Inventory and abilities must have separate pages");
+            }
+            if (secret != null)
+            {
+                Count(secret, "fields", InventoryText.DebugLabels.Length);
+                Count(secret, "unlockButtons", 2);
+                Count(secret, "unlockLabels", 2);
+                var fields = new SerializedObject(secret).FindProperty("fields");
+                for (int i = 0; i < fields.arraySize; i++)
+                {
+                    var input = fields.GetArrayElementAtIndex(i).objectReferenceValue as UnityEngine.UI.InputField;
+                    r.Check(input != null && input.contentType == UnityEngine.UI.InputField.ContentType.IntegerNumber,
+                        $"Hidden stat {i} must accept whole numbers");
+                }
+            }
+            if (hold == null) return;
+            r.Check(Mathf.Approximately(HoldMenuButton.HoldSeconds, 5f), "The hidden editor must require a continuous five-second hold");
+            var button = hold.GetComponent<UnityEngine.UI.Button>();
+            r.Check(button != null && button.onClick.GetPersistentEventCount() == 1 && button.onClick.GetPersistentTarget(0) == hold &&
+                button.onClick.GetPersistentMethodName(0) == nameof(HoldMenuButton.Click),
+                "The menu button must route its click through the hold handler exactly once");
         }
 
         /// <summary>Everything for sale has a picture, a price and, if it is held in the hand, a model; the shop draws with Spectral.</summary>
@@ -443,6 +556,7 @@ namespace AshenRealm.EditorTools
         static void CheckWorld(Report r, Zone[] zones, ZonePortal[] portals, EnemyAI[] enemies, NpcActor[] npcs, EncounterSite[] encounters)
         {
             r.Check(zones.Length == StoryText.ZoneTitles.Length, $"Expected {StoryText.ZoneTitles.Length} zones, found {zones.Length}");
+            r.Check(zones.Length == ZoneNumbers.FirstHome + ZoneNumbers.HomeCount, "The valley, city, three public houses, five depths and three cottages need 13 zones");
 
             bool OnGround(Vector3 p) => Physics.Raycast(p + Vector3.up * 1.5f, Vector3.down, out RaycastHit hit, 4f, ~0, QueryTriggerInteraction.Ignore) && Mathf.Abs(hit.point.y - p.y) < 1f;
 
@@ -480,7 +594,11 @@ namespace AshenRealm.EditorTools
                 r.Check(enemies.Any(e => e.EnemyId == definition.Id), $"{definition.Name} never appears in the world");
             r.Check(enemies.Count(e => e.EnemyId == "gloamlord") == 1, "Exactly one Gloamlord");
 
-            foreach (var npc in npcs) r.Check(StoryText.Npc(npc.NpcId) != null, $"{npc.name}: unknown npc id '{npc.NpcId}'");
+            foreach (var npc in npcs)
+            {
+                r.Check(StoryText.Npc(npc.NpcId) != null, $"{npc.name}: unknown npc id '{npc.NpcId}'");
+                r.Check(npc.GetComponent<NpcIdleAnimator>() != null, $"{npc.name} needs a living idle pose");
+            }
             foreach (var npc in StoryText.Npcs) r.Check(npcs.Any(n => n.NpcId == npc.Id), $"{npc.Name} never appears in the world");
             foreach (var site in encounters) r.Check(StoryText.Encounter(site.EncounterId) != null, $"{site.name}: unknown encounter '{site.EncounterId}'");
             foreach (var encounter in StoryText.Encounters) r.Check(encounters.Any(s => s.EncounterId == encounter.Id), $"{encounter.Name} never appears in the world");
@@ -498,6 +616,58 @@ namespace AshenRealm.EditorTools
             }
             r.Check(zones[ZoneNumbers.Forge].GetComponentsInChildren<ShopFixture>(true).Any(f => f.Goods == ItemSlot.Weapon), "The forge has no rack");
             r.Check(zones[ZoneNumbers.Chapel].GetComponentsInChildren<ShopFixture>(true).Any(f => f.Goods == ItemSlot.Relic), "The chapel has no relics");
+            CheckArrivalAndHomes(r, zones, portals);
+        }
+
+        static void CheckArrivalAndHomes(Report r, Zone[] zones, ZonePortal[] portals)
+        {
+            if (zones.Length < ZoneNumbers.FirstHome + ZoneNumbers.HomeCount) return;
+            Zone valley = zones[ZoneNumbers.Valley];
+            Transform[] valleyObjects = valley.GetComponentsInChildren<Transform>(true);
+            var blocker = valleyObjects.FirstOrDefault(t => t.name == "Closed Arrival Tunnel")?.GetComponent<BoxCollider>();
+            if (r.Check(blocker != null && !blocker.isTrigger, "The dark arrival tunnel needs a solid threshold"))
+            {
+                Vector3 eye = new Vector3(blocker.bounds.center.x, blocker.bounds.min.y + 1.6f, blocker.bounds.max.z + 4f);
+                r.Check(Physics.Raycast(eye, Vector3.back, out RaycastHit hit, 9f, ~0, QueryTriggerInteraction.Ignore) && hit.collider == blocker,
+                    "The tunnel must stop a player approaching from the valley");
+                var darkRecess = valleyObjects.FirstOrDefault(t => t.name == "Arrival Road Geometry")?.GetComponent<MeshRenderer>();
+                r.Check(darkRecess != null && darkRecess.sharedMaterial != null && darkRecess.sharedMaterial.renderQueue < 2500 &&
+                    darkRecess.bounds.Contains(blocker.bounds.center), "The arrival tunnel must have an opaque dark recess behind its threshold");
+            }
+            r.Check(valleyObjects.Count(t => t.name == "Caravan Wagon") == 2, "Two waiting wagons must mark the caravan's arrival");
+            foreach (string name in new[] { "Caravan Driver", "Caravan Guard", "Caravan Traveller" })
+            {
+                Transform person = valleyObjects.FirstOrDefault(t => t.name == name);
+                r.Check(person != null && person.GetComponent<NpcIdleAnimator>() != null && person.GetComponent<CapsuleCollider>() != null,
+                    $"{name} must wait beside the caravan with a visible idle pose and a collider");
+            }
+
+            for (int i = 0; i < ZoneNumbers.HomeCount; i++)
+            {
+                int index = ZoneNumbers.FirstHome + i;
+                Zone home = zones[index];
+                r.Check(home.Indoors && !home.Underground, $"{home.name} must be an above-ground interior");
+                ZonePortal[] doorsIn = valley.GetComponentsInChildren<ZonePortal>(true).Where(p => p.TargetZone == index).ToArray();
+                ZonePortal[] doorsOut = home.GetComponentsInChildren<ZonePortal>(true).Where(p => p.TargetZone == ZoneNumbers.Valley).ToArray();
+                r.Check(doorsIn.Length == 1 && doorsOut.Length == 1, $"{home.name} needs one entrance and one return door");
+                if (doorsIn.Length == 1 && doorsOut.Length == 1)
+                {
+                    var arrival = new SerializedObject(doorsOut[0]).FindProperty("arrival").objectReferenceValue as Transform;
+                    if (r.Check(arrival != null && arrival.IsChildOf(valley.transform), $"{home.name} must return to its own valley doorstep"))
+                    {
+                        Vector3 feet = arrival.position + Vector3.up * 0.4f;
+                        var overlaps = Physics.OverlapCapsule(feet, feet + Vector3.up * 1.1f, 0.33f, ~0, QueryTriggerInteraction.Ignore);
+                        r.Check(overlaps.All(c => c.GetComponent<CharacterController>() != null), $"{home.name}: return point intersects world geometry");
+                        Vector3 eye = arrival.position + Vector3.up * 1.6f;
+                        Vector3 towards = doorsIn[0].transform.position - eye;
+                        r.Check(Physics.SphereCast(eye, 0.04f, towards.normalized, out RaycastHit aim, towards.magnitude + 0.3f, ~0,
+                            QueryTriggerInteraction.Collide) && aim.collider.GetComponent<ZonePortal>() == doorsIn[0], $"{home.name}: the exterior door cannot be aimed at from its doorstep");
+                    }
+                }
+                var furniture = new HashSet<string>(home.GetComponentsInChildren<Collider>(true).Select(c => c.name));
+                foreach (string piece in new[] { "Floor", "Ceiling", "West Wall", "East Wall", "South Wall", "North Wall", "Bed", "Table", "Shelves", "Storage Chest" })
+                    r.Check(furniture.Contains(piece), $"{home.name} is missing {piece}");
+            }
         }
 
         static void CheckReach(Report r, PlayerCombat combat, CursedKnightAI knight)

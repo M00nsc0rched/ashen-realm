@@ -181,7 +181,11 @@ Shader "AshenRealm/PixelLit"
                 LIGHT_LOOP_BEGIN(pixelLightCount)
                     Light light = GetAdditionalLight(lightIndex, inputData.positionWS, shadowMask);
                     half amount = saturate(dot(inputData.normalWS, light.direction)) * light.distanceAttenuation * light.shadowAttenuation;
-                    color += albedo * light.color * Band(amount);
+                    // Quantise the radiance, not attenuation alone: otherwise every point light cuts off at two metres,
+                    // regardless of its intensity or range. Normalising the hue also caps the close-up band at one.
+                    half strength = max(light.color.r, max(light.color.g, light.color.b));
+                    half3 hue = light.color / max(strength, 0.0001h);
+                    color += albedo * hue * Band(amount * strength);
                 LIGHT_LOOP_END
             #endif
             #if defined(_ADDITIONAL_LIGHTS_VERTEX)

@@ -6,7 +6,7 @@ namespace AshenRealm.Player
 {
     /// <summary>
     /// Turns the one player object into the chosen class: stats, kit and which weapons sit under the hand pivots.
-    /// All four weapon sets ship in the rig; only the chosen one stays enabled. A weapon bought in Hollowgate takes the
+    /// All six weapon sets ship in the rig; only the chosen one stays enabled. A weapon bought in Hollowgate takes the
     /// place of the class's right-hand one, and what is carried adds to the class's numbers here.
     /// </summary>
     public sealed class PlayerClassRig : MonoBehaviour
@@ -57,13 +57,27 @@ namespace AshenRealm.Player
             int speed = (weapon?.Speed ?? 0) + (relic?.Speed ?? 0);
             combat.ApplyGear(attack, magic, speed, (weapon?.Lifesteal ?? 0f) + (relic?.Lifesteal ?? 0f));
             abilities.ApplyGear((weapon?.Focus ?? 0) + (relic?.Focus ?? 0));
-            health.SetMax(session.Class.MaxHealth + ((weapon?.Health ?? 0) + (relic?.Health ?? 0)) * HealthPerPoint, false);
+            RefreshHeldModels();
+            PlayerProgression progression = GetComponent<PlayerProgression>();
+            if (progression != null) progression.ApplyRuntime();
+            else health.SetMax(session.Class.MaxHealth + ((weapon?.Health ?? 0) + (relic?.Health ?? 0)) * HealthPerPoint, false);
+        }
 
+        /// <summary>Only changes what is visible, so taking out a torch does not reset combat or progression.</summary>
+        public void RefreshHeldModels()
+        {
+            GameSession session = GameSession.Instance;
+            if (session == null) return;
             int classIndex = (int)session.Class.Id;
+            bool torch = PlayerTorch.Instance != null && PlayerTorch.Instance.Equipped;
             for (int i = 0; i < weaponSets.Length; i++)
-                weaponSets[i].SetActive(i / HandsPerClass == classIndex && (weapon == null || i % HandsPerClass != 0));
+            {
+                bool right = i % HandsPerClass == 0;
+                weaponSets[i].SetActive(i / HandsPerClass == classIndex &&
+                    (right ? session.Weapon == null : !torch));
+            }
             ItemDefinition[] goods = Catalog.ItemsOf(ItemSlot.Weapon);
-            for (int i = 0; i < boughtWeapons.Length; i++) boughtWeapons[i].SetActive(goods[i] == weapon);
+            for (int i = 0; i < boughtWeapons.Length; i++) boughtWeapons[i].SetActive(i < goods.Length && goods[i] == session.Weapon);
         }
 
         /// <summary>What one blow would do with this item in place of what its slot holds now, forge work included.</summary>

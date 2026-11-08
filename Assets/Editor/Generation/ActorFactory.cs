@@ -77,6 +77,7 @@ namespace AshenRealm.EditorTools
                 Status = root.AddComponent<StatusEffects>(),
                 Abilities = root.AddComponent<PlayerAbilities>(),
             };
+            root.AddComponent<PlayerProgression>();
 
             var pivot = Child("Camera Pivot", root.transform, new Vector3(0f, 1.62f, 0f), Quaternion.identity);
             var cameraGo = Child("Main Camera", pivot, Vector3.zero, Quaternion.identity).gameObject;
@@ -102,9 +103,10 @@ namespace AshenRealm.EditorTools
             var shieldPivot = Child("Shield Pivot (Left Hand)", weaponRig, new Vector3(-0.48f, -0.44f, 0.6f), Quaternion.Euler(8f, -40f, 8f));
 
             var swordBuilder = new MeshBuilder();
-            PropMeshes.Sword(swordBuilder);
+            PlayerWeaponMeshes.KnightAxe(swordBuilder);
+            PlayerWeaponMeshes.Glove(swordBuilder);
             var swordMesh = GeneratedAssets.SaveMesh(swordBuilder, "Player_Sword");
-            var sword = MeshChild("Sword", swordPivot, swordMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.7f, false);
+            var sword = MeshChild("Knight Axe", swordPivot, swordMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.82f, false);
 
             var tip = Child("Blade Tip", sword.transform, new Vector3(0f, 0.92f, 0f), Quaternion.identity);
             var trail = tip.gameObject.AddComponent<TrailRenderer>();
@@ -125,6 +127,7 @@ namespace AshenRealm.EditorTools
 
             var shieldBuilder = new MeshBuilder();
             PropMeshes.Shield(shieldBuilder);
+            PlayerWeaponMeshes.Glove(shieldBuilder);
             var shieldMesh = GeneratedAssets.SaveMesh(shieldBuilder, "Player_Shield");
             var shield = MeshChild("Shield", shieldPivot, shieldMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.8f, false);
 
@@ -133,6 +136,7 @@ namespace AshenRealm.EditorTools
             {
                 var builder = new MeshBuilder();
                 build(builder);
+                PlayerWeaponMeshes.Glove(builder);
                 return MeshChild(name, pivot, GeneratedAssets.SaveMesh(builder, "Player_" + name.Replace(" ", "")), materials.World, Vector3.zero, Quaternion.identity, scale, false);
             }
             var daggerRight = Held("Dagger Right", swordPivot, PropMeshes.Dagger, Vector3.one);
@@ -141,6 +145,10 @@ namespace AshenRealm.EditorTools
             var castingHand = Held("Casting Hand", shieldPivot, PropMeshes.CastingHand, Vector3.one);
             var mace = Held("Mace", swordPivot, PropMeshes.Mace, Vector3.one);
             var lantern = Held("Hand Lantern", shieldPivot, PropMeshes.HandLantern, Vector3.one);
+            var boneStaff = Held("Necromancer Staff", swordPivot, PlayerWeaponMeshes.BoneStaff, Vector3.one);
+            var boneTalisman = Held("Bone Talisman", shieldPivot, PlayerWeaponMeshes.BoneTalisman, Vector3.one);
+            var reagent = Held("Reagent Bottle", swordPivot, PlayerWeaponMeshes.ReagentBottle, Vector3.one);
+            var alchemistKit = Held("Alchemist Kit", shieldPivot, PlayerWeaponMeshes.AlchemistKit, Vector3.one);
 
             // The forge's goods, in Catalog order. They take the place of the class's right-hand weapon.
             GameObject[] bought =
@@ -152,21 +160,21 @@ namespace AshenRealm.EditorTools
             };
             foreach (GameObject weapon in bought) weapon.SetActive(false);
 
-            // Underground the sun is off and this is the only light; ZoneManager switches it.
+            // The visible carried torch and its light are controlled by the inventory.
             var torchGo = Child("Torch", cameraGo.transform, new Vector3(0f, 0.6f, 1.6f), Quaternion.identity).gameObject;
             var torch = torchGo.AddComponent<Light>();
             torch.type = LightType.Point;
             torch.color = new Color(1f, 0.74f, 0.46f);
             torch.range = 22f;
-            torch.intensity = 5f;
+            torch.intensity = 12f;
             torch.shadows = LightShadows.None;
             torch.enabled = false;
             var flicker = torchGo.AddComponent<LightFlicker>();
-            SceneWiring.Set(flicker, "baseIntensity", 5f);
-            SceneWiring.Set(flicker, "intensityVariation", 0.4f);
+            SceneWiring.Set(flicker, "baseIntensity", 12f);
+            SceneWiring.Set(flicker, "intensityVariation", 0.9f);
             rig.Torch = torch;
 
-            foreach (var other in new[] { daggerRight, daggerLeft, staff, castingHand, mace, lantern }) other.SetActive(false);
+            foreach (var other in new[] { daggerRight, daggerLeft, staff, castingHand, mace, lantern, boneStaff, boneTalisman, reagent, alchemistKit }) other.SetActive(false);
 
             var classRig = root.AddComponent<PlayerClassRig>();
             SceneWiring.Set(rig.Status, "health", rig.Health);
@@ -179,9 +187,11 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(classRig, "health", rig.Health);
             SceneWiring.Set(classRig, "combat", rig.Combat);
             SceneWiring.Set(classRig, "abilities", rig.Abilities);
-            SceneWiring.Set(classRig, "weaponSets", new[] { sword, shield, daggerRight, daggerLeft, staff, castingHand, mace, lantern });
+            SceneWiring.Set(classRig, "weaponSets", new[] { sword, shield, daggerRight, daggerLeft, staff, castingHand, mace, lantern,
+                boneStaff, boneTalisman, reagent, alchemistKit });
             SceneWiring.Set(classRig, "boughtWeapons", bought);
             rig.ClassRig = classRig;
+            TorchBuilder.Build(root, cameraGo.transform, torch, classRig, rig.Controller, materials.World);
 
             // Internal wiring (prefab-safe).
             SceneWiring.Set(rig.Controller, "inputSource", rig.Input);
@@ -360,11 +370,74 @@ namespace AshenRealm.EditorTools
             capsule.height = 1.9f;
             capsule.radius = 0.4f;
             capsule.center = new Vector3(0f, 0.95f, 0f);
-            MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, "Person_" + id), materials.World);
+            GameObject model = MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, "Person_" + id), materials.World);
+            AddIdleAnimation(root, model.transform, id, materials);
             var npc = root.AddComponent<NpcActor>();
             SceneWiring.Set(npc, "npcId", id);
             SceneWiring.Set(npc, "director", director);
             return npc;
+        }
+
+        /// <summary>A waiting traveller, with the same living pose as the people who can be spoken to.</summary>
+        public static GameObject CreateAmbientNpc(string name, Vector3 position, float yaw, System.Action<MeshBuilder> figure,
+            Transform parent, GeneratedMaterials materials)
+        {
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, true);
+            root.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            var capsule = root.AddComponent<CapsuleCollider>();
+            capsule.height = 1.9f;
+            capsule.radius = 0.35f;
+            capsule.center = new Vector3(0f, 0.95f, 0f);
+            var body = new MeshBuilder();
+            figure(body);
+            string assetName = "Person_Ambient_" + name.Replace(" ", "");
+            GameObject model = MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, assetName), materials.World);
+            AddIdleAnimation(root, model.transform, name, materials);
+            return root;
+        }
+
+        static void AddIdleAnimation(GameObject root, Transform model, string id, GeneratedMaterials materials)
+        {
+            var idle = root.AddComponent<NpcIdleAnimator>();
+            SceneWiring.Set(idle, "model", model);
+            float phase = 0f;
+            foreach (char letter in id) phase += letter * 0.13f;
+            SceneWiring.Set(idle, "phase", phase);
+            if (id != "smith") return;
+
+            var shoulder = Child("Hammer Shoulder", model, new Vector3(0.36f, 1.54f, 0f), Quaternion.identity);
+            var arm = new MeshBuilder();
+            PeopleMeshes.SmithHammerArm(arm);
+            arm.Bake((p, n) => new Color(0.9f, 0.64f, 0.44f));
+            MeshChild("Hammer Arm", shoulder, GeneratedAssets.SaveMesh(arm, "Person_SmithHammerArm"), materials.World);
+            SceneWiring.Set(idle, "hammerArm", shoulder);
+
+            var sparksGo = Child("Hammer Sparks", root.transform, new Vector3(0f, 1.28f, 1.05f), Quaternion.identity).gameObject;
+            var sparks = sparksGo.AddComponent<ParticleSystem>();
+            var main = sparks.main;
+            main.loop = true;
+            main.playOnAwake = true;
+            main.startLifetime = new ParticleSystem.MinMaxCurve(0.18f, 0.5f);
+            main.startSpeed = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+            main.startSize = new ParticleSystem.MinMaxCurve(0.018f, 0.04f);
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(1f, 0.34f, 0.04f), new Color(1f, 0.9f, 0.35f));
+            main.gravityModifier = 0.45f;
+            main.maxParticles = 40;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            var emission = sparks.emission;
+            emission.rateOverTime = 0f;
+            var shape = sparks.shape;
+            shape.shapeType = ParticleSystemShapeType.Cone;
+            shape.angle = 65f;
+            shape.radius = 0.06f;
+            shape.rotation = new Vector3(-90f, 0f, 0f);
+            var renderer = sparks.GetComponent<ParticleSystemRenderer>();
+            renderer.sharedMaterial = materials.Sparks;
+            renderer.renderMode = ParticleSystemRenderMode.Billboard;
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            SceneWiring.Set(idle, "sparks", sparks);
         }
 
         public static EncounterSite CreateEncounter(string id, Vector3 position, Transform parent, StoryDirector director, GeneratedMaterials materials)

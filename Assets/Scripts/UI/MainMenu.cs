@@ -171,6 +171,7 @@ namespace AshenRealm.UI
         /// <summary>A card was taken: the menu goes and the soul starts.</summary>
         public void BeginSoul(CharacterClass id)
         {
+            if (!keeper.IsClassUnlocked(id)) return;
             SetPanelVisible(true);
             Hide();
             director.StartSoul(id);

@@ -10,7 +10,7 @@ namespace AshenRealm.Story
     public static class SaveStore
     {
         /// <summary>Bump when world geometry moves: older saves then arrive at their zone's entry, not inside a new wall.</summary>
-        public const int WorldVersion = 3;
+        public const int WorldVersion = 4;
 
         static string RosterKey => GameSettings.Prefix + "Roster";
         static string MetaKey => GameSettings.Prefix + "Meta";

@@ -1,6 +1,6 @@
 # Ashen Realm — Progress
 
-_Last updated: 2026-11-06_
+_Last updated: 2026-11-07_
 
 ## Environment (confirmed)
 - Unity project: `E:\Ashen Realm\AshenRealm`, Editor **6000.6.8f1** (installed via Unity Hub), URP template.
@@ -8,7 +8,40 @@ _Last updated: 2026-11-06_
   Test Framework 1.8.0 present as a transitive dependency (not used yet). No packages were added.
 - Installed build modules: Windows Standalone, WebGL. **iOS Build Support is not installed.** Host OS is Windows,
   so a native iOS build (Xcode) cannot be performed on this machine.
-- Git: repository on `master` (E: has no file ownership, so the path is in the global `safe.directory` list).
+- Git: current source branch `menus-and-houses`; the playable site is a separate build on `gh-pages` (E: has no file ownership,
+  so the project path is in the global `safe.directory` list).
+
+## Checkpoint L — arrival, valley homes, evening and the carried soul (2026-11-06)
+- The southern arrival road ends at a black mountain tunnel, blocked by an invisible threshold. Two wagons and three waiting travellers
+  mark the caravan that brought the soul here. The tunnel and caravan can be inspected.
+- The three valley cottages now have furnished interiors: the weaver's home, a roadside resting place and the letter-writer's home.
+  Each door leads back to its own doorstep. Their zones are appended at 10-12, preserving the depths at 5-9; world version is 4.
+- Sunset advances along the northbound road; reaching Hollowgate stores evening in `world_evening`. Loading or returning to the valley
+  keeps it. The first city arrival draws the carried torch once; inventory controls it thereafter, including underground.
+- The pause button opens the descent menu with inventory/abilities, Codex and save. Inventory shows class art, stats, equipment, potions
+  and torch; Souls buy six stat increases and three tiers of each of the two class abilities. Levels, growth, tiers, editable food and torch
+  choice are saved with the soul. Food has no hunger upkeep yet.
+- A continuous five-second hold on the top-right HUD menu button opens the hidden developer sheet: editable soul stats and permanent
+  Necromancer/Alchemist unlocks. The ledger gates selection and starting a soul. Both classes now have real weapons, ranged attacks and two abilities.
+- All six classes have separate hand models; the supplied warm/cold torch strips animate in the hand. NPCs breathe and turn, the smith
+  raises and strikes his hammer, and sparks emit at the blow.
+- Scope still deferred: Graveborne's full skill/passive system, story-based class unlock quests, hunger upkeep, Sanctum, followers and limb combat.
+
+### Checkpoint L validation
+Validated in the cached copy and the main project. The main project generated and passed with the documented `-refreshImportMode InProcess` option after its parallel import workers crashed during native UDS initialization; no Library deletion or reset was needed.
+
+| Check | Result |
+|---|---|
+| C# compilation | Runtime and Editor compiled with no C# errors, both standalone and in Unity |
+| Generation and validator | main project passed, 6989 checks; cached copy passed, 6980 checks before final UI text polish |
+| Automated playtest | passed on both projects, 262 checks, 0 failures |
+| Preview/menu renders | reviewed tunnel, caravan, evening city, home interiors, warm/blue torch frames and the inventory/ability/secret sheets at desktop, phone landscape and reference sizes |
+| WebGL build | succeeded, 26.2 MB, 14.3 min, 0 build errors |
+| Browser startup | built game loads to the main menu in in-app Chromium, 1207x931; interactive browser checks were interrupted before input |
+
+The deployment audit compared 124 C# files, three shaders, all menu images and the generated scene with the build copy: identical. Import metadata differs only in trailing whitespace, with unchanged GUIDs and settings. Live deployment is checked separately after pushing.
+
+Earlier checkpoint notes record their state at the time; this checkpoint supersedes their locked-class, level and zone-count limitations.
 
 ## Checkpoint K — the Cold Forge, the Grey Chapel and Gallows Market (2026-11-06)
 - Weapons stay at the door of every house: `Zone.Indoors` puts them away through `PlayerCombat.SetArmed`, the hands go empty, nothing
@@ -272,5 +305,5 @@ Health/Stamina/block logic tests.
 
 ## Next steps (proposed, not started)
 - Audio (procedural swoosh/impact/block sounds), hit-stop tuning after hands-on play.
-- Settings UI for look sensitivity / invert Y (API exists on `PlayerInputHub`).
+- Invert-Y option (look sensitivity is already available in settings).
 - Weapon clipping into walls (overlay camera or shorter rest pose) after device profiling.

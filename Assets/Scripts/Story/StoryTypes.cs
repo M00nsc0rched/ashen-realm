@@ -2,9 +2,9 @@ using System.Collections.Generic;
 
 namespace AshenRealm.Story
 {
-    public enum CharacterClass { Knight, Gravethief, Witch, Warden }
+    public enum CharacterClass { Knight, Gravethief, Witch, Warden, Necromancer, Alchemist }
     public enum Alignment { Marked, Mortal, Hallowed }
-    public enum AbilityEffect { ShieldBash, Rally, Backstab, PoisonBlade, LifeDrain, Hex, Smite, Mend }
+    public enum AbilityEffect { ShieldBash, Rally, Backstab, PoisonBlade, LifeDrain, Hex, Smite, Mend, BoneSpear, BoneArmor, AcidFlask, HealingBrew }
     public enum EnemyBody { Humanoid, Beast, Flyer, Blob }
     public enum EnemyRank { Common, Elite, Guardian, Boss }
     public enum MoveKind { Melee, Bolt, Heal, Buff, Ward }
@@ -124,7 +124,8 @@ namespace AshenRealm.Story
                 case CharacterClass.Knight: return Knight;
                 case CharacterClass.Gravethief: return Gravethief;
                 case CharacterClass.Witch: return Witch;
-                default: return Warden;
+                case CharacterClass.Warden: return Warden;
+                default: return string.Empty;
             }
         }
     }

@@ -15,7 +15,7 @@ namespace AshenRealm.Story
         /// <summary>Zone title cards: the valley, the city, then the five depths of the Deep Dark.</summary>
         public static readonly string[] ZoneTitles =
         {
-            "HAMUVÖLGY", "ÜREGKAPU", "A KÖTÉL ÉS LÁMPÁS", "A HIDEG KOHÓ", "A SZÜRKE KÁPOLNA", "A KATAKOMBÁK", "A GOMBAMÉLY", "A SÜLLYEDT KIKÖTŐ", "A PARÁZS-SZAKADÉK", "A FEHÉRVELŐ",
+            "HAMUVÖLGY", "ÜREGKAPU", "A KÖTÉL ÉS LÁMPÁS", "A HIDEG KOHÓ", "A SZÜRKE KÁPOLNA", "A KATAKOMBÁK", "A GOMBAMÉLY", "A SÜLLYEDT KIKÖTŐ", "A PARÁZS-SZAKADÉK", "A FEHÉRVELŐ", "A SZÖVŐ HÁZA", "AZ ÚTMENTI PIHENŐ", "AZ ÍRNOK OTTHONA",
         };
 
         public static readonly string[] ZoneSubtitles =
@@ -30,6 +30,9 @@ namespace AshenRealm.Story
             "3. mélység. Mocsárrá lett vízbe fúlt kikötő - korhadt mólók és fekete víz.",
             "4. mélység. A hőség a világ repedéseiből lélegzik fel. A Kórus fanatikusai imádják ezt a helyet.",
             "5. mélység. Rakott csontfalak, imával habarcsolva. Az itteni holtak sosem fejezték be a halált.",
+            "Otthon az alkonyati fák között.",
+            "Egy meleg szoba a város felé vezető úton.",
+            "Könyvek, pergamen és az erdő csendje.",
         };
 
         public const string KnightBlessing = "»A rend hamu, és te mégis eljöttél. Térdelj le. A Kórusnak semmibe nem kerül kimondani a szavakat, és jól látszik, hogy neked valamibe kerül végighallgatni őket.«";

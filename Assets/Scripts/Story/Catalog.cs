@@ -62,15 +62,39 @@ namespace AshenRealm.Story
                 Ability1 = new AbilityDefinition { Effect = AbilityEffect.Smite, Name = "Sújtás", Description = "Szent tűz; ostorozza az élőholtakat.", Cost = 3, Cooldown = 5f },
                 Ability2 = new AbilityDefinition { Effect = AbilityEffect.Mend, Name = "Gyógyítás", Description = "Sebeket gyógyítasz.", Cost = 3, Cooldown = 9f },
             },
+            new ClassDefinition
+            {
+                Id = CharacterClass.Necromancer, Name = "A Nekromanta", Role = "Az elátkozott",
+                Flavor = "A csont emlékezik. Te tudod, hogyan kell kérdezni.",
+                Backstory = "A karaván utasai kerülték a tekintetedet. Üregkapu alatt olyan holtak várnak, akiknek még maradt mondanivalójuk.",
+                Goal = "Feltárni a Mélysötét eltemetett titkait.",
+                Ending = "A trón üres. A holtak végre a saját nevükön szólhatnak.",
+                MaxHealth = 75f, MaxFocus = 30, FocusPerSecond = 0.9f, StartHonor = -20,
+                Damage = 28f, AttackCooldown = 0.8f, AttackDuration = 0.5f, BlockReduction = 0.55f, MoveMultiplier = 1.03f, Ranged = true,
+                Ability1 = new AbilityDefinition { Effect = AbilityEffect.BoneSpear, Name = "Csontlándzsa", Description = "A holtak szilánkja messzire döf.", Cost = 3, Cooldown = 5f },
+                Ability2 = new AbilityDefinition { Effect = AbilityEffect.BoneArmor, Name = "Csontpáncél", Description = "Csontvért felezi a sebzést és enyhíti a sebeket.", Cost = 2, Cooldown = 12f },
+            },
+            new ClassDefinition
+            {
+                Id = CharacterClass.Alchemist, Name = "Az Alkimista", Role = "Egy másik életben csapos",
+                Flavor = "A megfelelő elegy gyógyszer. Egyetlen cseppel több már fegyver.",
+                Backstory = "A karaván készletei között utaztál a városig. Most saját kezedben viszed az üvegeket, amelyekre a mélyben szükséged lesz.",
+                Goal = "Megtalálni a Mélysötét utolsó összetevőjét.",
+                Ending = "A készítmény elkészült. Üregkapu nem kérdezi, miből főzted.",
+                MaxHealth = 85f, MaxFocus = 8, FocusPerSecond = 0.65f, StartHonor = 10,
+                Damage = 19f, AttackCooldown = 0.65f, AttackDuration = 0.45f, BlockReduction = 0.6f, MoveMultiplier = 1.14f, Ranged = true,
+                Ability1 = new AbilityDefinition { Effect = AbilityEffect.AcidFlask, Name = "Savüveg", Description = "Maró elegy és hosszan ható méreg.", Cost = 2, Cooldown = 6f },
+                Ability2 = new AbilityDefinition { Effect = AbilityEffect.HealingBrew, Name = "Gyógyfőzet", Description = "Azonnali gyógyulás, majd lassú regeneráció.", Cost = 3, Cooldown = 10f },
+            },
         };
 
-        public static ClassDefinition ClassOf(CharacterClass id) => Classes[(int)id];
+        public static ClassDefinition ClassOf(CharacterClass id) => Classes[System.Math.Max(0, System.Math.Min((int)id, Classes.Length - 1))];
 
         // ---- Class cards -----------------------------------------------------------------------------
 
         /// <summary>
         /// The row of the class choice, in Graveborne's order. The Necromancer and the Alchemist are earned classes there and
-        /// are not ported yet, so here they are cards without a class. The passives are the cards' text; none works in the game yet.
+        /// stay sealed until unlocked in the hidden menu. Card numbers are the original design's points.
         /// </summary>
         public static readonly ClassCard[] Cards =
         {
@@ -84,13 +108,13 @@ namespace AshenRealm.Story
                 "Lemerülésenként egyszer a halálos csapás 1 ÉP-n hagy. Két köröd van legyőzni az ellenfelet, különben meghalsz."),
             new ClassCard
             {
-                Art = "CardNecromancer", Name = "A Nekromanta", Role = "Az elátkozott", Honor = -20,
+                Class = ClassOf(CharacterClass.Necromancer), Art = "CardNecromancer", Name = "A Nekromanta", Role = "Az elátkozott", Honor = -20,
                 Health = 25, Focus = 30, Attack = 5, Defense = 9, Magic = 47, Speed = 10, PassiveName = "Az Átkozott Ösvény",
                 PassiveText = "Minden lemerülés elején Támadó vagy Védekező ösvényt választasz. A futamon csak annak varázslatait tanulhatod meg.",
             },
             new ClassCard
             {
-                Art = "CardAlchemist", Name = "Az Alkimista", Role = "Egy másik életben csapos", Honor = 10,
+                Class = ClassOf(CharacterClass.Alchemist), Art = "CardAlchemist", Name = "Az Alkimista", Role = "Egy másik életben csapos", Honor = 10,
                 Health = 30, Focus = 8, Attack = 0, Defense = 17, Magic = 0, Speed = 14, UsesIntellect = true, PassiveName = "Vas Szájpadlás",
                 PassiveText = "Immunis vagy a méregre, a rothadásra és a vérzésre.",
             },

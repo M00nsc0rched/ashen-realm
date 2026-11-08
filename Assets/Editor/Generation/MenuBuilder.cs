@@ -26,6 +26,7 @@ namespace AshenRealm.EditorTools
         public Sprite PanelFill;
         public Sprite CardGlow;
         public Sprite[] Cards;
+        public Sprite LockedCard;
         public Texture2D Background;
         public Texture2D ChoiceBackground;
     }
@@ -81,7 +82,8 @@ namespace AshenRealm.EditorTools
             Star = sprites.Star,
             PanelFill = sprites.PanelFill,
             CardGlow = ImportSprite("CardGlow.png", GlowBorder),
-            Cards = Catalog.Cards.Select(card => ImportCard(card.Class != null ? card.Art : LockedCardArt)).ToArray(),
+            Cards = Catalog.Cards.Select(card => ImportCard(card.Art)).ToArray(),
+            LockedCard = ImportCard(LockedCardArt),
             Background = ImportBackground("MenuBackground.jpg"),
             ChoiceBackground = ImportBackground("ChoiceBackground.jpg"),
         };
@@ -194,10 +196,12 @@ namespace AshenRealm.EditorTools
             BuildSettings(canvasGo.transform, art, settings, input, keeper, confirm, layout, main);
             BuildConfirm(canvasGo.transform, art, confirm);
             BuildLayoutBar(canvasGo.transform, art, layout);
+            InventoryMenuBuilder.Build(canvasGo.transform, art, keeper, pause);
 
             SceneWiring.Set(pause, "mainMenu", main);
             SceneWiring.Set(pause, "settings", settings);
             SceneWiring.Set(pause, "keeper", keeper);
+            SceneWiring.Set(pause, "codex", codex);
 
             SetLayer(canvasGo.transform);
         }
@@ -426,6 +430,8 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(carousel, "canvas", menuCanvas);
             SceneWiring.Set(carousel, "cards", cards);
             SceneWiring.Set(carousel, "cardArt", cardArt);
+            SceneWiring.Set(carousel, "unlockedArt", art.Cards);
+            SceneWiring.Set(carousel, "lockedArt", art.LockedCard);
             SceneWiring.Set(carousel, "cardGlow", cardGlow);
             SceneWiring.Set(carousel, "dots", dots);
             SceneWiring.Set(carousel, "previousButton", previous);

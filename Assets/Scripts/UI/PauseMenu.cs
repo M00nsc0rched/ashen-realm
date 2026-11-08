@@ -20,6 +20,10 @@ namespace AshenRealm.UI
         [SerializeField, Optional] MainMenu mainMenu;
         [SerializeField, Optional] SettingsPanel settings;
         [SerializeField, Optional] SoulKeeper keeper;
+        [SerializeField, Optional] InventoryPanel inventory;
+        [SerializeField, Optional] SecretStatsPanel secret;
+        [SerializeField, Optional] CodexPanel codex;
+        [SerializeField, Optional] TouchControlsRoot controls;
         [SerializeField] Text fullscreenLabel;
         [SerializeField, Optional] Text objectiveLabel;
         [SerializeField, Optional] Selectable firstButton;
@@ -42,6 +46,9 @@ namespace AshenRealm.UI
 
         public void Toggle()
         {
+            if (secret != null && secret.IsOpen) { secret.Close(); return; }
+            if (inventory != null && inventory.IsOpen) { inventory.Close(); return; }
+            if (codex != null && codex.IsOpen) { codex.Close(); return; }
             if (mainMenu != null && mainMenu.IsOpen)
             {
                 mainMenu.Back();
@@ -60,7 +67,13 @@ namespace AshenRealm.UI
             Apply(!IsOpen);
         }
 
-        public void Resume() => Apply(false);
+        public void Resume()
+        {
+            if (inventory != null && inventory.IsOpen) inventory.Close();
+            if (secret != null && secret.IsOpen) secret.Close();
+            if (codex != null && codex.IsOpen) codex.Close();
+            Apply(false);
+        }
 
         public void SetObjective(string text)
         {
@@ -85,12 +98,49 @@ namespace AshenRealm.UI
 
         public void ToMainMenu() => keeper.ReturnToMenu();
 
+        public void OpenInventory()
+        {
+            if (inventory == null) return;
+            if (!IsOpen) Apply(true);
+            SetVisible(false);
+            inventory.Open(ReturnFocus);
+        }
+
+        public void OpenSecret()
+        {
+            if (secret == null || (mainMenu != null && mainMenu.IsOpen) || (dialogue != null && dialogue.IsOpen) ||
+                (shop != null && shop.IsOpen)) return;
+            if (!IsOpen) Apply(true);
+            SetVisible(false);
+            secret.Open(ReturnFocus);
+        }
+
+        public void OpenCodex()
+        {
+            if (codex == null) return;
+            if (!IsOpen) Apply(true);
+            SetVisible(false);
+            codex.Open(ReturnFocus);
+        }
+
+        public void SaveSoul()
+        {
+            if (keeper != null && keeper.Save()) GameMessages.Notify(InventoryText.Saved);
+        }
+
+        void ReturnFocus()
+        {
+            SetVisible(true);
+            MenuFocus.Enter(firstButton);
+        }
+
         void Apply(bool open)
         {
             IsOpen = open;
             lastToggle = Time.unscaledTime;
             Time.timeScale = open ? 0f : 1f;
             if (input != null) input.SetPaused(open);
+            if (controls != null) controls.SetMenuOpen(open);
             SetVisible(open);
             UpdateLabels(Screen.fullScreen);
             if (open) MenuFocus.Enter(firstButton);

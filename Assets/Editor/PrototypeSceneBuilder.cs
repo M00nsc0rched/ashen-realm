@@ -139,6 +139,9 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(director, "playerAbilities", player.Abilities);
 
                 var zones = new List<Zone> { valley };
+                CreateArrivalLore(layout.Arrival, valley.transform);
+                foreach (var person in layout.Arrival.People)
+                    ActorFactory.CreateAmbientNpc(person.name, person.position, person.yaw, person.figure, valley.transform, materials);
                 ActorFactory.CreatePortal("Gate To Hollowgate", layout.GatePosition, 0f, new Vector3(6f, 9f, 1f), valley.transform, zoneManager, ZoneNumbers.City, false,
                     GameText.GateToCity, StoryDirector.DeadFlag("knight"), GameText.GateBarred);
 
@@ -192,13 +195,22 @@ namespace AshenRealm.EditorTools
                     zones.Add(BuildDepth(biomes[i], index, last, materials, enemies, player, projectiles, impacts, zoneManager, director));
                 }
 
+                for (int i = 0; i < layout.Homes.Count; i++)
+                {
+                    int index = ZoneNumbers.FirstHome + i;
+                    var home = layout.Homes[i];
+                    Transform returnPoint = Marker("Hamlet Home " + i + " Return", valley.transform, home.arrival, home.yaw + 180f);
+                    ActorFactory.CreatePortal("Hamlet Home " + i + " Door", home.door, home.yaw, new Vector3(1.12f, 2.65f, 0.24f),
+                        valley.transform, zoneManager, index, false, GameText.EnterHome, "", "");
+                    zones.Add(BuildHamletHome(i, materials, zoneManager, returnPoint));
+                }
+
                 SceneWiring.Set(zoneManager, "zones", zones.ToArray());
                 SceneWiring.Set(zoneManager, "player", player.Controller);
                 SceneWiring.Set(zoneManager, "lifecycle", player.Lifecycle);
                 SceneWiring.Set(zoneManager, "combat", player.Combat);
                 SceneWiring.Set(zoneManager, "atmosphere", Object.FindAnyObjectByType<AtmosphereController>());
                 SceneWiring.Set(zoneManager, "sun", RenderSettings.sun);
-                SceneWiring.Set(zoneManager, "torch", player.Torch);
                 SceneWiring.Set(zoneManager, "worldCamera", player.CameraEffects.GetComponent<Camera>());
                 SceneWiring.Set(zoneManager, "compass", hud.Compass);
                 SceneWiring.Set(zoneManager, "fade", hud.Fade);
@@ -322,6 +334,39 @@ namespace AshenRealm.EditorTools
                 GameText.StairDown, "", "");
 
             ConfigureZone(zone, ZoneNumbers.Tavern, false, new Color(0.9f, 0.84f, 0.78f), new Color(0.06f, 0.04f, 0.03f), 13f, 40f, entry, exit, objective);
+            SceneWiring.Set(zone, "indoors", true);
+            return zone;
+        }
+
+        static void CreateArrivalLore(ArrivalLayout layout, Transform parent)
+        {
+            void Lore(string name, Vector3 position, Vector3 size, string prompt, string text)
+            {
+                var go = new GameObject(name);
+                go.transform.SetParent(parent, false);
+                go.transform.position = position + Vector3.up * (size.y * 0.5f);
+                var box = go.AddComponent<BoxCollider>();
+                box.size = size;
+                box.isTrigger = true;
+                var lore = go.AddComponent<LoreInspectable>();
+                SceneWiring.Set(lore, "prompt", prompt);
+                SceneWiring.Set(lore, "loreText", text);
+            }
+            Lore("Arrival Tunnel Lore", layout.Tunnel, new Vector3(5.9f, 4.5f, 0.25f), GameText.InspectArrivalTunnel, GameText.ArrivalTunnelLore);
+            Lore("Caravan Lore", layout.Caravan, new Vector3(0.45f, 2.2f, 2.6f), GameText.InspectCaravan, GameText.CaravanLore);
+        }
+
+        static Zone BuildHamletHome(int household, GeneratedMaterials materials, ZoneManager zoneManager, Transform returnPoint)
+        {
+            int index = ZoneNumbers.FirstHome + household;
+            Vector3 origin = ZoneOrigin(index);
+            Zone zone = NewZone("Zone Hamlet Home " + household, origin);
+            RoomLayout room = new HamletGenerator(materials.World, origin, ValleyGenerator.Seed + 113 + household, household).Generate(zone.transform);
+            Transform entry = Marker("Hamlet Home Entry", zone.transform, room.Entry, 0f);
+            Transform objective = Marker("Hamlet Home Door", zone.transform, room.DoorOut, 0f);
+            ActorFactory.CreatePortal("Hamlet Home " + household + " Door Out", room.DoorOut, 0f, new Vector3(2.15f, 3f, 0.22f),
+                zone.transform, zoneManager, ZoneNumbers.Valley, false, GameText.LeaveHouse, "", "", returnPoint);
+            ConfigureZone(zone, index, false, new Color(0.86f, 0.8f, 0.74f), new Color(0.055f, 0.04f, 0.035f), 9f, 24f, entry, entry, objective);
             SceneWiring.Set(zone, "indoors", true);
             return zone;
         }
@@ -539,7 +584,7 @@ namespace AshenRealm.EditorTools
         }
 
         /// <summary>Golden-hour sun from the west-north-west, low enough for long painterly shadows.</summary>
-        static readonly Quaternion SunRotation = Quaternion.Euler(24f, 110f, 0f);
+        static readonly Quaternion SunRotation = Quaternion.Euler(13f, 110f, 0f);
 
         static VolumeProfile CreateVolumeProfile()
         {
@@ -658,8 +703,8 @@ namespace AshenRealm.EditorTools
             sunGo.transform.rotation = SunRotation;
             var sun = sunGo.AddComponent<Light>();
             sun.type = LightType.Directional;
-            sun.color = new Color(1f, 0.86f, 0.66f);
-            sun.intensity = 1.45f;
+            sun.color = new Color(1f, 0.65f, 0.36f);
+            sun.intensity = 1.35f;
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.85f;
 
@@ -670,8 +715,8 @@ namespace AshenRealm.EditorTools
             // Cool ambient against the warm sun; fog matches the painted sky's horizon for atmospheric depth.
             var atmosphereGo = new GameObject("Atmosphere");
             var atmosphere = atmosphereGo.AddComponent<AtmosphereController>();
-            SceneWiring.Set(atmosphere, "ambientColor", new Color(0.6f, 0.58f, 0.64f));
-            SceneWiring.Set(atmosphere, "fogColor", horizon);
+            SceneWiring.Set(atmosphere, "ambientColor", new Color(0.49f, 0.4f, 0.43f));
+            SceneWiring.Set(atmosphere, "fogColor", new Color(0.56f, 0.34f, 0.3f));
             SceneWiring.Set(atmosphere, "fogStart", 30f);
             SceneWiring.Set(atmosphere, "fogEnd", 320f);
             atmosphere.Apply();
