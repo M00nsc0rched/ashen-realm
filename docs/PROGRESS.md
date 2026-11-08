@@ -1,6 +1,6 @@
 # Ashen Realm — Progress
 
-_Last updated: 2026-11-07_
+_Last updated: 2026-11-08_
 
 ## Environment (confirmed)
 - Unity project: `E:\Ashen Realm\AshenRealm`, Editor **6000.6.8f1** (installed via Unity Hub), URP template.
@@ -10,6 +10,43 @@ _Last updated: 2026-11-07_
   so a native iOS build (Xcode) cannot be performed on this machine.
 - Git: current source branch `menus-and-houses`; the playable site is a separate build on `gh-pages` (E: has no file ownership,
   so the project path is in the global `safe.directory` list).
+
+## Checkpoint M — places worth exploring (2026-11-08)
+- All thirteen zones are redesigned through their generators. The valley gains a pilgrims' spring, a western loop and broken viaduct,
+  a planted sword garden, village well/working yards, cottage awnings and gardens, and a caravan rest with packhorses.
+- The three cottage interiors have separate household compositions: the weaver's textile loft/bed alcove, a roadside kitchen,
+  and the scribe's books and brass celestial globe. Their original doors and safe arrivals remain in place.
+- Hollowgate gains framed/shuttered windows, awnings, pennants, gate buttresses, the roofed Well of Names and Lantern Court.
+  Amber vertex-lit pools mark inhabited places; the cooler evening light keeps street silhouettes readable.
+- The tavern has a candlewheel, runner and travellers' token wall; the forge has armour plans, an unfinished suit and quenching trough;
+  the chapel has a processional floor, rose windows and votive shrines. Existing NPC, service and portal positions remain.
+- Every depth has a guaranteed landmark chamber, side galleries, loops and varied ceiling heights. The Catacombs' memorial nave,
+  Fungal grove, Harbor cargo barge, Ember chained furnace and Marrow ribbed cathedral use separate architecture in the existing static chunks.
+  A flood fill checks every floor tile and gameplay placement before generation finishes. Decorative dungeon props remain noncolliding.
+- The depths are lit like the houses: every emissive face (flames, lava, spore light, lanterns) becomes a baked light, and the stone takes
+  its glow, warm pools by the fires and darkness between, instead of one even tint. `DungeonLights` adds a fire on the wall every three tiles
+  of every room (torch sconces, skull shelves with candles, bracket fungus, ship's lanterns, lava seams) and hanging pieces from the vaults
+  (cage lamps, bone chandeliers, glowing roots, nets, cauldrons). Walls and floors are cut finer so the light has corners to land on.
+  The depth ambients are near neutral; each biome's cold lives in its unlit stone (`DungeonGenerator.Unlit`). No colliders and no
+  real lights were added.
+- Thirteen new inspectable discoveries connect objects with the people who left them. Authored eye-level `Vistas` provide repeatable
+  previews; physics checks and runtime interaction tests cover their approach and targeting. Both arrival directions are walked on all five depths.
+- World version is 5; souls saved in older geometry arrive at their zone's safe entry. Zone ids, class kits, torch choice and saved stat growth stay stable.
+
+### Checkpoint M validation
+| Check | Result |
+|---|---|
+| C# compilation | Runtime and Editor preflight and Unity compilation passed |
+| Generation and validator | final main project passed, 7506 checks; 5715/5715 dungeon floor cells and 337 gameplay points connected |
+| Automated playtest | final pass: 316 checks, 0 failures, including every new discovery and both arrival aisles on all five depths |
+| Visual review | 48 authored views across all 13 zones, plus existing world shots; refined the biome floor motifs, Marrow light, courtyard pools and the caravan/forge/chapel review poses |
+| Build source audit | 129 C# files, three shaders, the generated scene/meta and 375 world/menu asset files are byte-identical between the verified main project and cached build copy |
+| WebGL build and deployment | succeeded, 40.2 MB in all; the data file is 32.2 MB, up from 21.4 MB before the depth lighting pass. Published on gh-pages |
+| Depth lighting pass | all five depths baked (222 to 826 lights each); validator 7506 checks, playtest 316 checks, depth previews reviewed |
+
+The thirteen discoveries receive reading time based on their text length (up to twelve seconds). The world keeps its two PixelLit
+materials, at most three permanent point lights per active zone, and the separate carried torch. A real phone, Safari and Firefox have
+not been tested for this checkpoint.
 
 ## Checkpoint L — arrival, valley homes, evening and the carried soul (2026-11-06)
 - The southern arrival road ends at a black mountain tunnel, blocked by an invisible threshold. Two wagons and three waiting travellers

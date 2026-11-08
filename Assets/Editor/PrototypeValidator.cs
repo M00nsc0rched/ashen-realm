@@ -202,7 +202,7 @@ namespace AshenRealm.EditorTools
             One<GameBootstrap>();
             One<ImpactEffects>();
             One<Volume>();
-            r.Check(All<LoreInspectable>().Length == 4, "The blade, gallows, arrival tunnel and caravan must be inspectable");
+            r.Check(All<LoreInspectable>().Length >= 17, "Original lore and a discovery in every redesigned inhabited place and depth must be inspectable");
             var pixelCamera = One<PixelCamera>();
             var pause = One<PauseMenu>();
             if (pause != null)
@@ -562,6 +562,9 @@ namespace AshenRealm.EditorTools
 
             foreach (var zone in zones)
             {
+                var meshes = zone.GetComponentsInChildren<MeshFilter>(true).Where(m => m.sharedMesh != null).ToArray();
+                Debug.Log($"[AshenRealm][World] {zone.name}: {meshes.Length} meshes, {meshes.Sum(m => (long)m.sharedMesh.vertexCount)} vertices, " +
+                    $"{zone.GetComponentsInChildren<Collider>(true).Length} colliders");
                 r.Check(!string.IsNullOrEmpty(zone.Title) && !string.IsNullOrEmpty(zone.Subtitle), $"{zone.name} has no title card");
                 r.Check(zone.Entry != null && OnGround(zone.Entry.position), $"{zone.name}: entry is not on the ground");
                 r.Check(zone.Exit != null && OnGround(zone.Exit.position), $"{zone.name}: stair arrival is not on the ground");
@@ -572,6 +575,31 @@ namespace AshenRealm.EditorTools
                 Vector3 feet = zone.Entry.position + Vector3.up * 0.4f;
                 var overlaps = Physics.OverlapCapsule(feet, feet + Vector3.up * 1.1f, 0.33f, ~0, QueryTriggerInteraction.Ignore);
                 r.Check(overlaps.All(c => c.GetComponent<CharacterController>() != null), $"{zone.name}: entry overlaps {string.Join(", ", overlaps.Select(c => c.name))}");
+                if (zone.Exit != null)
+                {
+                    Vector3 returnFeet = zone.Exit.position + Vector3.up * 0.4f;
+                    var returnOverlaps = Physics.OverlapCapsule(returnFeet, returnFeet + Vector3.up * 1.1f, 0.33f, ~0, QueryTriggerInteraction.Ignore);
+                    r.Check(returnOverlaps.All(c => c.GetComponent<CharacterController>() != null),
+                        $"{zone.name}: returning player overlaps {string.Join(", ", returnOverlaps.Select(c => c.name))}");
+                }
+
+                Transform[] views = zone.GetComponentsInChildren<Transform>(true)
+                    .Where(t => t.parent != null && t.parent.name == "Vistas").ToArray();
+                r.Check(views.Length >= 2, $"{zone.name}: visual review needs at least two authored views");
+                r.Check(views.Select(v => v.name).Distinct().Count() == views.Length, $"{zone.name}: visual review names must be unique");
+                foreach (Transform view in views)
+                {
+                    Vector3 p = view.position;
+                    r.Check(!float.IsNaN(p.sqrMagnitude) && !float.IsInfinity(p.sqrMagnitude), $"{zone.name}/{view.name}: invalid camera position");
+                    var obstructions = Physics.OverlapSphere(p, 0.12f, ~0, QueryTriggerInteraction.Ignore)
+                        .Where(c => c.GetComponentInParent<Health>() == null).ToArray();
+                    r.Check(obstructions.Length == 0,
+                        $"{zone.name}/{view.name}: review camera is inside {string.Join(", ", obstructions.Select(c => c.name))}");
+                }
+                var discoveries = zone.GetComponentsInChildren<LoreInspectable>(true).Where(s => s.name.StartsWith("Discovery ")).ToArray();
+                r.Check(discoveries.Length > 0, $"{zone.name}: the redesigned place has no environmental discovery");
+                foreach (var discovery in discoveries)
+                    r.Check(ScenicAccess.TryApproach(discovery, out _, out _), $"{zone.name}/{discovery.name}: no standing position can target the discovery within interaction reach");
             }
 
             foreach (var portal in portals)

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AshenRealm.Core;
 using AshenRealm.Interactions;
 using UnityEngine;
 
@@ -58,14 +59,79 @@ namespace AshenRealm.EditorTools
             BuildWindow();
             BuildBanners();
             BuildMonks();
+            BuildVotiveNave();
             Finish("Chapel_Room");
 
             Light("Chapel Candles", new Vector3(0f, ChoirFloor + 1.9f, 5f), new Color(1f, 0.72f, 0.42f), 8f, 0.9f, 0.2f);
+            WorldVista.Add(root, "Chapel_Processional_Nave", origin + new Vector3(0f, 1.65f, -8.1f), origin + new Vector3(0f, 3.1f, 7f));
+            WorldVista.Add(root, "Chapel_Votive_Alcove", origin + new Vector3(-0.3f, 1.65f, -4.9f), origin + new Vector3(-6.7f, 3f, -4.3f));
+            WorldVista.Add(root, "Chapel_Rose_and_Choir", origin + new Vector3(0f, 1.65f, 0.6f), origin + new Vector3(0f, 4.1f, 8.8f));
             Person(layout, "choir", new Vector3(0f, ChoirFloor, 4.75f), 0f, PeopleMeshes.Monk);
             return layout;
         }
 
         // ---- Floor, walls, ceiling -------------------------------------------------------------------------
+
+        void BuildVotiveNave()
+        {
+            // A pale inlaid aisle leads the eye between the dark pews and stops before the choir's steps.
+            for (float z = -8.6f; z < 1.5f; z += 0.74f)
+            {
+                room.SetColor(Pal.Stone, 0.62f);
+                room.Box(new Vector3(0f, 0.018f, z), new Vector3(1.48f, 0.025f, 0.7f));
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    room.SetColor(Pal.Brass, 0.38f);
+                    room.Box(new Vector3(side * 0.68f, 0.035f, z), new Vector3(0.055f, 0.012f, 0.65f));
+                }
+                room.Push(new Vector3(0f, 0.036f, z), Quaternion.Euler(0f, 45f, 0f), Vector3.one);
+                room.SetColor(Pal.PaintBlue, 0.35f);
+                room.Box(Vector3.zero, new Vector3(0.22f, 0.015f, 0.22f));
+                room.Pop();
+            }
+            TownDetailMeshes.CandleWheel(room, new Vector3(0f, 5.6f, -4.3f), 1.45f, 8.2f);
+            AddGlow(new Vector3(0f, 4.1f, -4.3f), CandleLight * 0.75f, 10f);
+
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Vector3 at = new Vector3(side * (HalfWidth - 0.3f), 0f, -4.3f);
+                TownDetailMeshes.RoseWindow(room, at + new Vector3(side * 0.14f, 5.4f, 0f), Quaternion.Euler(0f, side > 0f ? 90f : -90f, 0f), 1.05f);
+                AddGlow(at + new Vector3(-side * 0.8f, 4.4f, 0f), WindowLight * 1.25f, 8f);
+                room.ShadedBox(at + new Vector3(0f, 0.3f, 0f), new Vector3(0.7f, 0.6f, 2.05f), Pal.StoneMoss, rng, 0.34f, 0.46f);
+                room.ShadedBox(at + new Vector3(-side * 0.07f, 1.17f, 0f), new Vector3(0.83f, 0.18f, 2.25f), Pal.Stone, rng, 0.45f, 0.58f);
+                Solid("Votive Shrine", at + new Vector3(-side * 0.07f, 0.6f, 0f), new Vector3(0.88f, 1.2f, 2.25f));
+                room.SetColor(Pal.Stone, 0.42f);
+                room.Box(at + new Vector3(side * 0.12f, 2.06f, 0f), new Vector3(0.12f, 1.65f, 1.8f));
+                for (int i = 0; i < 5; i++)
+                {
+                    float z = -0.8f + i * 0.4f;
+                    Candle(at + new Vector3(-side * 0.25f, 1.28f, z), 0.14f + i % 3 * 0.08f);
+                    room.SetColor(Pal.Bone, 0.5f);
+                    room.Box(at + new Vector3(-side * 0.34f, 1.48f, z), new Vector3(0.04f, 0.14f, 0.22f));
+                }
+                foreach (float z in new[] { -1.18f, 1.18f })
+                {
+                    room.ShadedBox(at + new Vector3(0f, 1.8f, z), new Vector3(0.45f, 3.6f, 0.3f), Pal.Stone, rng, 0.37f, 0.5f);
+                    room.ShadedBox(at + new Vector3(0f, 3.65f, z), new Vector3(0.62f, 0.18f, 0.48f), Pal.Stone, rng, 0.45f, 0.56f);
+                }
+            }
+            WorldVista.Inspect(root, "Chapel Nameless Votive Shrine", origin + new Vector3(-6.27f, 1.7f, -4.3f),
+                new Vector3(0.2f, 1.2f, 1.75f), GameText.ChapelVotiveLore);
+
+            // Low stacks behind the rail support the book-keeper's work without hiding the central portrait or relics.
+            foreach (float side in new[] { -1f, 1f })
+            for (int pile = 0; pile < 3; pile++)
+            for (int book = 0; book < 4; book++)
+            {
+                Vector3 p = new Vector3(side * 5.45f, ChoirFloor + 0.08f + book * 0.15f, 7.1f + pile * 0.65f);
+                room.SetColor(book % 2 == 0 ? Pal.ClothRed : Pal.PaintBlue, 0.26f);
+                room.Push(p, Quaternion.Euler(0f, (book - 2) * 7f, 0f), Vector3.one);
+                room.Box(Vector3.zero, new Vector3(0.62f, 0.13f, 0.43f));
+                room.SetColor(Pal.Bone, 0.4f);
+                room.Box(new Vector3(0f, 0f, -0.22f), new Vector3(0.54f, 0.09f, 0.025f));
+                room.Pop();
+            }
+        }
 
         void BuildShell()
         {

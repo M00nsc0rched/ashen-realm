@@ -110,12 +110,17 @@ namespace AshenRealm.EditorTools
             BuildGate(layout);
             BuildPuddles();
             BuildFences();
+            BuildPilgrimRoute();
+            BuildVillageCourtyard();
+            DressCampAndGraves();
+            BuildDesignedGroves();
             ScatterTrees();
             ScatterRocks();
             ScatterFoliage();
             BuildMountains();
             BuildBoundary();
             FlushChunks();
+            AddScenicViews();
 
             layout.PlayerSpawn = Ground(SpawnCenter.x, SpawnCenter.y) + Vector3.up * 0.1f;
             layout.PlayerYaw = 0f;
@@ -150,6 +155,10 @@ namespace AshenRealm.EditorTools
             paths.Add(CatmullRom(new[] { new Vector2(-4f, -12f), new Vector2(8f, -15f), new Vector2(20f, -13f), new Vector2(30f, -14f), HamletCenter }));
             paths.Add(CatmullRom(new[] { HamletCenter, new Vector2(42f, -6f), new Vector2(48f, 2f), new Vector2(52f, 6f) }));
             paths.Add(CatmullRom(new[] { new Vector2(1f, 9f), new Vector2(13f, 13f), new Vector2(17f, 30f), new Vector2(14f, 50f), new Vector2(5f, 70f), GateCenter }));
+            paths.Add(CatmullRom(new[] { new Vector2(-3f, -65f), new Vector2(-16f, -64f), new Vector2(-24f, -58f), new Vector2(-27f, -52f),
+                new Vector2(-35f, -45f), new Vector2(-44f, -30f), new Vector2(-40f, -17f), GraveyardCenter }));
+            paths.Add(CatmullRom(new[] { GraveyardCenter, new Vector2(-43f, 13f), new Vector2(-46f, 32f), new Vector2(-41f, 44f),
+                new Vector2(-30f, 58f), new Vector2(-6f, 70f), new Vector2(5f, 70f) }));
         }
 
         static Vector2[] CatmullRom(Vector2[] points)
@@ -200,6 +209,7 @@ namespace AshenRealm.EditorTools
             flats.Add((HamletCenter, 14f, 8f, BaseHeight(HamletCenter.x, HamletCenter.y)));
             flats.Add((WindmillCenter, 4f, 9f, BaseHeight(WindmillCenter.x, WindmillCenter.y) + 1.8f));
             flats.Add((GateCenter, 8f, 9f, BaseHeight(GateCenter.x, GateCenter.y - 10f)));
+            flats.Add((new Vector2(-34f, -53f), 6f, 6f, BaseHeight(-34f, -53f) + 0.3f));
 
             clearings.Add((RuinsCenter, 19f));
             clearings.Add((new Vector2(0f, 10f), 10f));   // knight patrol ground
@@ -211,6 +221,9 @@ namespace AshenRealm.EditorTools
             clearings.Add((HamletCenter, 17f));
             clearings.Add((WindmillCenter, 7f));
             clearings.Add((GateCenter, 11f));
+            clearings.Add((new Vector2(-34f, -53f), 9f));
+            clearings.Add((new Vector2(-43f, 51f), 20f));
+            clearings.Add((new Vector2(-13f, -84f), 5f));
         }
 
         /// <summary>Trampled ground in the hamlet square.</summary>
@@ -491,6 +504,28 @@ namespace AshenRealm.EditorTools
                 b.ShadedBox(new Vector3(-2.55f + plank * 0.85f, 4.4f, 0.2f), new Vector3(0.8f, 8.8f, 0.3f), Pal.WoodDark, rng, 0.28f, 0.42f);
             b.ShadedBox(new Vector3(0f, 2.5f, -0.02f), new Vector3(6f, 0.4f, 0.1f), Pal.SteelDark, rng, 0.3f, 0.4f);
             b.ShadedBox(new Vector3(0f, 6.5f, -0.02f), new Vector3(6f, 0.4f, 0.1f), Pal.SteelDark, rng, 0.3f, 0.4f);
+            for (float x = -19f; x <= 19f; x += 2.2f)
+            {
+                if (Mathf.Abs(x) < 5.5f) continue;
+                b.ShadedBox(new Vector3(x, 9.65f, 1f), new Vector3(1.3f, 1.3f, 1.8f), Pal.Stone, rng, 0.32f, 0.5f);
+            }
+            foreach (float side in new[] { -1f, 1f })
+            {
+                b.SetColor(Pal.WoodDark, 0.3f);
+                b.Box(new Vector3(side * 4.2f, 7.7f, -1.45f), new Vector3(1.8f, 0.1f, 0.1f));
+                for (int fold = 0; fold < 6; fold++)
+                {
+                    b.SetColor(fold % 2 == 0 ? Pal.ClothRed : Pal.ClothDark, 0.45f);
+                    b.Box(new Vector3(side * 4.2f - 0.65f + fold * 0.26f, 5.8f, -1.45f - fold % 2 * 0.03f), new Vector3(0.27f, 3.7f, 0.04f));
+                }
+                b.SetColor(Pal.Brass, 0.6f);
+                b.Box(new Vector3(side * 4.2f, 6.25f, -1.52f), new Vector3(0.12f, 1.25f, 0.035f));
+                b.Box(new Vector3(side * 4.2f, 6.45f, -1.53f), new Vector3(0.7f, 0.12f, 0.035f));
+                b.SetColor(Pal.SteelDark, 0.38f);
+                b.Box(new Vector3(side * 3.7f, 3.2f, -1.55f), new Vector3(0.42f, 0.8f, 0.45f));
+                b.SetColor(Pal.Lantern, 0.65f);
+                b.Box(new Vector3(side * 3.7f, 3.45f, -1.8f), new Vector3(0.26f, 0.45f, 0.2f));
+            }
             b.Pop();
 
             layout.GatePosition = p;
@@ -905,6 +940,7 @@ namespace AshenRealm.EditorTools
             if (Vector2.Distance(new Vector2(x, z), HamletCenter) < 8f) return true;           // hamlet square
             foreach (var house in houseFootprints)
                 if (Vector2.Distance(new Vector2(x, z), house) < 5.5f) return true;
+            if (Vector2.Distance(new Vector2(x, z), new Vector2(-34f, -53f)) < 4f) return true;
             return Vector2.Distance(new Vector2(x, z), WindmillCenter) < 3f;
         }
 
@@ -997,6 +1033,40 @@ namespace AshenRealm.EditorTools
                 arrival.y = SurfaceHeight(arrival.x, arrival.z) + 0.1f;
                 layout.Homes.Add((door, arrival, h.yaw));
 
+                // Each cottage has a sheltered threshold, a flower box and its own work left outside.
+                chunk.Push(p, rotation, Vector3.one);
+                float doorX = -h.w * 0.12f, front = -h.d * 0.5f;
+                for (int board = 0; board < 5; board++)
+                {
+                    chunk.SetColor(Pal.Wood, 0.44f);
+                    chunk.Box(new Vector3(doorX - 0.8f + board * 0.4f, 0.09f, front - 0.5f), new Vector3(0.38f, 0.12f, 0.85f));
+                }
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    chunk.SetColor(Pal.WoodDark, 0.34f);
+                    chunk.Box(new Vector3(doorX + side * 1.05f, 1.45f, front - 1.0f), new Vector3(0.1f, 2.9f, 0.1f));
+                }
+                for (int strip = 0; strip < 8; strip++)
+                {
+                    chunk.SetColor(i == 0 ? Pal.ClothRed : i == 1 ? Pal.Thatch : Pal.ClothDark, strip % 2 == 0 ? 0.46f : 0.57f);
+                    chunk.SetLayer(TexLayer.Cloth, UVMode.Triplanar, 0.7f);
+                    float x = doorX - 1.2f + strip * 0.3f;
+                    chunk.QuadOutward(new Vector3(x, 3.03f, front + 0.08f), new Vector3(x + 0.3f, 3.03f, front + 0.08f),
+                        new Vector3(x + 0.3f, 2.75f, front - 1.25f), new Vector3(x, 2.75f, front - 1.25f), new Vector3(doorX, 0f, front));
+                    chunk.Box(new Vector3(x + 0.15f, 2.65f, front - 1.25f), new Vector3(0.3f, 0.24f, 0.035f));
+                }
+                chunk.SetColor(Pal.Wood, 0.35f);
+                Vector3 planter = new Vector3(h.w * 0.22f, 1.05f, front - 0.16f);
+                chunk.Box(planter, new Vector3(1.1f, 0.28f, 0.4f));
+                for (int flower = 0; flower < 5; flower++)
+                {
+                    chunk.SetColor(flower % 2 == 0 ? Pal.FlowerRed : Pal.FlowerYellow, 0.58f);
+                    chunk.Prism(planter + new Vector3(-0.4f + flower * 0.2f, 0.17f, 0f), 0.1f, 0.04f, 0.25f, 5);
+                }
+                chunk.Pop();
+                foreach (float side in new[] { -1f, 1f })
+                    AddBoxCollider("Cottage Porch Post", p + rotation * new Vector3(doorX + side * 1.05f, 1.45f, front - 1f), rotation, new Vector3(0.1f, 2.9f, 0.1f));
+
                 // Barrels and crates by each house.
                 for (int k = 0; k < 3; k++)
                 {
@@ -1076,6 +1146,209 @@ namespace AshenRealm.EditorTools
             PropMeshes.Signpost(signChunk, rng);
             signChunk.Pop();
             AddBoxCollider("Signpost", sign + Vector3.up * 1.2f, Quaternion.identity, new Vector3(0.2f, 2.4f, 0.2f));
+        }
+
+        void BuildPilgrimRoute()
+        {
+            Vector3 spring = Ground(-34f, -53f);
+            var basin = DecorChunk(spring.x, spring.z);
+            basin.Push(spring, Quaternion.identity, Vector3.one);
+            basin.SetColor(Pal.Black, 0.06f);
+            basin.Prism(Vector3.up * 0.02f, 2.5f, 2.5f, 0.1f, 18);
+            basin.SetColor(Pal.Water, 0.58f);
+            basin.Prism(Vector3.up * 0.14f, 2.28f, 2.28f, 0.035f, 18);
+            for (int i = 0; i < 18; i++)
+            {
+                float a = i * Mathf.PI * 2f / 18f;
+                basin.Push(new Vector3(Mathf.Cos(a) * 2.6f, 0.22f, Mathf.Sin(a) * 2.6f), Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f), Vector3.one);
+                basin.ShadedBox(Vector3.zero, new Vector3(0.55f, 0.34f, 0.92f), Pal.StoneMoss, rng, 0.3f, 0.52f);
+                basin.Pop();
+            }
+            foreach (float side in new[] { -1f, 1f })
+            {
+                basin.ShadedBox(new Vector3(side * 1.75f, 2.2f, 3.35f), new Vector3(0.85f, 4.4f, 0.95f), Pal.StoneMoss, rng, 0.3f, 0.5f);
+                basin.ShadedBox(new Vector3(side * 1.75f, 4.5f, 3.35f), new Vector3(1.1f, 0.3f, 1.15f), Pal.Stone, rng, 0.4f, 0.58f);
+                AddBoxCollider("Pilgrim Spring Pillar", spring + new Vector3(side * 1.75f, 2.2f, 3.35f), Quaternion.identity, new Vector3(0.85f, 4.4f, 0.95f));
+            }
+            basin.ShadedBox(new Vector3(0f, 4.75f, 3.35f), new Vector3(4.6f, 0.45f, 1.15f), Pal.Stone, rng, 0.35f, 0.52f);
+            basin.SetColor(Pal.WoodDark, 0.31f);
+            basin.Box(new Vector3(0f, 2.7f, 3.3f), new Vector3(0.04f, 3.8f, 0.04f));
+            basin.SetColor(Pal.Brass, 0.52f);
+            basin.Prism(new Vector3(0f, 0.7f, 3.3f), 0.48f, 0.18f, 0.8f, 10);
+            basin.SetColor(Pal.FireYellow, 0.78f);
+            basin.Prism(new Vector3(0f, 1.5f, 3.3f), 0.1f, 0f, 0.25f, 5);
+            for (int i = 0; i < 7; i++)
+            {
+                basin.SetColor(i % 2 == 0 ? Pal.ClothRed : Pal.Thatch, 0.46f);
+                float x = -1.4f + i * 0.46f;
+                basin.DoubleSided(new Vector3(x, 3.9f, 3.28f), new Vector3(x + 0.12f, 3.9f, 3.28f), new Vector3(x + 0.18f, 2.9f - i % 3 * 0.2f, 3.24f), Vector3.back);
+            }
+            basin.Pop();
+            WorldVista.Inspect(root, "Pilgrims Spring Lore", Ground(-31f, -53f) + Vector3.up * 1f, new Vector3(0.8f, 1.8f, 0.8f), GameText.SpringLore);
+
+            // A ruined high road makes a distant silhouette, with open arches at ground level.
+            for (int arch = 0; arch < 3; arch++)
+            {
+                float x = -54f + arch * 10f;
+                Vector3 at = Ground(x, 51f);
+                var b = DecorChunk(x, 51f);
+                b.Push(at, Quaternion.identity, Vector3.one);
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    b.ShadedBox(new Vector3(side * 4.2f, 3.2f, 0f), new Vector3(1.5f, 6.4f, 1.8f), Pal.StoneMoss, rng, 0.26f, 0.45f);
+                    AddBoxCollider("Old Viaduct Pier", at + new Vector3(side * 4.2f, 3.2f, 0f), Quaternion.identity, new Vector3(1.5f, 6.4f, 1.8f));
+                }
+                for (int stone = 0; stone <= 10; stone++)
+                {
+                    if (arch == 2 && stone > 5 && stone < 9) continue;
+                    float a = stone * Mathf.PI / 10f;
+                    b.Push(new Vector3(Mathf.Cos(a) * 3.6f, 5.7f + Mathf.Sin(a) * 3.6f, 0f), Quaternion.Euler(0f, 0f, a * Mathf.Rad2Deg), Vector3.one);
+                    b.ShadedBox(Vector3.zero, new Vector3(0.9f, 1.15f, 1.65f), Pal.Stone, rng, 0.3f, 0.49f);
+                    b.Pop();
+                }
+                if (arch < 2)
+                    b.ShadedBox(new Vector3(0f, 9.4f, 0f), new Vector3(10f, 0.7f, 2.15f), Pal.StoneMoss, rng, 0.3f, 0.48f);
+                b.Pop();
+            }
+            foreach (Vector2 spot in new[] { new Vector2(-20f, -64f), new Vector2(-42f, -37f), new Vector2(-45f, 24f), new Vector2(-23f, 63f) })
+            {
+                Vector3 p = Ground(spot.x, spot.y);
+                var b = DecorChunk(p.x, p.z);
+                b.ShadedBox(p + Vector3.up * 0.65f, new Vector3(0.6f, 1.3f, 0.6f), Pal.StoneMoss, rng, 0.3f, 0.5f);
+                AddBoxCollider("Pilgrim Road Marker", p + Vector3.up * 0.65f, Quaternion.identity, new Vector3(0.6f, 1.3f, 0.6f));
+                b.SetColor(Pal.Brass, 0.48f);
+                b.Box(p + new Vector3(0f, 1f, -0.31f), new Vector3(0.23f, 0.07f, 0.025f));
+            }
+        }
+
+        void BuildVillageCourtyard()
+        {
+            Vector3 well = Ground(34.3f, -10.8f);
+            var b = DecorChunk(well.x, well.z);
+            b.Push(well, Quaternion.identity, Vector3.one);
+            WayfarerMeshes.Well(b, rng);
+            b.Pop();
+            AddBoxCollider("Hamlet Well", well + Vector3.up * 1.8f, Quaternion.identity, new Vector3(2.75f, 3.6f, 2.4f));
+            for (int i = 0; i < 26; i++)
+            {
+                float a = i * Mathf.PI * 2f / 26f;
+                Vector3 p = Ground(well.x + Mathf.Cos(a) * 2.2f, well.z + Mathf.Sin(a) * 2.2f);
+                b.ShadedBox(p + Vector3.up * 0.025f, new Vector3(0.65f, 0.05f, 0.55f), Pal.Cobble, rng, 0.35f, 0.58f);
+            }
+            Vector3 lineA = Ground(27.5f, -18f), lineB = Ground(27f, -12f);
+            foreach (Vector3 at in new[] { lineA, lineB })
+            {
+                b.SetColor(Pal.WoodDark, 0.4f);
+                b.Box(at + Vector3.up * 1.55f, new Vector3(0.12f, 3.1f, 0.12f));
+                AddBoxCollider("Drying Line Post", at + Vector3.up * 1.55f, Quaternion.identity, new Vector3(0.14f, 3.1f, 0.14f));
+            }
+            WayfarerMeshes.Bunting(b, lineA + Vector3.up * 2.9f, lineB + Vector3.up * 2.9f, 8);
+            for (int garden = 0; garden < 3; garden++)
+            {
+                Vector3 at = Ground(39f + garden * 3f, -30f);
+                b.Push(at, Quaternion.identity, Vector3.one);
+                b.SetColor(Pal.DirtDark, 0.34f);
+                b.Box(new Vector3(0f, 0.02f, 0f), new Vector3(2.2f, 0.08f, 3.8f));
+                foreach (float side in new[] { -1f, 1f })
+                {
+                    WayfarerMeshes.Beam(b, new Vector3(side * 1.15f, 0.15f, -2f), new Vector3(side * 1.15f, 0.15f, 2f), 0.18f);
+                    WayfarerMeshes.Beam(b, new Vector3(-1.15f, 0.15f, side * 2f), new Vector3(1.15f, 0.15f, side * 2f), 0.18f);
+                }
+                for (int row = 0; row < 5; row++)
+                for (int plant = 0; plant < 3; plant++)
+                {
+                    b.SetColor(garden == 1 ? Pal.FlowerViolet : Pal.LeafGreen, 0.46f + plant * 0.07f);
+                    b.Prism(new Vector3(-0.68f + plant * 0.68f, 0.08f, -1.45f + row * 0.7f), 0.19f, 0.05f, garden == 1 ? 0.6f : 0.33f, 5);
+                }
+                b.Pop();
+            }
+            Vector3 wood = Ground(21.9f, -8.1f);
+            b.Push(wood, Quaternion.Euler(0f, -37f, 0f), Vector3.one);
+            WayfarerMeshes.LogPile(b, rng, 2.2f, 4);
+            b.Pop();
+            AddBoxCollider("Cottage Woodpile", wood + Vector3.up * 0.55f, Quaternion.Euler(0f, -37f, 0f), new Vector3(1.5f, 1.1f, 2.2f));
+            Vector3 hay = Ground(55f, -27f);
+            b.Push(hay, Quaternion.identity, Vector3.one);
+            b.SetColor(Pal.Thatch, 0.56f);
+            b.Prism(Vector3.zero, 1.7f, 1.2f, 1.5f, 12);
+            b.Prism(Vector3.up * 1.5f, 1.2f, 0.08f, 1.4f, 12);
+            b.Pop();
+            AddBoxCollider("Harvest Haystack", hay + Vector3.up * 1.1f, Quaternion.identity, new Vector3(2.8f, 2.2f, 2.8f));
+        }
+
+        void DressCampAndGraves()
+        {
+            Vector3 fire = Ground(CampCenter.x, CampCenter.y);
+            var b = DecorChunk(fire.x, fire.z);
+            foreach (float side in new[] { -1f, 1f })
+                WayfarerMeshes.Beam(b, fire + new Vector3(side * 1.2f, 0f, 0.25f), fire + new Vector3(0f, 2.4f, 0.25f), 0.09f);
+            b.SetColor(Pal.SteelDark, 0.3f);
+            b.Box(fire + new Vector3(0f, 1.5f, 0.25f), new Vector3(0.03f, 1.1f, 0.03f));
+            b.Prism(fire + new Vector3(0f, 0.8f, 0.25f), 0.26f, 0.34f, 0.36f, 10);
+            Vector3 supplies = Ground(22f, -37.5f);
+            b.Push(supplies, Quaternion.Euler(0f, 15f, 0f), Vector3.one);
+            WayfarerMeshes.LogPile(b, rng, 1.5f);
+            WayfarerMeshes.Bucket(b, new Vector3(1.1f, 0f, 0f), 1.1f);
+            b.Pop();
+            for (int i = 0; i < 15; i++)
+            {
+                float a = i * Mathf.PI * 2f / 15f;
+                if (i == 4 || i == 5 || i == 11) continue;
+                Vector3 at = Ground(GraveyardCenter.x + Mathf.Cos(a) * 10.5f, GraveyardCenter.y + Mathf.Sin(a) * 10.5f);
+                var stones = DecorChunk(at.x, at.z);
+                stones.ShadedBox(at + Vector3.up * 0.3f, new Vector3(1.1f, 0.6f, 0.8f), Pal.StoneMoss, rng, 0.3f, 0.52f);
+                AddBoxCollider("Sword Garden Memorial", at + Vector3.up * 0.3f, Quaternion.identity, new Vector3(1.1f, 0.6f, 0.8f));
+                stones.SetColor(Pal.Plaster, 0.58f);
+                stones.Prism(at + new Vector3(0f, 0.65f, 0f), 0.06f, 0.05f, 0.22f, 6);
+                stones.SetColor(Pal.FireYellow, 0.7f);
+                stones.Prism(at + new Vector3(0f, 0.87f, 0f), 0.025f, 0f, 0.1f, 4);
+            }
+            foreach (float side in new[] { -1f, 1f })
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 at = Ground(side * 12.5f, 25f + i * 8f);
+                var stones = DecorChunk(at.x, at.z);
+                stones.ShadedBox(at + Vector3.up * 0.25f, new Vector3(1.8f, 0.5f, 1.8f), Pal.StoneMoss, rng, 0.3f, 0.45f);
+                int drums = 3 + (i + (side < 0f ? 1 : 0)) % 3;
+                for (int drum = 0; drum < drums; drum++)
+                {
+                    stones.SetColor(Pal.StoneMoss, 0.38f + drum % 2 * 0.08f);
+                    stones.Prism(at + Vector3.up * (0.5f + drum * 0.8f), 0.5f, 0.47f, 0.78f, 8);
+                }
+                float height = 0.5f + drums * 0.8f;
+                AddBoxCollider("Chapel Garden Column", at + Vector3.up * (height * 0.5f), Quaternion.identity, new Vector3(1.1f, height, 1.1f));
+            }
+        }
+
+        void BuildDesignedGroves()
+        {
+            var points = new List<Vector2>
+            {
+                new Vector2(-8f, -72f), new Vector2(9f, -64f), new Vector2(-11f, -47f), new Vector2(10f, -34f),
+                new Vector2(-23f, -58f), new Vector2(-41f, -57f),
+            };
+            for (int row = 0; row < 2; row++)
+            for (int col = 0; col < 3; col++) points.Add(new Vector2(15f + col * 5.4f, -34f + row * 6f));
+            for (int i = 0; i < points.Count; i++)
+            {
+                Vector2 point = points[i];
+                Vector3 at = Ground(point.x, point.y) - Vector3.up * 0.12f;
+                float scale = i < 6 ? 1.1f : 0.8f;
+                PlaceTree(autumnVariants[i % autumnVariants.Length], at, Quaternion.Euler(0f, i * 37f, 0f), scale);
+                treePositions.Add(point);
+                AddBoxCollider("Orchard And Road Tree", at + Vector3.up * 2f, Quaternion.identity, new Vector3(0.55f, 4f, 0.55f));
+            }
+        }
+
+        void AddScenicViews()
+        {
+            WorldVista.Add(root, "Pilgrims Spring", Ground(-25f, -58f) + Vector3.up * 1.7f, Ground(-34f, -53f) + Vector3.up * 2f);
+            WorldVista.Add(root, "Hamlet Well Court", Ground(29f, -16f) + Vector3.up * 1.7f, Ground(35f, -10f) + Vector3.up * 1.7f);
+            WorldVista.Add(root, "Forgotten High Road", Ground(-20f, 44f) + Vector3.up * 1.7f, Ground(-44f, 51f) + Vector3.up * 5.2f);
+            WorldVista.Add(root, "Sword Garden", Ground(-23f, -14f) + Vector3.up * 1.7f, Ground(-33f, -4f) + Vector3.up * 1.8f);
+            WorldVista.Add(root, "Chapel Procession", Ground(11f, 17f) + Vector3.up * 1.7f, Ground(0f, 34f) + Vector3.up * 3.3f);
+            WorldVista.Add(root, "Wayfarers Hearth", Ground(18f, -48f) + Vector3.up * 1.7f, Ground(26f, -42f) + Vector3.up * 1.3f);
+            WorldVista.Add(root, "Hollowgate Pilgrims Approach", Ground(0f, 79f) + Vector3.up * 1.7f, Ground(0f, 92f) + Vector3.up * 5f);
         }
 
         void BuildPuddles()

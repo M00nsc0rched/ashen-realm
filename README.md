@@ -72,15 +72,22 @@ Growth and the torch choice are saved with the soul; class unlocks belong to the
 - Choose a class. Each has its own health, weapon, starting honor and two abilities.
 - Look south at the dark, closed mountain tunnel and the waiting caravan that brought you here.
 - Visit the three furnished cottages beside the valley road; each door returns to its own doorstep.
+- Explore the hamlet's working yards, the pilgrims' spring, the broken viaduct and the sword garden. Look for objects with
+  **MEGVIZSGÁLÁS**: the places and the people who left them have short stories to discover.
 - Follow the dirt road north from the fenced spawn lane toward the ruined chapel.
 - The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,
   then strike. 4 sword hits defeat it, and the gate behind the chapel opens.
 - Inside the chapel, aim at the **chest** at the altar and press E / HASZNÁL ("LÁDA KINYITÁSA") for gold and a healing draught.
 - In **Üregkapu**, talk to the Dark Wanderer and the townsfolk. Temper your weapon, buy potions, buy back your honor.
+- Leave the market road for the Well of Names and Lantern Court; look up at the rooflines, hanging signs and window light.
+  The tavern, forge, chapel and three homes each have their own furnishings and a discoverable memento.
 - Sunset fades along the road. By the city it is evening; returning to the valley keeps that light. The first city arrival
   takes out your torch, which the inventory can put away or draw again. The townsfolk breathe and turn; the smith works his hammer.
 - The tavern door is the stair down. Every depth has packs, a named terror, chests and encounters whose text changes
   with your honor. A Legendary Guardian bars each stair; the Gloamlord waits at the bottom.
+- The five depths have different architecture and routes: a memorial nave in the Catacombs, a luminous fungal grove,
+  the drowned docks, the chained furnace, and the ribbed cathedral of Marrow. Side galleries and loops give the journey
+  landmarks to find beyond its guardian and stair.
 - If you fall in battle you rise again at the zone's entry after a few seconds.
 
 ## Batch mode

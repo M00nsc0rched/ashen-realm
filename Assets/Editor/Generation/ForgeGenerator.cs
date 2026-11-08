@@ -1,3 +1,4 @@
+using AshenRealm.Core;
 using UnityEngine;
 
 namespace AshenRealm.EditorTools
@@ -47,9 +48,13 @@ namespace AshenRealm.EditorTools
             BuildRack();
             BuildCorners();
             BuildWindow();
+            BuildWorkshopCharacter();
             Finish("Forge_Room");
 
             Light("Forge Fire", new Vector3(HearthX, 1.5f, HalfDepth - 1f), new Color(1f, 0.48f, 0.2f), 9f, 1.5f, 0.5f);
+            WorldVista.Add(root, "Forge_Fire_and_Work", origin + new Vector3(0.2f, 1.65f, -3.5f), origin + new Vector3(-1.7f, 1.7f, 4.6f));
+            WorldVista.Add(root, "Forge_Armour_and_Plans", origin + new Vector3(-2.7f, 1.65f, -3.7f), origin + new Vector3(-5.8f, 1.6f, -1.8f));
+            WorldVista.Add(root, "Forge_Cold_Quench", origin + new Vector3(4.2f, 1.65f, 2.8f), origin + new Vector3(4.75f, 0.9f, 4.65f));
 
             var layout = new ForgeLayout
             {
@@ -63,6 +68,59 @@ namespace AshenRealm.EditorTools
         }
 
         // ---- Floor, walls, ceiling -------------------------------------------------------------------------
+
+        void BuildWorkshopCharacter()
+        {
+            // A cooler corner balances the orange furnace: quenching water, wet flags and spare billets.
+            var trough = new Vector3(4.75f, 0f, 4.65f);
+            room.ShadedBox(trough + Vector3.up * 0.31f, new Vector3(1.7f, 0.62f, 0.9f), Pal.WetStone, rng, 0.3f, 0.45f);
+            room.SetColor(Pal.Black, 0.18f);
+            room.Box(trough + Vector3.up * 0.64f, new Vector3(1.42f, 0.035f, 0.65f));
+            room.SetColor(Pal.Water, 0.35f);
+            room.Current.Sheen = 0.8f;
+            room.Box(trough + Vector3.up * 0.655f, new Vector3(1.27f, 0.018f, 0.52f));
+            Solid("Quenching Trough", trough + Vector3.up * 0.35f, new Vector3(1.75f, 0.7f, 0.95f));
+            AddGlow(new Vector3(4.7f, 2.2f, 4.4f), StreetLight * 1.4f, 6f);
+            for (int i = 0; i < 7; i++)
+                room.ShadedBox(new Vector3(5.4f - (i % 3) * 0.24f, 0.1f + i / 3 * 0.11f, 3.7f), new Vector3(0.2f, 0.1f, 0.5f), Pal.SteelDark, rng, 0.32f, 0.48f);
+
+            // An unfinished harness gives the street-side corner a readable silhouette.
+            Vector3 stand = new Vector3(-4.6f, 0f, -3.8f);
+            Timber(stand + Vector3.up * 0.85f, new Vector3(0.14f, 1.7f, 0.14f), 0.35f);
+            Timber(stand + Vector3.up * 0.06f, new Vector3(0.9f, 0.12f, 0.65f), 0.4f);
+            room.SetColor(Pal.SteelDark, 0.45f);
+            room.Prism(stand + Vector3.up * 0.85f, 0.25f, 0.34f, 0.6f, 6);
+            room.Prism(stand + Vector3.up * 1.48f, 0.15f, 0.19f, 0.32f, 8);
+            room.SetColor(Pal.Black, 0.22f);
+            room.Box(stand + new Vector3(0f, 1.68f, -0.18f), new Vector3(0.24f, 0.045f, 0.05f));
+            foreach (float side in new[] { -1f, 1f })
+            {
+                room.SetColor(Pal.Steel, 0.4f);
+                room.Prism(stand + new Vector3(side * 0.38f, 1.29f, 0f), 0.19f, 0.13f, 0.16f, 6);
+            }
+            Solid("Unfinished Armour", stand + Vector3.up * 0.9f, new Vector3(1.02f, 1.8f, 0.68f));
+
+            Vector3 plan = new Vector3(-HalfWidth + 0.14f, 2.15f, -1.5f);
+            room.ShadedBox(plan, new Vector3(0.12f, 1.55f, 1.85f), Pal.WoodDark, rng, 0.3f, 0.44f);
+            room.SetColor(Pal.Bone, 0.48f);
+            room.Box(plan + Vector3.right * 0.08f, new Vector3(0.03f, 1.25f, 1.5f));
+            foreach (float side in new[] { -1f, 1f })
+            {
+                TownDetailMeshes.Beam(room, plan + new Vector3(0.105f, 0.4f, side * 0.18f), plan + new Vector3(0.105f, -0.2f, side * 0.32f), 0.025f, Pal.PaintBlue, 0.3f);
+                TownDetailMeshes.Beam(room, plan + new Vector3(0.105f, -0.2f, side * 0.32f), plan + new Vector3(0.105f, -0.49f, side * 0.2f), 0.025f, Pal.PaintBlue, 0.3f);
+                TownDetailMeshes.Beam(room, plan + new Vector3(0.105f, 0.4f, side * 0.18f), plan + new Vector3(0.105f, 0.23f, side * 0.51f), 0.025f, Pal.PaintBlue, 0.3f);
+            }
+            TownDetailMeshes.Beam(room, plan + new Vector3(0.105f, 0.4f, -0.18f), plan + new Vector3(0.105f, 0.4f, 0.18f), 0.025f, Pal.PaintBlue, 0.3f);
+            room.SetColor(Pal.Black, 0.18f);
+            room.Box(plan + new Vector3(0.13f, 0.16f, -0.1f), new Vector3(0.025f, 0.15f, 0.16f));
+            WorldVista.Inspect(root, "Forge Armour Plans", origin + plan + Vector3.right * 0.18f,
+                new Vector3(0.18f, 1.4f, 1.65f), GameText.ForgePlanLore);
+
+            // The path to the smith and the goods stays clear; these chains hang well above the player's head.
+            TownDetailMeshes.Beam(room, new Vector3(0.75f, 2.9f, 2.8f), new Vector3(0.75f, Height, 2.8f), 0.04f, Pal.SteelDark, 0.36f);
+            TownDetailMeshes.Beam(room, new Vector3(1.5f, 3f, 3.3f), new Vector3(1.5f, Height, 3.3f), 0.04f, Pal.SteelDark, 0.36f);
+            TownDetailMeshes.Ring(room, new Vector3(0.75f, 2.8f, 2.8f), 0.23f, 0.045f, Pal.SteelDark, 0.4f, 8);
+        }
 
         void BuildShell()
         {

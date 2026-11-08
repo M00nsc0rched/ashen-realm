@@ -305,6 +305,26 @@ namespace AshenRealm.EditorTools
         }
 
         /// <summary>
+        /// Where this mesh glows, gathered per grid cell of <paramref name="cell"/> metres: the area-weighted centre and colour
+        /// of every strongly emissive face (flames, lava, spore light), so a bake can light the stone around them.
+        /// </summary>
+        public void CollectGlows(float cell, Dictionary<Vector3Int, (Vector3 position, Color color, float area)> into)
+        {
+            for (int t = 0; t < triangles.Count; t += 3)
+            {
+                int i0 = triangles[t], i1 = triangles[t + 1], i2 = triangles[t + 2];
+                if (uv1[i0].y < 0.2f) continue;
+                Vector3 a = positions[i0], b = positions[i1], c = positions[i2];
+                float area = Vector3.Cross(b - a, c - a).magnitude * 0.5f;
+                if (area <= 0f) continue;
+                Vector3 centre = (a + b + c) / 3f;
+                var key = new Vector3Int(Mathf.FloorToInt(centre.x / cell), Mathf.FloorToInt(centre.y / cell), Mathf.FloorToInt(centre.z / cell));
+                into.TryGetValue(key, out var sum);
+                into[key] = (sum.position + centre * area, sum.color + colors[i0] * (area * uv1[i0].y), sum.area + area);
+            }
+        }
+
+        /// <summary>
         /// Appends another builder's triangles transformed by <paramref name="matrix"/> (after the current matrix).
         /// Matrices must not mirror (no negative scale), since source winding is kept.
         /// </summary>

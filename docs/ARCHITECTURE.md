@@ -159,6 +159,9 @@ interaction collider; the smith also has a hammer arm and timed particle sparks.
 | `Generation/PropMeshes` | Sword, shield, pines (bough cards), autumn trees, grass/flower/wheat cards, houses, windmill, lanterns, barrels, crates, chest, camp, knight parts |
 | `Generation/ValleyGenerator` | Smooth blended terrain, paths, ruins, graveyard, camp, hamlet, windmill, puddles, scattering, chunking, colliders, bounds |
 | `Generation/ArrivalGenerator`, `HamletGenerator` | Southern tunnel and caravan; three furnished cottages with distinct household props |
+| `Generation/WayfarerMeshes`, `TownDetailMeshes` | Details for the valley's roadside compositions and the city's architecture and interiors |
+| `Generation/DungeonArchitecture` | Biome-specific vaulted halls, floor motifs, wall reliefs and landmark/side-room compositions, merged into dungeon chunks |
+| `Generation/WorldVista`, `ScenicAccess` | Repeatable eye-level review views and nonblocking discoveries; physics checks for standing room and interaction reach |
 | `Generation/ActorFactory` | Player (with pixel camera and drifting leaves), Cursed Knight and chest hierarchies |
 | `Generation/HudBuilder` | HUD canvas (top bars, compass, emblem, pause), touch controls, layout rings, pause menu, pixel screen, generated UI sprites |
 | `Generation/MenuBuilder` | Menu canvas after the sketches: main menu, Codex, settings, confirm box, layout bar, and the shared gold widgets |
@@ -187,6 +190,21 @@ Cursed Knight patrolling its entrance. Branches: camp with campfire (26,−42), 
 (−32,−6) with an inspectable blade, hamlet of three half-timbered houses with lantern posts (34,−14), windmill on a
 rise (54,8) beside wheat fields. Playable area ≈ 206×206 m enclosed by rim hills and four invisible boundary walls;
 distant mountain ring at 215–330 m.
+
+The valley's side route links a pilgrims' spring, the broken viaduct and the sword garden; the hamlet has a shared well,
+working yards and gardens. The arrival tunnel stays physically closed. Hollowgate adds the Well of Names and Lantern Court
+off the main market road; door, shop and NPC positions keep their existing contracts. Evening light reveals silhouettes while
+vertex-lit amber pools mark the inhabited doorways.
+
+After dressing, `DungeonGenerator.LightTheHalls` puts a `DungeonLights` wall light every three tiles along each room's walls and a
+few hanging pieces under its vault; `BakeLight` then gathers every strongly emissive face per 2 m cell (`MeshBuilder.CollectGlows`)
+and bakes those glows into all 16 chunks with a spatial bucket lookup, over each biome's dim unlit colour.
+The five depths retain a tile-grid collision shell and unobstructed combat aisles. Each has a guaranteed landmark chamber,
+side galleries, biome-specific ceiling heights and extra links between rooms. Catacombs, Fungal, Harbor, Ember and Marrow
+use separate architectural compositions. A flood fill must reach every floor tile and every gameplay placement before the
+generator can finish; decoration joins the existing 16 static chunks without adding colliders. Each zone provides authored
+`Vistas` camera poses for `PreviewCapture`, and an inspectable discovery whose approach is checked using a standing capsule
+and the same three-metre sphere probe as `PlayerInteractor`. World version 5 sends older geometry saves to a safe zone entry.
 
 ### Web platform
 `GameBootstrap` leaves frame pacing to the browser on WebGL. Losing pointer lock (Esc in the browser) raises

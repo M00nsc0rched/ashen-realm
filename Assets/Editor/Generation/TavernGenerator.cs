@@ -1,3 +1,4 @@
+using AshenRealm.Core;
 using UnityEngine;
 
 namespace AshenRealm.EditorTools
@@ -47,11 +48,15 @@ namespace AshenRealm.EditorTools
             BuildBehindTheBar();
             BuildTables();
             BuildRopeAndLantern();
+            BuildHospitality();
             Finish("Tavern_Room");
 
             // Two real lights on top of the baked ones, so the fire and the great lantern still breathe.
             Light("Hearth Light", new Vector3(HearthX, 1.05f, HalfDepth - 1.5f), new Color(1f, 0.52f, 0.22f), 9f, 1.8f, 0.5f);
             Light("Rope Lantern", new Vector3(0f, 2.3f, 5.4f), new Color(1f, 0.68f, 0.36f), 8f, 0.9f, 0.15f);
+            WorldVista.Add(root, "Tavern_Hearth_and_Candlewheel", origin + new Vector3(0f, 1.65f, -2.8f), origin + new Vector3(-2.8f, 2f, 5.4f));
+            WorldVista.Add(root, "Tavern_Travellers_Tokens", origin + new Vector3(-4.7f, 1.65f, -5.1f), origin + new Vector3(-7.2f, 1.9f, -4.8f));
+            WorldVista.Add(root, "Tavern_Warm_Bar", origin + new Vector3(0f, 1.65f, -4.4f), origin + new Vector3(4.9f, 1.6f, 2.6f));
 
             var layout = new TavernLayout
             {
@@ -93,6 +98,55 @@ namespace AshenRealm.EditorTools
         }
 
         void Wall(Vector3 from, Vector3 to) => StoneWall(from, to, Height, WallThickness);
+
+        void BuildHospitality()
+        {
+            // The long warm axis joins the street to the stair without stealing the space people walk through.
+            TownDetailMeshes.Runner(room, new Vector3(0.35f, 0.018f, -0.5f), 1.65f, 10.6f, Pal.ClothRed);
+            TownDetailMeshes.CandleWheel(room, new Vector3(0.2f, 3.05f, -0.5f), 1.12f, Height - 0.15f);
+            AddGlow(new Vector3(0.2f, 2.8f, -0.5f), LampLight * 0.95f, 8f);
+            TownDetailMeshes.Pennants(room, new Vector3(-6.6f, 3.7f, -5.3f), new Vector3(6.6f, 3.7f, -5.3f), Pal.ClothRed, 14);
+
+            // Travellers leave their tokens on a board beside the door, not in front of anyone's conversation.
+            Vector3 wall = new Vector3(-HalfWidth + 0.16f, 1.95f, -4.85f);
+            room.ShadedBox(wall, new Vector3(0.14f, 1.6f, 1.8f), Pal.WoodDark, rng, 0.3f, 0.43f);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Timber(wall + new Vector3(0.09f, side * 0.8f, 0f), new Vector3(0.12f, 0.12f, 2f), 0.48f);
+                Timber(wall + new Vector3(0.09f, 0f, side * 0.9f), new Vector3(0.12f, 1.72f, 0.12f), 0.48f);
+            }
+            for (int i = 0; i < 9; i++)
+            {
+                Vector3 token = wall + new Vector3(0.15f, 0.5f - i / 3 * 0.48f, -0.6f + i % 3 * 0.58f);
+                room.SetColor(Pal.Thatch, 0.43f);
+                room.Box(token + Vector3.up * 0.13f, new Vector3(0.035f, 0.22f, 0.025f));
+                room.Push(token, Quaternion.Euler(0f, 0f, 90f), Vector3.one);
+                room.SetColor(i % 3 == 0 ? Pal.Brass : i % 3 == 1 ? Pal.Bone : Pal.PaintBlue, 0.4f + i % 2 * 0.1f);
+                room.Prism(Vector3.zero, 0.12f, 0.12f, 0.04f, i % 2 == 0 ? 6 : 8);
+                room.Pop();
+            }
+            Lantern(new Vector3(-6.9f, 2.85f, -4.85f), 0.65f);
+            AddGlow(new Vector3(-6.8f, 2.4f, -4.85f), LampLight * 0.85f, 5.5f);
+            WorldVista.Inspect(root, "Travellers Token Wall", origin + wall + new Vector3(0.2f, -0.2f, 0f),
+                new Vector3(0.2f, 1.45f, 1.7f), GameText.TavernTokenLore);
+
+            // Copper and dried bundles above the counter catch the fire instead of leaving the ceiling a blank slab.
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 p = new Vector3(5.5f, 2.7f + (i % 2) * 0.15f, -1.2f + i * 0.75f);
+                TownDetailMeshes.Beam(room, p + Vector3.up * 0.3f, new Vector3(p.x, Height - 0.1f, p.z), 0.025f, Pal.SteelDark, 0.35f);
+                room.SetColor(Pal.Brass, 0.36f);
+                room.Prism(p, 0.22f, 0.3f, 0.3f, 10);
+                TownDetailMeshes.Ring(room, p + Vector3.up * 0.31f, 0.3f, 0.035f, Pal.Brass, 0.48f, 10);
+            }
+            // A meal and a folded cloth make the near table feel recently used.
+            room.SetColor(Pal.Bone, 0.52f);
+            room.Prism(new Vector3(4.5f, TableHeight + 0.025f, -5.3f), 0.24f, 0.24f, 0.025f, 10);
+            room.SetColor(Pal.Thatch, 0.53f);
+            room.Prism(new Vector3(4.5f, TableHeight + 0.055f, -5.3f), 0.14f, 0.11f, 0.09f, 8);
+            room.SetColor(Pal.ClothRed, 0.38f);
+            room.Box(new Vector3(5.15f, TableHeight + 0.04f, -5.2f), new Vector3(0.33f, 0.025f, 0.45f));
+        }
 
         void BuildTimber()
         {

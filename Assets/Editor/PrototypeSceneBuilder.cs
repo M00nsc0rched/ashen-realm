@@ -280,37 +280,40 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(zone, "fogEnd", fogEnd);
         }
 
-        /// <summary>The five depths, from Graveborne's BIOMES table (colours lifted so the torch has something to show).</summary>
+        /// <summary>
+        /// The five depths, from Graveborne's BIOMES table. The ambient stays near neutral: each depth's own cold lives in its
+        /// baked stone (`DungeonGenerator.Unlit`), so the fires on its walls can stay warm instead of turning to its tint.
+        /// </summary>
         static BiomeStyle[] Biomes() => new[]
         {
             new BiomeStyle
             {
                 Name = "Catacombs", Decor = DungeonDecor.Catacombs, Wall = Pal.Stone, WallBand = Pal.RockDark, Floor = Pal.Cobble, FloorPatch = Pal.Stone, Ceiling = Pal.RockDark,
-                Ambient = new Color(0.66f, 0.6f, 0.78f), Fog = new Color(0.14f, 0.12f, 0.2f), FogStart = 8f, FogEnd = 52f,
+                Ambient = new Color(0.84f, 0.8f, 0.9f), Fog = new Color(0.14f, 0.12f, 0.2f), FogStart = 8f, FogEnd = 52f,
                 Enemies = new[] { "rat", "bat", "skeleton", "skeleton", "ooze" }, Elite = "gravemaw", Keeper = "morr", Encounters = new[] { "well", "beggar" },
             },
             new BiomeStyle
             {
                 Name = "Fungal", Decor = DungeonDecor.Fungal, Wall = Pal.FungalRock, WallBand = Pal.RockDark, Floor = Pal.Dirt, FloorPatch = Pal.StoneMoss, Ceiling = Pal.FungalRock,
-                Ambient = new Color(0.5f, 0.72f, 0.6f), Fog = new Color(0.09f, 0.18f, 0.14f), FogStart = 8f, FogEnd = 52f,
+                Ambient = new Color(0.74f, 0.86f, 0.8f), Fog = new Color(0.09f, 0.18f, 0.14f), FogStart = 8f, FogEnd = 52f,
                 Enemies = new[] { "ooze", "wolf", "ghoul", "bat" }, Elite = "sporetyrant", Keeper = "mycel", Encounters = new[] { "sporewife", "cage" },
             },
             new BiomeStyle
             {
                 Name = "Harbor", Decor = DungeonDecor.Harbor, Wall = Pal.WetStone, WallBand = Pal.RockDark, Floor = Pal.Wood, FloorPatch = Pal.WetStone, Ceiling = Pal.RockDark,
-                Ambient = new Color(0.5f, 0.68f, 0.68f), Fog = new Color(0.08f, 0.16f, 0.17f), FogStart = 7f, FogEnd = 48f,
+                Ambient = new Color(0.74f, 0.82f, 0.86f), Fog = new Color(0.08f, 0.16f, 0.17f), FogStart = 7f, FogEnd = 48f,
                 Enemies = new[] { "drownedthrall", "drownedthrall", "shade", "bat" }, Elite = "undertow", Keeper = "brine", Encounters = new[] { "ferryman", "shrine" },
             },
             new BiomeStyle
             {
                 Name = "Ember", Decor = DungeonDecor.Ember, Wall = Pal.Basalt, WallBand = Pal.RockDark, Floor = Pal.Basalt, FloorPatch = Pal.DirtDark, Ceiling = Pal.Basalt,
-                Ambient = new Color(0.92f, 0.62f, 0.5f), Fog = new Color(0.26f, 0.12f, 0.07f), FogStart = 9f, FogEnd = 56f,
+                Ambient = new Color(0.94f, 0.8f, 0.72f), Fog = new Color(0.26f, 0.12f, 0.07f), FogStart = 9f, FogEnd = 56f,
                 Enemies = new[] { "cultist", "imp", "rotpriest", "cultist" }, Elite = "cinderprophet", Keeper = "pyraxes", Encounters = new[] { "forgewidow" },
             },
             new BiomeStyle
             {
                 Name = "Marrow", Decor = DungeonDecor.Marrow, Wall = Pal.BoneWall, WallBand = Pal.Stone, Floor = Pal.BoneWall, FloorPatch = Pal.Stone, Ceiling = Pal.BoneWall,
-                Ambient = new Color(0.72f, 0.68f, 0.6f), Fog = new Color(0.2f, 0.18f, 0.15f), FogStart = 9f, FogEnd = 56f,
+                Ambient = new Color(0.8f, 0.78f, 0.88f), Fog = new Color(0.12f, 0.1f, 0.18f), FogStart = 9f, FogEnd = 56f,
                 Enemies = new[] { "skeleton", "archer", "bonehound", "shade" }, Elite = "marrowcantor", Keeper = "gloamlord", Encounters = new[] { "bonechoir" },
             },
         };

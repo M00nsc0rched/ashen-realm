@@ -1095,6 +1095,53 @@ namespace AshenRealm.EditorTools
             inventory.Close();
             pause.Resume();
 
+            // Check both arrival directions on every redesigned depth with the real player capsule and input.
+            input = Object.FindAnyObjectByType<PlayerInputHub>();
+            for (int zoneIndex = 0; zoneIndex < zones.ZoneCount; zoneIndex++)
+            {
+                zones.Place(zoneIndex, Vector3.zero, 0f, false);
+                var discoveries = zones.Current.GetComponentsInChildren<LoreInspectable>();
+                foreach (var discovery in discoveries)
+                {
+                    if (!discovery.name.StartsWith("Discovery ")) continue;
+                    if (!Check(ScenicAccess.TryApproach(discovery, out Vector3 feet, out Quaternion look), $"{discovery.name}: the player can approach"))
+                        continue;
+                    Vector3 angles = look.eulerAngles;
+                    controller.Teleport(feet, angles.y, angles.x > 180f ? angles.x - 360f : angles.x);
+                    yield return 0.2f;
+                    var discoveryInteractor = controller.GetComponent<PlayerInteractor>();
+                    Check(ReferenceEquals(discoveryInteractor.Current, discovery), $"{discovery.name}: the real crosshair targets it");
+                    string message = null;
+                    void Receive(string value) => message = value;
+                    GameMessages.Notification += Receive;
+                    discovery.Interact(controller.gameObject);
+                    GameMessages.Notification -= Receive;
+                    Check(!string.IsNullOrEmpty(message), $"{discovery.name}: inspection reveals its story");
+                }
+            }
+            for (int depth = 0; depth < ZoneNumbers.DepthCount; depth++)
+            {
+                int index = ZoneNumbers.FirstDepth + depth;
+                zones.Place(index, Vector3.zero, 0f, false);
+                yield return 0.25f;
+                Check(zones.CurrentIndex == index && zones.Current.Underground && combat.Armed && controller.IsGrounded,
+                    $"Depth {depth + 1}: arrival grounds the armed player");
+                Vector3 fromEntry = controller.transform.position;
+                input.SetTouchMove(Vector2.up);
+                yield return 0.55f;
+                input.SetTouchMove(Vector2.zero);
+                Check(Flat(controller.transform.position - fromEntry).magnitude > 1f,
+                    $"Depth {depth + 1}: the entrance aisle can be walked");
+                controller.Teleport(zones.Current.Exit.position, zones.Current.Exit.eulerAngles.y);
+                yield return 0.25f;
+                Vector3 fromExit = controller.transform.position;
+                input.SetTouchMove(Vector2.up);
+                yield return 0.55f;
+                input.SetTouchMove(Vector2.zero);
+                Check(controller.IsGrounded && Flat(controller.transform.position - fromExit).magnitude > 1f,
+                    $"Depth {depth + 1}: the return aisle can be walked");
+            }
+
             ClearOwnSaveData();
         }
 

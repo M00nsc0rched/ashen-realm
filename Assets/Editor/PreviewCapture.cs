@@ -67,6 +67,21 @@ namespace AshenRealm.EditorTools
                 Save(camera, showHud ? hud : null, composite, Path.Combine(OutputFolder, name + ".png"));
             }
 
+            void Vistas(Zone zone, string prefix)
+            {
+                foreach (Transform group in zone.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Vistas"))
+                foreach (Transform view in group)
+                {
+                    string safeName = string.Concat(view.name.Select(c => char.IsLetterOrDigit(c) || c == '_' ? c : '_'));
+                    Shot(prefix + "_vista_" + safeName, view.position, view.position + view.forward * 10f, false, false);
+                }
+            }
+
+            var valley = roots.SelectMany(r => r.GetComponentsInChildren<Zone>(true)).First(z => !z.Indoors && !z.Underground && z.name == "Zone Valley");
+            Vistas(valley, "00_Valley");
+            camTransform.SetPositionAndRotation(originalPos, originalRot);
+            if (weapons != null) weapons.gameObject.SetActive(true);
+
             Save(camera, hud, composite, Path.Combine(OutputFolder, "01_spawn_first_person.png"));
             Vector3 arrivalGround = Ground(0f, -86f);
             Shot("01b_arrival_tunnel", arrivalGround + Vector3.up * 1.7f, new Vector3(0f, arrivalGround.y + 2.8f, -97f), false, false);
@@ -132,6 +147,11 @@ namespace AshenRealm.EditorTools
                 string prefix = $"{10 + i}_{zone.name.Replace("Zone ", "")}";
                 Vector3 entry = zone.Entry.position + Vector3.up * 1.62f;
                 Shot(prefix + "_a_arrival", entry, entry + zone.Entry.forward * 10f, !zone.Indoors, i == 2);
+                // Review the architecture in its own light, without a weapon obscuring the composition.
+                bool torchWasEnabled = torch != null && torch.enabled;
+                if (torch != null) torch.enabled = false;
+                Vistas(zone, prefix);
+                if (torch != null) torch.enabled = torchWasEnabled;
 
                 if (i == ZoneNumbers.FirstDepth)
                 {

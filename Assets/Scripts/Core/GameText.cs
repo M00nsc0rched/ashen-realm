@@ -20,6 +20,24 @@ namespace AshenRealm.Core
         public const string InspectBlade = "PENGE MEGVIZSGÁLÁSA";
         public const string BladeLore = "Egy lovag kardja, markolatig a földbe döfve. Markolatgombján megtört nap: a Hamvas Eskü jele.";
 
+        // Discoveries in the redesigned places.
+        public const string SpringLore = "A forrás kövei közé régi útjelzőket falaztak. Valaki minden ősszel friss virágot hoz ide, pedig az ösvény már sehová sem vezet.";
+        public const string WellLore = "A kút kávájába neveket karcoltak. Az újabb betűk mélyebbek: azokat vésték ide, akiknek már senki sem tudott sírt ásni.";
+        public const string WeaverLore = "A szövőszéken félbemaradt vászon feszül. A szegélybe apró napokat hímeztek, ugyanazt a jelet, amelyet az út menti kardok viselnek.";
+        public const string ProvisionerLore = "A polcon minden útravaló két adagra van osztva. A második csomaghoz kötött cédulán csak ennyi áll: annak, aki utánad érkezik.";
+        public const string ScribeLore = "A leveleken nincs címzett. Mind ugyanazzal a mondattal kezdődik: ha egyszer újra járható lesz a hágó...";
+        public const string TavernTokenLore = "A falra szegezett úti jelvényeket senki sem váltja már vissza. Aggie minden este letörli róluk a port, aztán eggyel több poharat készít ki.";
+        public const string ForgePlanLore = "A kohó falán régi páncél javítási rajza függ. Minden repedést kijelöltek rajta; a szív fölötti lyukat tinta fedi.";
+        public const string ChapelVotiveLore = "A kis oltárnál a gyertyák alatt üres névtáblák állnak. Itt azokért ég a fény, akiknek még a nevét is elvitte a mélység.";
+        public static readonly string[] DepthLandmarkLore =
+        {
+            "A sírfülkékbe nem rangot, hanem mesterséget véstek. Kovács, molnár, szövő: egy egész város alszik a másik alatt.",
+            "A gombák a régi lámpatartók köré nőttek. Hideg fényük ugyanazt az utat követi, amelyen egykor a sírásók jártak.",
+            "A csónak oldalába belülről karcoltak rovásokat. Még akkor is számolták az utasokat, amikor már nem volt part, ahol kiköthettek volna.",
+            "A kohót tartó láncokat egyenként nevezték el. A legvastagabbra ezt ütötték: hazatérés. Ez az egy szakadt el.",
+            "A csontkoronát nem egyetlen koponyából faragták. A trón minden viselője hozzátett egy darabot; az utolsó hely még üres."
+        };
+
         // Enemy
         public const string KnightName = "ÁTKOZOTT LOVAG";
         public const string KnightDefeated = "Az Átkozott Lovag elesett. Esküje végre megtört.";

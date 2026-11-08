@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using AshenRealm.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -47,8 +48,10 @@ namespace AshenRealm.EditorTools
         readonly Material material;
         readonly Vector3 origin;
         readonly System.Random rng;
-        MeshBuilder ground, buildings, foliageFree;
+        MeshBuilder ground, buildings, foliageFree, details;
         Transform root, colliderRoot;
+        readonly List<Vector3> windowGlows = new List<Vector3>();
+        readonly List<(Vector3 position, float strength)> courtyardGlows = new List<(Vector3, float)>();
 
         public CityGenerator(Material material, Vector3 origin, int seed)
         {
@@ -68,16 +71,31 @@ namespace AshenRealm.EditorTools
             ground = new MeshBuilder();
             buildings = new MeshBuilder();
             foliageFree = new MeshBuilder();
+            details = new MeshBuilder();
+            windowGlows.Clear();
+            courtyardGlows.Clear();
 
             BuildGround();
             BuildWalls();
             var layout = new CityLayout { Root = root };
             BuildDistricts(layout);
+            BuildStreetCharacter();
+            BuildCourtyards();
             BuildMountains();
+
+            // Amber windows stain the nearest stone while the rest keeps the blue evening light.
+            ground.Bake(WindowLightAt);
+            buildings.Bake(WindowLightAt);
+            details.Bake(WindowLightAt);
 
             Save(ground, "City_Ground", ShadowCastingMode.Off);
             Save(buildings, "City_Buildings", ShadowCastingMode.On);
             Save(foliageFree, "City_Mountains", ShadowCastingMode.Off);
+            Save(details, "City_Street_Details", ShadowCastingMode.On);
+            WorldVista.Add(root, "Hollowgate_Gate_and_Market", origin + new Vector3(0f, 1.65f, -54f), origin + new Vector3(0f, 3.6f, -8f));
+            WorldVista.Add(root, "Hollowgate_Well_of_Names", origin + new Vector3(-9f, 1.65f, 11f), origin + new Vector3(-15.5f, 1.6f, 19f));
+            WorldVista.Add(root, "Hollowgate_Lantern_Court", origin + new Vector3(8f, 1.65f, 12f), origin + new Vector3(15.5f, 2.4f, 19f));
+            WorldVista.Add(root, "Hollowgate_Tavern_Street", origin + new Vector3(0f, 1.65f, 15f), origin + new Vector3(0f, 3f, 32f));
             return layout;
         }
 
@@ -164,6 +182,23 @@ namespace AshenRealm.EditorTools
             buildings.Push(p, rotation, Vector3.one);
             PropMeshes.House(buildings, rng, width, depth, height, tiled);
             buildings.Pop();
+            details.Push(p, rotation, Vector3.one);
+            foreach (float side in new[] { -1f, 1f })
+            foreach (float windowX in new[] { width * 0.22f, -width * 0.36f })
+            {
+                if (side < 0f && windowX < 0f) continue;
+                Vector3 window = new Vector3(windowX, 0.6f + height * 0.62f, side * (depth * 0.5f + 0.18f));
+                TownDetailMeshes.Window(details, window, side < 0f ? 0f : 180f, true);
+                windowGlows.Add(p + rotation * (window + new Vector3(0f, -0.7f, side * 0.8f)));
+            }
+            if (width < 12f)
+            {
+                TownDetailMeshes.Awning(details, new Vector3(-width * 0.12f, 3f, -depth * 0.5f - 0.12f), 2.4f,
+                    tiled ? Pal.ClothRed : Pal.PaintBlue);
+                details.SetColor(Pal.Stone, 0.48f);
+                details.Box(new Vector3(-width * 0.12f, 0.05f, -depth * 0.5f - 0.45f), new Vector3(1.7f, 0.12f, 0.65f));
+            }
+            details.Pop();
             Box("House", p + Vector3.up * ((0.6f + height + depth * 0.5f) * 0.5f), new Vector3(width + 0.4f, 0.6f + height + depth * 0.5f, depth + 0.4f), rotation);
         }
 
@@ -187,8 +222,8 @@ namespace AshenRealm.EditorTools
             float[] rows = { -52f, -40f, -28f };
             foreach (float z in rows)
             {
-                House(-15f, z, 90f, 8f, 6f, 3.2f, z < -35f);
-                House(15f, z, -90f, 8f, 6f, 3.0f, z > -45f);
+                House(-15f, z, -90f, 8f, 6f, 3.2f, z < -35f);
+                House(15f, z, 90f, 8f, 6f, 3.0f, z > -45f);
             }
 
             // Back streets fill the corners, seen across the rooftops.
@@ -323,6 +358,181 @@ namespace AshenRealm.EditorTools
         {
             Prop(new Vector3(x, 0f, z), yaw, b => TownMeshes.MarketStall(b, rng, StallWidth, lantern, swept));
             Box("Stall", new Vector3(x, 0.5f, z), new Vector3(1.6f, 1f, StallWidth + 0.2f), Quaternion.identity);
+        }
+
+        Color WindowLightAt(Vector3 at, Vector3 normal)
+        {
+            Color light = Color.white;
+            foreach (Vector3 glow in windowGlows)
+            {
+                float reach = Mathf.Clamp01(1f - Vector3.Distance(at, glow) / 5.5f);
+                light += new Color(1.55f, 0.68f, 0.2f) * (reach * reach);
+            }
+            foreach (var glow in courtyardGlows)
+            {
+                float reach = Mathf.Clamp01(1f - Vector3.Distance(at, glow.position) / 6.5f);
+                light += new Color(1f, 0.48f, 0.12f) * (reach * reach * glow.strength);
+            }
+            return light;
+        }
+
+        void CourtyardLightPool(Vector3 centre, float radius)
+        {
+            // Small flags carry the baked gradient; a single six-metre ground quad would miss the pool's centre.
+            const float flag = 0.7f;
+            for (float x = -radius; x < radius; x += flag)
+            for (float z = -radius; z < radius; z += flag)
+            {
+                if (x * x + z * z > radius * radius) continue;
+                Vector3 p = centre + new Vector3(x, 0.028f, z);
+                details.SetColor(Pal.Cobble, 0.44f);
+                details.QuadOutward(p, p + Vector3.right * flag, p + new Vector3(flag, 0f, flag),
+                    p + Vector3.forward * flag, p + Vector3.down);
+            }
+        }
+
+        static void CourtyardLantern(MeshBuilder b, Vector3 p)
+        {
+            b.SetColor(Pal.SteelDark, 0.38f);
+            b.Prism(p, 0.16f, 0.16f, 0.045f, 6);
+            b.Prism(p + Vector3.up * 0.33f, 0.2f, 0.07f, 0.13f, 6);
+            foreach (float x in new[] { -0.12f, 0.12f })
+            foreach (float z in new[] { -0.12f, 0.12f })
+                b.Box(p + new Vector3(x, 0.18f, z), new Vector3(0.025f, 0.3f, 0.025f));
+            b.SetColor(Pal.Lantern, 0.43f);
+            b.Current.Emission = 0.55f;
+            b.Prism(p + Vector3.up * 0.045f, 0.115f, 0.115f, 0.28f, 6);
+        }
+
+        void BuildStreetCharacter()
+        {
+            // A clear processional street, framed above head height rather than filled with obstacles.
+            foreach (float z in new[] { -36f, -20f })
+                TownDetailMeshes.Pennants(details, new Vector3(-11.4f, 5.3f, z), new Vector3(11.4f, 5.5f, z + 1.2f), Pal.ClothRed, 22);
+            TownDetailMeshes.Pennants(details, new Vector3(-8f, 5.4f, 29f), new Vector3(8f, 5.4f, 29f), Pal.PaintBlue, 15);
+
+            // Stone drains and small paving courses give the broad ground plane an intentional rhythm.
+            foreach (float side in new[] { -1f, 1f })
+            for (float z = -56f; z < -12f; z += 1.1f)
+            {
+                details.SetColor(Pal.Stone, 0.35f);
+                details.Box(new Vector3(side * 3.65f, 0.025f, z), new Vector3(0.2f, 0.05f, 0.96f));
+            }
+            TownDetailMeshes.Ring(details, new Vector3(0f, 0.025f, 16f), 4.7f, 0.12f, Pal.Stone, 0.58f, 32);
+            TownDetailMeshes.Ring(details, new Vector3(0f, 0.028f, 16f), 4.3f, 0.055f, Pal.Brass, 0.32f, 32);
+            for (int i = 0; i < 8; i++)
+            {
+                float a = i * Mathf.PI * 0.25f;
+                Vector3 direction = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+                Vector3 across = new Vector3(direction.z, 0f, -direction.x);
+                Vector3 centre = new Vector3(0f, 0.032f, 16f);
+                details.SetColor(i % 2 == 0 ? Pal.Stone : Pal.SteelDark, i % 2 == 0 ? 0.58f : 0.35f);
+                details.Triangle(centre + direction * 4f, centre + direction * 1.2f + across * 0.34f,
+                    centre + direction * 1.2f - across * 0.34f, Vector3.up);
+            }
+
+            foreach (float side in new[] { -1f, 1f })
+            foreach (float z in new[] { -43f, -12f, 25f, 47f })
+            {
+                Vector3 p = new Vector3(side * 62.5f, 0f, z);
+                details.ShadedBox(p + Vector3.up * 3.1f, new Vector3(2.3f, 6.2f, 2f), Pal.StoneMoss, rng, 0.33f, 0.45f);
+                details.ShadedBox(p + Vector3.up * 6.3f, new Vector3(2.65f, 0.3f, 2.3f), Pal.Stone, rng, 0.4f, 0.52f);
+            }
+            foreach (float x in new[] { -Half, Half })
+            foreach (float z in new[] { -Half, Half })
+            {
+                details.SetColor(Pal.Stone, 0.42f);
+                details.Prism(new Vector3(x, 0f, z), 3.2f, 2.8f, 11.3f, 8);
+                details.SetColor(Pal.RoofTile, 0.31f);
+                details.Prism(new Vector3(x, 11.3f, z), 3.35f, 0f, 4.2f, 8);
+            }
+            foreach (Vector3 p in new[] { new Vector3(-11f, 0f, 27f), new Vector3(11f, 0f, 27f), new Vector3(22f, 0f, 11.5f) })
+                TownDetailMeshes.Planter(details, p, rng);
+
+            // The window-lit thresholds use small flags, so the warmth has vertices to land on.
+            foreach (Vector3 glow in windowGlows)
+            for (int x = -1; x <= 1; x++)
+            for (int z = -1; z <= 1; z++)
+            {
+                details.SetColor(Pal.Cobble, 0.45f);
+                details.Box(new Vector3(glow.x + x * 0.7f, 0.012f, glow.z + z * 0.7f), new Vector3(0.66f, 0.018f, 0.66f));
+            }
+        }
+
+        void BuildCourtyards()
+        {
+            var well = new MeshBuilder();
+            Vector3 centre = new Vector3(-15.5f, 0f, 19f);
+            well.Push(centre, Quaternion.identity, Vector3.one);
+            TownDetailMeshes.Ring(well, new Vector3(0f, 0.025f, 0f), 4.3f, 0.14f, Pal.Stone, 0.5f, 24);
+            well.SetColor(Pal.Black, 0.16f);
+            well.Prism(new Vector3(0f, 0.25f, 0f), 1.55f, 1.55f, 0.04f, 16);
+            for (int i = 0; i < 16; i++)
+            {
+                float a = i * Mathf.PI * 0.125f;
+                well.Push(new Vector3(Mathf.Cos(a) * 1.65f, 0.5f, Mathf.Sin(a) * 1.65f), Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f), Vector3.one);
+                well.ShadedBox(Vector3.zero, new Vector3(0.6f, 1f, 0.64f), Pal.StoneMoss, rng, 0.38f, 0.58f);
+                well.Pop();
+            }
+            TownDetailMeshes.Ring(well, new Vector3(0f, 1.04f, 0f), 1.66f, 0.25f, Pal.Stone, 0.56f);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                TownDetailMeshes.Beam(well, new Vector3(side * 1.95f, 0f, 0f), new Vector3(side * 1.95f, 3.65f, 0f), 0.2f);
+                well.Push(new Vector3(0f, 3.8f, side * 0.72f), Quaternion.Euler(side * 24f, 0f, 0f), Vector3.one);
+                well.SetColor(Pal.RoofTile, 0.42f);
+                well.Box(Vector3.zero, new Vector3(4.65f, 0.15f, 1.7f));
+                well.Pop();
+            }
+            TownDetailMeshes.Beam(well, new Vector3(-2.1f, 3.32f, 0f), new Vector3(2.1f, 3.32f, 0f), 0.18f);
+            TownDetailMeshes.Beam(well, new Vector3(0f, 3.28f, 0f), new Vector3(0f, 0.5f, 0f), 0.035f, Pal.Thatch, 0.5f);
+            well.SetColor(Pal.Wood, 0.38f);
+            well.Prism(new Vector3(1.2f, 1.16f, -0.65f), 0.22f, 0.28f, 0.4f, 8);
+            CourtyardLantern(well, new Vector3(0f, 2.65f, -0.78f));
+            TownDetailMeshes.Beam(well, new Vector3(0f, 3.11f, -0.78f), new Vector3(0f, 3.42f, -0.78f), 0.035f, Pal.SteelDark, 0.35f);
+            courtyardGlows.Add((centre + new Vector3(0f, 2.83f, -0.78f), 16f));
+            foreach (float side in new[] { -1f, 1f })
+            {
+                well.ShadedBox(new Vector3(side * 3.6f, 0.42f, 0f), new Vector3(0.65f, 0.16f, 2.3f), Pal.Stone, rng, 0.42f, 0.54f);
+                foreach (float z in new[] { -0.85f, 0.85f })
+                    well.ShadedBox(new Vector3(side * 3.6f, 0.2f, z), new Vector3(0.5f, 0.4f, 0.3f), Pal.Stone, rng, 0.3f, 0.4f);
+            }
+            well.Pop();
+            well.Bake(WindowLightAt);
+            Save(well, "City_Well_of_Names", ShadowCastingMode.On);
+            CourtyardLightPool(centre, 6.2f);
+            Box("Well of Names", centre + Vector3.up * 0.65f, new Vector3(4.3f, 1.3f, 4.3f), Quaternion.identity);
+            WorldVista.Inspect(root, "Well of Names Inscription", origin + centre + new Vector3(0f, 1.05f, -2.2f),
+                new Vector3(1.75f, 1.15f, 0.18f), GameText.WellLore);
+
+            var court = new MeshBuilder();
+            Vector3 tree = new Vector3(15.5f, 0f, 19f);
+            court.Push(tree, Quaternion.identity, Vector3.one);
+            TownDetailMeshes.Ring(court, new Vector3(0f, 0.32f, 0f), 2.2f, 0.48f, Pal.StoneMoss, 0.47f);
+            court.SetColor(Pal.DirtDark, 0.3f);
+            court.Prism(Vector3.zero, 2f, 2f, 0.16f, 16);
+            court.SetColor(Pal.Bark, 0.46f);
+            court.Prism(Vector3.zero, 0.38f, 0.16f, 5.5f, 7);
+            for (int i = 0; i < 7; i++)
+            {
+                float a = i * Mathf.PI * 2f / 7f;
+                Vector3 tip = new Vector3(Mathf.Cos(a) * 1.9f, 4.6f + (i % 3) * 0.45f, Mathf.Sin(a) * 1.9f);
+                TownDetailMeshes.Beam(court, new Vector3(0f, 2.5f + (i % 2) * 0.4f, 0f), tip, 0.13f, Pal.Bark, 0.4f);
+                court.Rock(tip, new Vector3(1.75f, 1.35f, 1.75f), rng, i % 2 == 0 ? Pal.LeafGold : Pal.LeafOrange, 0.35f, 0.57f, 0.22f);
+                court.SetColor(Pal.Thatch, 0.4f);
+                court.Box(tip + new Vector3(0f, -0.6f, 0f), new Vector3(0.025f, 1.1f, 0.025f));
+                CourtyardLantern(court, tip + Vector3.down * 1.3f);
+                courtyardGlows.Add((tree + tip + Vector3.down * 1.12f, 4f));
+            }
+            for (int i = 0; i < 35; i++)
+            {
+                court.SetColor(i % 2 == 0 ? Pal.LeafGold : Pal.LeafOrange, 0.4f);
+                court.Box(new Vector3(R(-2.8f, 2.8f), 0.014f, R(-2.8f, 2.8f)), new Vector3(0.12f, 0.012f, 0.09f));
+            }
+            court.Pop();
+            court.Bake(WindowLightAt);
+            Save(court, "City_Lantern_Court", ShadowCastingMode.On);
+            CourtyardLightPool(tree, 6.2f);
+            Box("Lantern Court Tree", tree + Vector3.up * 0.5f, new Vector3(4.8f, 1f, 4.8f), Quaternion.identity);
         }
 
         void BuildMountains()

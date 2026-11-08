@@ -64,16 +64,16 @@ namespace AshenRealm.Core
             eveningProgress = eveningLocked ? 1f : Mathf.Max(eveningProgress, travelled);
             float t = Mathf.SmoothStep(0f, 1f, eveningProgress);
             Color duskAmbient = new Color(0.49f, 0.4f, 0.43f);
-            Color nightAmbient = new Color(0.19f, 0.22f, 0.32f);
+            Color nightAmbient = new Color(0.3f, 0.33f, 0.44f);
             Color duskFog = new Color(0.56f, 0.34f, 0.3f);
-            Color nightFog = new Color(0.065f, 0.085f, 0.14f);
+            Color nightFog = new Color(0.09f, 0.115f, 0.19f);
             Apply(Color.Lerp(duskAmbient, nightAmbient, t), Color.Lerp(duskFog, nightFog, t), currentZone.FogStart, currentZone.FogEnd);
             Light sun = RenderSettings.sun;
             if (sun != null)
             {
                 sun.transform.rotation = Quaternion.Euler(Mathf.Lerp(13f, 2f, t), 110f, 0f);
                 sun.color = Color.Lerp(new Color(1f, 0.65f, 0.36f), new Color(0.48f, 0.57f, 0.8f), t);
-                sun.intensity = Mathf.Lerp(1.35f, 0.18f, t);
+                sun.intensity = Mathf.Lerp(1.35f, 0.26f, t);
                 sun.shadowStrength = Mathf.Lerp(0.85f, 0.55f, t);
             }
             if (eveningSky == null && RenderSettings.skybox != null)

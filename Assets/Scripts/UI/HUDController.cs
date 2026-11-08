@@ -128,7 +128,7 @@ namespace AshenRealm.UI
             // Two things said on one arrival share the box, or the second would wipe the first.
             notificationText.text = Time.frameCount == notificationFrame ? $"{notificationText.text}\n{message}" : message;
             notificationFrame = Time.frameCount;
-            notificationTimer = notificationDuration;
+            notificationTimer = Mathf.Max(notificationDuration, Mathf.Min(12f, notificationText.text.Length / 22f));
         }
 
         void Update()
