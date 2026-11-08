@@ -99,7 +99,9 @@ Exit codes: 0 ok, 1 generation failed, 2 validation failed. Search the log for `
 - If the project is open in the Editor, validate a copy (`robocopy` to `../_BatchValidation`, excluding Temp/Logs;
   delete `Library/EditorInstance.json`, `*.pid`, `*-lock` in the copy; re-sync `Assets/` before each run with `/XF *.meta`:
   an idle Editor has not written metas for new scripts yet, and mirroring would delete the copy's and break its scene).
-  Run robocopy from PowerShell: Git Bash rewrites its `/E` switches. New assets get their metas in the copy, so copy those
+  Leave the generated outputs out of that copy (`/XF *.meta *.unity /XD Assets\Art\Generated Assets\Prefabs`): robocopy also copies an
+  older file over a newer one, so the project's stale generated scene would replace the copy's fresh one, and a later playtest or
+  preview run would test the old world. Run robocopy from PowerShell: Git Bash rewrites its `/E` switches. New assets get their metas in the copy, so copy those
   `.meta` files back into the project, or the project and the copy disagree on GUIDs.
 
 ## Conventions

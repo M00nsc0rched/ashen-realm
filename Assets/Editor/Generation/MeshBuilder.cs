@@ -344,18 +344,95 @@ namespace AshenRealm.EditorTools
             }
         }
 
+        /// <summary>
+        /// While building, every triangle owns its corners, which keeps hard edges and baking simple. Saved, corners that
+        /// match in every attribute become one vertex: a quad's two triangles share two, a fan shares its centre. Nothing
+        /// renders differently; the download is about a third lighter.
+        /// </summary>
         public Mesh ToMesh(string name)
         {
+            var index = new Dictionary<CornerKey, int>(positions.Count);
+            var weldedPositions = new List<Vector3>();
+            var weldedNormals = new List<Vector3>();
+            var weldedColors = new List<Color>();
+            var weldedUv0 = new List<Vector4>();
+            var weldedUv1 = new List<Vector4>();
+            var weldedTriangles = new List<int>(triangles.Count);
+            foreach (int i in triangles)
+            {
+                var key = new CornerKey(positions[i], normals[i], colors[i], uv0[i], uv1[i]);
+                if (!index.TryGetValue(key, out int welded))
+                {
+                    welded = weldedPositions.Count;
+                    index.Add(key, welded);
+                    weldedPositions.Add(positions[i]);
+                    weldedNormals.Add(normals[i]);
+                    weldedColors.Add(Stepped(colors[i]));
+                    weldedUv0.Add(uv0[i]);
+                    weldedUv1.Add(uv1[i]);
+                }
+                weldedTriangles.Add(welded);
+            }
+
             var mesh = new Mesh { name = name };
-            mesh.indexFormat = positions.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
-            mesh.SetVertices(positions);
-            mesh.SetNormals(normals);
-            mesh.SetColors(colors);
-            mesh.SetUVs(0, uv0);
-            mesh.SetUVs(1, uv1);
-            mesh.SetTriangles(triangles, 0, true);
+            mesh.indexFormat = weldedPositions.Count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+            mesh.SetVertices(weldedPositions);
+            mesh.SetNormals(weldedNormals);
+            mesh.SetColors(weldedColors);
+            mesh.SetUVs(0, weldedUv0);
+            mesh.SetUVs(1, weldedUv1);
+            mesh.SetTriangles(weldedTriangles, 0, true);
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        /// <summary>
+        /// Baked light leaves every corner a colour of its own, and arbitrary floats barely compress: steps of 1/512 are finer
+        /// than the posterised screen can show, and they pack several times tighter in the web download.
+        /// </summary>
+        static Color Stepped(Color c)
+        {
+            const float steps = 512f;
+            return new Color(Mathf.Round(c.r * steps) / steps, Mathf.Round(c.g * steps) / steps, Mathf.Round(c.b * steps) / steps, c.a);
+        }
+
+        /// <summary>
+        /// A corner, rounded finely enough to be invisible: a quad's two triangles compute the same normal with different
+        /// last bits, and those corners should still merge.
+        /// </summary>
+        readonly struct CornerKey : System.IEquatable<CornerKey>
+        {
+            readonly int px, py, pz, nx, ny, nz, cr, cg, cb, ca, u0, u1, u2, u3, v0, v1, v2, v3;
+
+            public CornerKey(Vector3 p, Vector3 n, Color c, Vector4 uv, Vector4 parameters)
+            {
+                px = Q(p.x, 10000f); py = Q(p.y, 10000f); pz = Q(p.z, 10000f);
+                nx = Q(n.x, 4096f); ny = Q(n.y, 4096f); nz = Q(n.z, 4096f);
+                cr = Q(c.r, 4096f); cg = Q(c.g, 4096f); cb = Q(c.b, 4096f); ca = Q(c.a, 4096f);
+                u0 = Q(uv.x, 4096f); u1 = Q(uv.y, 4096f); u2 = Q(uv.z, 16f); u3 = Q(uv.w, 16f);
+                v0 = Q(parameters.x, 4096f); v1 = Q(parameters.y, 4096f); v2 = Q(parameters.z, 4096f); v3 = Q(parameters.w, 4096f);
+            }
+
+            static int Q(float value, float scale) => Mathf.RoundToInt(value * scale);
+
+            public bool Equals(CornerKey o) =>
+                px == o.px && py == o.py && pz == o.pz && nx == o.nx && ny == o.ny && nz == o.nz &&
+                cr == o.cr && cg == o.cg && cb == o.cb && ca == o.ca && u0 == o.u0 && u1 == o.u1 && u2 == o.u2 && u3 == o.u3 &&
+                v0 == o.v0 && v1 == o.v1 && v2 == o.v2 && v3 == o.v3;
+
+            public override bool Equals(object obj) => obj is CornerKey o && Equals(o);
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    int h = px;
+                    h = h * 397 ^ py; h = h * 397 ^ pz; h = h * 397 ^ nx; h = h * 397 ^ ny; h = h * 397 ^ nz;
+                    h = h * 397 ^ cr; h = h * 397 ^ cg; h = h * 397 ^ cb; h = h * 397 ^ u0; h = h * 397 ^ u1;
+                    h = h * 397 ^ u2; h = h * 397 ^ v1; h = h * 397 ^ v2;
+                    return h;
+                }
+            }
         }
 
         public static float Lerp(System.Random rng, float min, float max) => min + (float)rng.NextDouble() * (max - min);

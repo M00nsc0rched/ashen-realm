@@ -43,6 +43,7 @@ _Last updated: 2026-11-08_
 | Build source audit | 129 C# files, three shaders, the generated scene/meta and 375 world/menu asset files are byte-identical between the verified main project and cached build copy |
 | WebGL build and deployment | succeeded, 40.2 MB in all; the data file is 32.2 MB, up from 21.4 MB before the depth lighting pass. Published on gh-pages |
 | Depth lighting pass | all five depths baked (222 to 826 lights each); validator 7506 checks, playtest 316 checks, depth previews reviewed |
+| Download size | the lit depths took `WebGL.data` from 21.4 to 32.2 MB. The build report showed meshes at 167 MB uncompressed (130 before), and the cause was baked colours: every corner a different float, which barely compresses. `MeshBuilder.ToMesh` now welds identical corners (valley 582k to 223k vertices, meshes 167 to 98 MB) and stores colours in steps of 1/512: `WebGL.data` is 23.3 MB, 31.7 MB in all. Validator 7506 and playtest 316 passed on that build; previews show no banding |
 
 The thirteen discoveries receive reading time based on their text length (up to twelve seconds). The world keeps its two PixelLit
 materials, at most three permanent point lights per active zone, and the separate carried torch. A real phone, Safari and Firefox have

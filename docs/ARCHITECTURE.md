@@ -196,6 +196,8 @@ working yards and gardens. The arrival tunnel stays physically closed. Hollowgat
 off the main market road; door, shop and NPC positions keep their existing contracts. Evening light reveals silhouettes while
 vertex-lit amber pools mark the inhabited doorways.
 
+`MeshBuilder.ToMesh` welds corners that match in every attribute (a quad's two triangles share two) and rounds colours to 1/512:
+baked light leaves every corner a colour of its own, and unrounded floats were most of the web download.
 After dressing, `DungeonGenerator.LightTheHalls` puts a `DungeonLights` wall light every three tiles along each room's walls and a
 few hanging pieces under its vault; `BakeLight` then gathers every strongly emissive face per 2 m cell (`MeshBuilder.CollectGlows`)
 and bakes those glows into all 16 chunks with a spatial bucket lookup, over each biome's dim unlit colour.
