@@ -173,7 +173,7 @@ namespace AshenRealm.Story
         static EnemyMove Rage(string name, int weight) => new EnemyMove { Name = name, Kind = MoveKind.Buff, Weight = weight };
         static EnemyMove Ward(string name, int weight) => new EnemyMove { Name = name, Kind = MoveKind.Ward, Weight = weight };
 
-        public static readonly EnemyDefinition[] Enemies =
+        public static readonly EnemyDefinition[] Enemies = EnemyPatterns.Configure(new[]
         {
             // ---- Common foes ----
             new EnemyDefinition { Id = "rat", Name = "Pestispatkány", Body = EnemyBody.Beast, Health = 30f, Speed = 3.4f, Scale = 0.7f, GoldMin = 2, GoldMax = 6, AttackInterval = 1.6f,
@@ -288,7 +288,7 @@ namespace AshenRealm.Story
                     Hallowed = "»Tiszta kezek a Fehérvelőben. A csont majd megszokja.«",
                     Defeat = "»A csont... nem emlékszik... semmire...«",
                 } },
-        };
+        });
 
         public static EnemyDefinition Enemy(string id) => Enemies.FirstOrDefault(e => e.Id == id);
 

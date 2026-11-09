@@ -30,7 +30,7 @@ namespace AshenRealm.Core
         public const string Relic = "Ereklye";
         public static readonly string[] ClassWeapons =
         {
-            "Lovagbárd és pajzs", "Két sírtőr", "Boszorkánybot", "Buzogány és lámpás", "Csontbot és talizmán", "Reagensüveg és készlet"
+            "Holdbárd és nappajzs", "Sírtőr", "Agancsbot és kristály", "Virrasztó ikerpengék", "Láncos holdsarlók", "Zöld reagensüveg"
         };
         public const string Empty = "Üres";
         public const string BasicAttack = "Csapás";
@@ -46,7 +46,12 @@ namespace AshenRealm.Core
         public const string RaiseDefense = "VÉD +2";
         public const string RaiseMagic = "MÁG +2";
         public const string RaiseSpeed = "GYO +2";
-        public const string AbilityGuide = "A kaszt két fogása: Q / R, a vállgombok vagy az érintőgombok. A fejlesztések erre a lélekre érvényesek.";
+        public const string AbilityGuide = "Négy fogásból kettőt készíthetsz elő a Q / R helyre. Az előkészítés ingyenes, a fejlesztés lélekbe kerül. A várakozás csere után is megmarad.";
+        public const string EquipQ = "Q-hoz";
+        public const string EquipR = "R-hez";
+        public const string ActiveQ = "Q aktív";
+        public const string ActiveR = "R aktív";
+        public const string LoadoutSaved = "A két előkészített képességet elmentetted.";
         public const string CannotAfford = "Nincs elég lelked.";
         public const string Secret = "...";
         public const string SecretClasses = "JÁTSZHATÓ KASZTOK";

@@ -202,8 +202,10 @@ namespace AshenRealm.Combat
         void ThrowBolt()
         {
             if (projectiles == null) return;
-            Vector3 origin = aimOrigin.position + aimOrigin.forward * 0.8f + aimOrigin.right * 0.15f - aimOrigin.up * 0.1f;
             CharacterClass id = GameSession.Instance.Class.Id;
+            bool flaskInLeft = id == CharacterClass.Alchemist && GameSession.Instance.Weapon == null &&
+                (PlayerTorch.Instance == null || !PlayerTorch.Instance.Equipped);
+            Vector3 origin = aimOrigin.position + aimOrigin.forward * 0.8f + aimOrigin.right * (flaskInLeft ? -0.15f : 0.15f) - aimOrigin.up * 0.1f;
             BoltKind kind = id == CharacterClass.Necromancer ? BoltKind.Shadow : id == CharacterClass.Alchemist ? BoltKind.Venom : BoltKind.Fire;
             EnemyMove effect = id == CharacterClass.Alchemist ? new EnemyMove { PoisonDps = 3f, PoisonTime = 4f } : null;
             projectiles.Launch(kind, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true, effect, Drink);

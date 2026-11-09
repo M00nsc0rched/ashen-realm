@@ -4,10 +4,11 @@ namespace AshenRealm.Story
 {
     public enum CharacterClass { Knight, Gravethief, Witch, Warden, Necromancer, Alchemist }
     public enum Alignment { Marked, Mortal, Hallowed }
-    public enum AbilityEffect { ShieldBash, Rally, Backstab, PoisonBlade, LifeDrain, Hex, Smite, Mend, BoneSpear, BoneArmor, AcidFlask, HealingBrew }
+    public enum AbilityEffect { ShieldBash, Rally, Backstab, PoisonBlade, LifeDrain, Hex, Smite, Mend, BoneSpear, BoneArmor, AcidFlask, HealingBrew,
+        Whirlwind, IronSkin, FanOfKnives, Caltrops, FrostLance, ChainLightning, Sanctuary, Consecration, BoneNova, SoulHarvest, FireBomb, FlashPowder }
     public enum EnemyBody { Humanoid, Beast, Flyer, Blob }
     public enum EnemyRank { Common, Elite, Guardian, Boss }
-    public enum MoveKind { Melee, Bolt, Heal, Buff, Ward }
+    public enum MoveKind { Melee, Bolt, Heal, Buff, Ward, Charge, Sweep, Pounce, Ground, Teleport, Volley, Ring, Counter, Burrow }
     public enum BoltKind { Arrow, Fire, Shadow, Holy, Venom, Brine }
     public enum NpcService { None, Tavern, Forge, Chapel, Market }
     public enum ItemSlot { Weapon, Relic }
@@ -102,12 +103,27 @@ namespace AshenRealm.Story
         public float Heal;
         /// <summary>Bolts fired in one cast.</summary>
         public int Hits = 1;
+        public float Windup = 0.7f;
+        public float Recovery = 0.65f;
+        public float MinRange;
+        public float Range;
+        public float Radius = 2.5f;
+        public float ActiveTime = 0.45f;
+        public float TravelDistance = 6f;
+        public float Cooldown;
+        public int MinPhase = 1;
 
         public EnemyMove Poison(float dps, float seconds) { PoisonDps = dps; PoisonTime = seconds; return this; }
         public EnemyMove Stun(float seconds) { StunTime = seconds; return this; }
         public EnemyMove Weaken(float seconds) { WeakenTime = seconds; return this; }
         public EnemyMove Drain(float fraction) { Lifesteal = fraction; return this; }
         public EnemyMove Volley(int hits) { Hits = hits; return this; }
+        public EnemyMove Timing(float windup, float recovery) { Windup = windup; Recovery = recovery; return this; }
+        public EnemyMove Reach(float min, float max) { MinRange = min; Range = max; return this; }
+        public EnemyMove Area(float radius) { Radius = radius; return this; }
+        public EnemyMove Travel(float distance, float seconds) { TravelDistance = distance; ActiveTime = seconds; return this; }
+        public EnemyMove Phase(int phase) { MinPhase = phase; return this; }
+        public EnemyMove Rest(float seconds) { Cooldown = seconds; return this; }
     }
 
     public sealed class EnemyDialogue
@@ -144,6 +160,11 @@ namespace AshenRealm.Story
         public float AttackInterval = 2.2f;
         /// <summary>Bolt casters stop this far from the player instead of closing to melee.</summary>
         public float PreferredRange;
+        /// <summary>Circling while in reach; negative and positive values choose opposite sides.</summary>
+        public float Strafe;
+        public float PhaseTwoAt = 0.55f;
+        /// <summary>Zero for a two-phase foe.</summary>
+        public float PhaseThreeAt;
         public EnemyMove[] Moves;
         public EnemyDialogue Dialogue;
     }

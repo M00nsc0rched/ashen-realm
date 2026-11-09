@@ -3,7 +3,7 @@ using UnityEngine;
 namespace AshenRealm.EditorTools
 {
     /// <summary>Class-specific tools, all authored with the grip at the origin.</summary>
-    internal static class PlayerWeaponMeshes
+    internal static partial class PlayerWeaponMeshes
     {
         public static void Glove(MeshBuilder b)
         {
@@ -74,7 +74,8 @@ namespace AshenRealm.EditorTools
 
         public static void ReagentBottle(MeshBuilder b)
         {
-            b.SetColor(Pal.FungalGlow, 0.63f);
+            b.SetColor(Pal.FungalGlow, 0.43f);
+            b.Current.Emission = 0.03f;
             b.Prism(new Vector3(0f, 0.03f, 0f), 0.095f, 0.11f, 0.19f, 8);
             b.Prism(new Vector3(0f, 0.22f, 0f), 0.11f, 0.045f, 0.09f, 8);
             b.SetColor(Pal.Brass, 0.5f);
@@ -82,7 +83,7 @@ namespace AshenRealm.EditorTools
             b.SetColor(Pal.Wood, 0.42f);
             b.Prism(new Vector3(0f, 0.39f, 0f), 0.045f, 0.04f, 0.06f, 7);
             b.SetColor(Pal.Plaster, 0.78f);
-            b.Box(new Vector3(0f, 0.13f, -0.099f), new Vector3(0.09f, 0.1f, 0.016f));
+            b.Box(new Vector3(-0.045f, 0.13f, -0.099f), new Vector3(0.018f, 0.08f, 0.012f));
         }
 
         public static void AlchemistKit(MeshBuilder b)

@@ -25,13 +25,13 @@ namespace AshenRealm.EditorTools
     /// State survives the Play-mode domain reload through SessionState.
     /// </summary>
     [InitializeOnLoad]
-    public static class PlaytestRunner
+    public static partial class PlaytestRunner
     {
         const string StateKey = "AshenRealm.Playtest.State";   // 0 idle, 1 entering, 2 running, 3 finished
         const string ResultKey = "AshenRealm.Playtest.Result";
         const string BatchKey = "AshenRealm.Playtest.Batch";
         const string LogPrefix = "[AshenRealm][Playtest]";
-        const double TimeoutSeconds = 300.0;
+        const double TimeoutSeconds = 540.0;
 
         static IEnumerator routine;
         static float waitUntil;
@@ -484,7 +484,7 @@ namespace AshenRealm.EditorTools
             Check(session.Weapon == sword && session.Gold == goldBefore - sword.Price && sword.Price == 44, $"The Iron Sword costs what Graveborne asks ({session.Gold})");
             Check(Mathf.Approximately(combat.Damage, bareDamage + 9f), $"The sword bites harder ({bareDamage} to {combat.Damage})");
             Check(!shop.CanBuy, "What is already in the hand cannot be bought again");
-            Check(swordPivot.Find("Bought Iron Sword").gameObject.activeSelf && !swordPivot.Find("Knight Axe").gameObject.activeSelf, "The bought sword replaces the class's");
+            Check(swordPivot.Find("Bought Iron Sword").gameObject.activeSelf && !swordPivot.Find("Knight Crescent Polearm").gameObject.activeSelf, "The bought sword replaces the class's");
             shop.Select(2);
             goldBefore = session.Gold;
             shop.Buy();
@@ -650,11 +650,17 @@ namespace AshenRealm.EditorTools
                 Physics.SyncTransforms();
                 yield return 0.2f;
                 float focusNow = abilities.Focus;
-                float foeHealth = next.Health.Current;
                 health.SetCurrent(40f);
-                bool used = abilities.TryUse(0);
+                // Nearby pursuers can change the nearest target while the approach settles.
+                Health bashed = null;
+                float bashDamage = 0f;
+                void RecordBash(IDamageable target, float dealt) { bashed = target as Health; bashDamage = dealt; }
+                combat.HitLanded += RecordBash;
+                bool used;
+                try { used = abilities.TryUse(0); }
+                finally { combat.HitLanded -= RecordBash; }
                 Check(used && abilities.Focus < focusNow, "Shield Bash spends focus");
-                Check(next.Health.Current < foeHealth && next.GetComponent<StatusEffects>().Stunned, "Shield Bash hurts and stuns");
+                Check(bashed != null && bashDamage > 0f && bashed.GetComponent<StatusEffects>().Stunned, "Shield Bash hurts and stuns");
                 Check(health.Current > 40f, $"The Bloodstone drinks from the blow ({health.Current})");
             }
 
@@ -706,10 +712,10 @@ namespace AshenRealm.EditorTools
             }
             const string right = "Sword Pivot (Right Hand)", left = "Shield Pivot (Left Hand)";
             if (PlayerProgression.Instance.TorchEquipped) PlayerProgression.Instance.ToggleTorch();
-            Check(Held(right, "Knight Axe") && Held(left, "Shield"), "The knight holds the axe and shield of his class card");
+            Check(Held(right, "Knight Crescent Polearm") && Held(left, "Sun Shield"), "The knight holds the crescent polearm and sun shield on his class card");
             session.ChooseClass(CharacterClass.Gravethief);
-            Check(Held(right, "Dagger Right") && Held(left, "Dagger Left"), "The Gravethief holds two daggers");
-            Check(!Held(right, "Knight Axe") && !Held(left, "Shield"), "The Gravethief does not hold the knight's weapons");
+            Check(Held(right, "Dagger Right") && Held(left, "Bracing Hand"), "The Gravethief holds the card's single dagger and free bracing hand");
+            Check(!Held(right, "Knight Crescent Polearm") && !Held(left, "Sun Shield"), "The Gravethief does not hold the knight's weapons");
 
             // Settings, from the pause menu: everything applies at once.
             var pause = Object.FindAnyObjectByType<PauseMenu>();
@@ -1027,8 +1033,8 @@ namespace AshenRealm.EditorTools
                 "Class unlocks survive a scene reload");
 
             // All six kits use the models shown on their cards; saving and restoring keeps their identity.
-            string[] rightModels = { "Knight Axe", "Dagger Right", "Witch Staff", "Mace", "Necromancer Staff", "Reagent Bottle" };
-            string[] leftModels = { "Shield", "Dagger Left", "Casting Hand", "Hand Lantern", "Bone Talisman", "Alchemist Kit" };
+            string[] rightModels = { "Knight Crescent Polearm", "Dagger Right", "Witch Antler Staff", "Warden Crescent Right", "Necromancer Sickle Right", "Alchemist Ready Hand" };
+            string[] leftModels = { "Sun Shield", "Bracing Hand", "Casting Hand", "Warden Crescent Left", "Necromancer Sickle Left", "Reagent Bottle" };
             for (int classId = 0; classId < 6; classId++)
             {
                 session.ChooseClass((CharacterClass)classId);
@@ -1037,6 +1043,17 @@ namespace AshenRealm.EditorTools
                 Transform heldLeft = rig.Find(left + "/" + leftModels[classId]);
                 Check(heldRight != null && heldRight.gameObject.activeInHierarchy && heldLeft != null && heldLeft.gameObject.activeInHierarchy,
                     $"Class {classId} holds its own right and left hand models");
+                if (classId == (int)CharacterClass.Alchemist)
+                {
+                    PlayerProgression.Instance.ToggleTorch();
+                    Transform torchFlask = rig.Find(right + "/Alchemist Torch Flask");
+                    Check(PlayerTorch.Instance.Equipped && torchFlask != null && torchFlask.gameObject.activeInHierarchy &&
+                          !heldRight.gameObject.activeInHierarchy && !heldLeft.gameObject.activeInHierarchy,
+                        "The alchemist carries the torch in the left hand and moves the flask to the right");
+                    PlayerProgression.Instance.ToggleTorch();
+                    Check(!torchFlask.gameObject.activeInHierarchy && heldLeft.gameObject.activeInHierarchy && heldRight.gameObject.activeInHierarchy,
+                        "Putting the torch away restores the alchemist's left flask and free right hand");
+                }
                 soulKeeper.Save();
                 SoulRecord classSave = soulKeeper.LatestSoul();
                 soulKeeper.Load(classSave);
@@ -1142,6 +1159,9 @@ namespace AshenRealm.EditorTools
                     $"Depth {depth + 1}: the return aisle can be walked");
             }
 
+            foreach (float pauseFor in EnemyCombatPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in AbilityPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in RunCityNpcScenario()) yield return pauseFor;
             ClearOwnSaveData();
         }
 

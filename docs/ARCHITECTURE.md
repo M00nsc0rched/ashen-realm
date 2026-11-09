@@ -31,6 +31,9 @@ Later additions: `AI/` gained `EnemyAI`, `ICreatureAnimator`, `CreatureAnimator`
 `Story/SoulKeeper`, `SaveStore`, `SaveData`, `CodexBook`, `ISavedState`.
 Checkpoint L adds `Player/PlayerProgression`, `PlayerTorch`; `AI/NpcIdleAnimator`; `UI/InventoryPanel`, `SecretStatsPanel`,
 `HoldMenuButton`, `ClassPortrait`; and `Core/InventoryText`.
+Checkpoint N adds `Story/AbilityBook`, `EnemyPatterns`, `CityActivityLedger`; `AI/EnemyAttackTelegraph`,
+`IEnemyAttackAnimator`, `EncounterIdleAnimator`; `Interactions/CityActivity`; and `Core/CityText`. Ability tiers and equipped
+slots belong to `PlayerProgression`; the persistent city ledger listens for dungeon kills while the city zone is inactive.
 
 ### Zones
 Thirteen zones sit 1000 m apart along X (`World/ZoneNumbers`) and all stay active in the Editor, so the validator can raycast them.
@@ -55,6 +58,43 @@ Souls for relics, through `SoulKeeper`), equips the item in `GameSession` and tr
 reaches the same counter from the seller's dialogue or from a `ShopFixture` on the goods themselves. `PlayerClassRig` adds the points to
 the class's numbers and swaps the right-hand model; `PlayerProgression` composes saved growth on top. Weapon and relic ids are saved in `SoulRecord`.
 
+The starting kits follow the class-card paintings: crescent polearm and sun shield, grave dagger, antler staff and casting
+hand, twin warden blades, chained crescent sickles, and the alchemist's green reagent flask. `CardWeaponMeshes` extends
+`PlayerWeaponMeshes` with the same grip-at-origin convention and visible class hands. `EquipmentIconBuilder` photographs
+these mesh recipes and the four shop weapons into transparent sprites; `InventoryPanel` changes its icon with the actual
+equipped item. Drawing a torch hides the left-hand model; for an alchemist without a purchased weapon, the flask moves to
+the right hand. This visual refresh does not reapply stats or clear skill cooldowns.
+
+### City services and inhabitants
+`CityActivitiesGenerator` puts five `CityActivity` targets beside the existing streets. Each target has a small trigger for
+the normal three-metre interaction probe; decoration adds no solid obstruction. `CityActivityLedger.Use` applies the result
+to the real health, focus, gold, potions or honor and saves it:
+
+| Target | Cost and result |
+|---|---|
+| Well | 3 gold for 25 health and 3 focus |
+| Market supplies | 30 gold for two healing potions |
+| Memorial candle | 10 gold for 8 honor |
+| Lantern-tree rest | 8 gold for 15 health and full focus |
+| Watch board | Accept, review or claim the current contract |
+
+The four paid services are limited by saved `city_n_service_<kind>_<descent>` flags. The actual tavern-to-first-depth arrival
+starts the next allowance. A fully restored visitor keeps their money and well/rest allowance; insufficient funds leave
+every service unchanged. The three watch contracts require 3, 5 and 7 distinct dungeon foes and pay 35/55/75 gold plus
+4/6/8 Souls. Accepted, counted enemy keys and paid flags live in the soul's existing flags. The ledger is outside every
+zone so it can listen to `EnemyAI.Slain` underground; its deferred `LateUpdate` save also includes the ordinary enemy's
+cleared flag and loot. A city death or a repeated notification for the same enemy cannot advance the contract.
+
+`PeopleMeshes` gives the city merchant and five depth merchants different hats, faces, coats and stock. `NpcIdleAnimator`
+animates a separate counting arm as well as breathing and turning. `NpcCampGenerator` furnishes each depth merchant's
+workshop with its own stock, rug, table, packs and baked lantern glow. Camps add no colliders or realtime lights.
+
+`EncounterPeopleGenerator` authors all eight story encounters: the well woman and her bucket, ragged beggar, mushroom
+tender, ferryman with moving oar, forgewidow with tools, three skeletal singers, injured four-legged wolf in a cage, and
+skull-and-candle shrine. Their dishonored variants retain individual clothes and props. `EncounterIdleAnimator` moves
+the body and tool pivots (the wolf's head and tail, or the candle flame) while the original interaction capsule stays
+anchored. Dialogue, encounter ids and saved keys are unchanged; resolving an encounter also disables its vacated collider.
+
 ### Story flow
 `MainMenu` opens the game; its `Új lélek` opens `ClassCarousel`, a row of cards with the middle one's sheet beside it (time scale 0,
 gameplay input paused). The row is one float, and each card's place, size and light follow from its distance to it, so arrows, a
@@ -75,15 +115,18 @@ loses focus, and on demand. A load always starts from a fresh scene: the main me
 scene reloads first. So the world only ever loses what a soul cleared: each `ISavedState` (chest, foe, encounter, knight)
 has a unique key that doubles as a session flag, and loading calls `ApplyCleared` on those whose flag is set, in inactive
 zones too. Positions are trusted only while `SaveStore.WorldVersion` matches; otherwise the soul arrives at its zone's entry.
-World version 4 keeps the depth ids stable and adds the three valley homes.
+World version 5 keeps the depth and valley-home ids stable and sends saves from older geometry to a safe zone entry.
 
 The meta record outlives every soul: Souls (paid per rank and per Codex discovery, at Graveborne's rates), descents, the
 deepest depth, class unlocks and the Codex. `CodexBook` builds the Codex from `Catalog` and `StoryText`, so its total is always true.
 
-`ProgressRecord` belongs to one soul: level, stat bonuses, two ability tiers, food and torch choice. `PlayerProgression` spends Souls,
-applies the resulting combat/health/focus values and captures the record. Loading restores the session, then growth, then zone and
+`ProgressRecord` belongs to one soul: level, stat bonuses, four known ability tiers, two equipped ability indices, food and
+torch choice. `PlayerProgression` spends Souls, applies the resulting combat/health/focus values and captures the record.
+Loading restores the session, then growth, then zone and
 current health/focus. `InventoryPanel` presents equipment and abilities; `HoldMenuButton` opens `SecretStatsPanel` after five continuous
 unscaled seconds. The hidden editor changes the same saved values and unlock ledger, rather than a separate display-only copy.
+Older records retain their first two tiers through `AbilityOneTier`/`AbilityTwoTier`; the added skills start at tier one
+and an absent or invalid loadout becomes slots 0/1. Equipping a skill already in the other slot swaps the pair.
 Food is stored and editable; hunger upkeep is not implemented.
 
 Settings live in `GameSettings` and apply at once through its `Changed` event: `HudAppearance` fades the status elements
@@ -114,9 +157,10 @@ TouchJoystick / TouchLookArea / TouchButton ──Touch*()─┘                
   look never swings the sword: the STRIKE (`TÁMADÁS`) button is the only way to attack. The playtest checks this.
 
 ### Text and language
-All player-facing strings are Hungarian. HUD strings live in `Core/GameText`, menu strings in `Core/MenuText` and `Core/InventoryText` (builders and
-runtime scripts reference them; the web page template is translated separately). Menus draw with Spectral (three faces,
-`Assets/Art/Fonts`, SIL OFL), and the validator checks both menu string tables, the Codex and menu `Text` against the font's own glyphs. The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
+All player-facing strings are Hungarian. HUD strings live in `Core/GameText`, menu strings in `Core/MenuText` and
+`Core/InventoryText`, and city services in `Core/CityText` (builders and runtime scripts reference them; the web page template
+is translated separately). Menus draw with Spectral (three faces,
+`Assets/Art/Fonts`, SIL OFL), and the validator checks the menu string tables, the Codex and menu `Text` against the font's own glyphs. The web build's embedded `LegacyRuntime` font covers only U+0020–U+007E and
 U+00A0–U+017F (á é í ó ö ő ú ü ű are in; em dash, ellipsis and the minus sign are not), so the validator checks every
 `GameText` string, scene `Text` and interactable string against that range. Interaction prompts are written in upper
 case in `GameText` instead of being converted at runtime.
@@ -129,18 +173,47 @@ case in `GameText` instead of being converted at runtime.
   (1.2 per absorbed point). Running out of stamina breaks the guard.
 - `Health` raises `Damaged`, `Died`, `Changed`; `HitFlash`, `CameraEffects`, the HUD and AI subscribe.
 
+### Abilities and loadouts
+`AbilityBook.At` keeps stable indices for each class's original two skills and two additional skills: four per class,
+24 total. `InventoryPanel` shows all four with their descriptions, generated icons, three tiers and Q/R assignment buttons.
+`PlayerProgression` owns the four tiers and two distinct equipped indices, charges 25/48 Souls for tier two/three, and saves
+both upgrades and free loadout changes. The HUD and touch buttons follow the active slots, including their icons and cooldowns.
+
+`PlayerAbilities` resolves slot input through those indices and stores ready times by known ability, so moving a cooling
+skill between Q/R cannot make it ready. It spends focus only on a usable cast. New effects include close-area sweeps,
+protection, thrown knives, poison traps, a frost lance, chain lightning, sanctuary and consecration circles, bone nova,
+soul harvesting, fire bombs and flash powder. Their tiers affect real damage, duration, coverage or projectile count.
+`ImpactEffects` supplies visible spell bursts and ground markers; ongoing ability routines stop on death or zone change.
+
+### Enemy tactics
+`EnemyPatterns.Configure` gives each bestiary definition its own weighted move list, ranges, timings, cooldowns and health
+phase gates. `EnemyAI` selects an eligible move for range, line of sight and phase, and avoids repeating the previous move
+when another is available. Ranged foes keep their preferred distance and strafe; close attackers seek melee reach.
+Named terrors and guardians unlock additional techniques as health falls, with three phases for the Gloamlord.
+
+The shared executor supports melee blows, sweeps, rushes, leaps, burrowing, teleporting, marked ground attacks, hollow
+rings, counters, projectiles, volleys, healing and wards. Rush contact can hit once; ground effects commit to their warned
+position, and rings leave their centre safe. `EnemyAttackTelegraph` draws full-size floor outlines during wind-up, with
+lanes for rushes and leaps and an inner edge for rings. `IEnemyAttackAnimator` passes the move kind to `CreatureAnimator`
+or `KnightAnimator` for distinct preparations and burrowing poses; damage timing remains in AI. `EnemySignatureMeshes`
+adds characteristic weapons, crowns and other visible details to the named terrors and guardians.
+
 ### Cursed Knight FSM
 `Idle → Patrol → Chase → Attack → Dead` on a `CharacterController` (no NavMesh). Detection = radius + FOV + line of sight.
-Attacks: wind-up (telegraphed overhead raise), overlap-sphere hit at the chop, recovery; committed attacks have
-hyper-armour. A blocked blow makes the knight recoil. Losing the player resets its health and returns it to patrol.
+The separate valley tutorial knight cycles through an overhead chop, broad sweep and short rush, with different
+preparations, committed directions and recovery times. Hits resolve through overlap spheres; the sweep checks its front
+arc and the rush advances before contact. Committed attacks have hyper-armour. A blocked blow makes the knight recoil.
+Losing the player resets its health and attack sequence and returns it to patrol.
 Obstacle handling is a stuck-detector side-step, enough for the open valley.
 
 ### Procedural animation
 Weapons sit under `Main Camera/Weapon Rig/{Sword Pivot (Right Hand), Shield Pivot (Left Hand)}`. Swap the child meshes
 for animated models later without touching gameplay. The knight rig is `Model/Hips/{Leg L, Leg R, Torso/{Head, Arm L, Arm R, Cape}}`.
-All six classes have separate right/left hand models. `PlayerTorch` animates the supplied eight-frame warm/cold atlases with the
-`AshenRealm/TorchStrip` shader; drawing it hides the class's left-hand item. `NpcIdleAnimator` moves the figure without moving its
-interaction collider; the smith also has a hammer arm and timed particle sparks.
+All six classes have separate right/left hand models made from their card equipment recipes. `PlayerTorch` animates the
+supplied eight-frame warm/cold atlases with the `AshenRealm/TorchStrip` shader; drawing it hides the class's left-hand item.
+`NpcIdleAnimator` moves the figure without moving its
+interaction collider; the smith also has a hammer arm and timed particle sparks. `EncounterIdleAnimator` gives story figures
+their own working motions, independently of the stable encounter capsule.
 
 ## Editor generation (`Assets/Editor`)
 | File | Role |
@@ -148,7 +221,7 @@ interaction collider; the smith also has a hammer arm and timed particle sparks.
 | `PrototypeSceneBuilder` | Menu `Ashen Realm > Generate Prototype`; orchestrates everything, saves scene, build settings |
 | `PrototypeValidator` | Menu `Ashen Realm > Validate Prototype`; asset/scene/reference/placement/logic checks |
 | `IOSBuildConfigurator` | Menu `Ashen Realm > Apply iOS Player Settings` |
-| `PlaytestRunner` | Menu `Ashen Realm > Run Automated Playtest`; Play-mode scenario driven through the input hub |
+| `PlaytestRunner` | Menu `Ashen Realm > Run Automated Playtest`; Play-mode scenario driven through the input hub, extended by `AbilityPlaytestChecks`, `EnemyCombatPlaytestChecks` and `CityNpcPlaytests` |
 | `PreviewCapture` | Menu `Ashen Realm > Capture Preview Shots`; offscreen renders of key vantage points |
 | `MenuCapture` | Menu `Ashen Realm > Capture Menu Shots`; renders the menu screens at desktop and phone aspect |
 | `WebGLBuilder` | Menu `Ashen Realm > Build WebGL` → `Builds/WebGL` with the `AshenRealm` web template |
@@ -165,7 +238,10 @@ interaction collider; the smith also has a hammer arm and timed particle sparks.
 | `Generation/ActorFactory` | Player (with pixel camera and drifting leaves), Cursed Knight and chest hierarchies |
 | `Generation/HudBuilder` | HUD canvas (top bars, compass, emblem, pause), touch controls, layout rings, pause menu, pixel screen, generated UI sprites |
 | `Generation/MenuBuilder` | Menu canvas after the sketches: main menu, Codex, settings, confirm box, layout bar, and the shared gold widgets |
-| `Generation/InventoryMenuBuilder`, `TorchBuilder`, `PlayerWeaponMeshes` | Inventory/developer controls, supplied torch atlases and all six class kits |
+| `Generation/InventoryMenuBuilder`, `TorchBuilder`, `PlayerWeaponMeshes`, `CardWeaponMeshes` | Inventory/developer controls, supplied torch atlases and all six card-matched class kits |
+| `Generation/AbilityIconBuilder`, `EquipmentIconBuilder` | Painted pixel skill sprites; equipment icons photographed from the held mesh recipes |
+| `Generation/CityActivitiesGenerator`, `NpcCampGenerator`, `EncounterPeopleGenerator` | Working city targets, furnished merchant camps and distinct story encounter figures |
+| `Generation/EnemySignatureMeshes` | Characteristic details for named terrors and guardians |
 
 ### Rendering approach (pixel-art painterly look)
 - **Low-resolution world, crisp UI.** `PixelCamera` renders the world camera into a 360 px-high render texture with point
@@ -214,6 +290,7 @@ and the same three-metre sphere probe as `PlayerInteractor`. World version 5 sen
 main menu). The page template caps device pixel ratio and shows a rotate-device notice on phones in portrait.
 
 ## Extending
-- New enemy: reuse `Health`, `HitFlash`, implement an AI + animator pair, add a factory method, rerun the generator.
+- New enemy: add its `Catalog` definition and `EnemyPatterns` move list, build its look in `EnemyFactory`, and rerun the generator.
+  Reuse `EnemyAI`, `Health`, `HitFlash` and the animator contract; add a move executor only when its behavior needs one.
 - New interactable: implement `IInteractable` on a collider's GameObject (or a parent).
 - Replace art: drop models under the existing pivots / roots; gameplay components do not depend on mesh content.

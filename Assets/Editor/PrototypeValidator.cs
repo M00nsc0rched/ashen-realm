@@ -166,6 +166,15 @@ namespace AshenRealm.EditorTools
             One<ZoneManager>();
             One<GameSession>();
             One<StoryDirector>();
+            var cityLedger = One<CityActivityLedger>();
+            r.Check(cityLedger != null && cityLedger.GetComponentInParent<Zone>() == null && cityLedger.gameObject.activeSelf,
+                "City contracts must remain active while travelling underground");
+            var cityStations = All<CityActivity>();
+            r.Check(cityStations.Length == Enum.GetValues(typeof(CityActivityKind)).Length &&
+                cityStations.Select(s => s.Kind).Distinct().Count() == cityStations.Length,
+                "The city needs one working station for each of its five activities");
+            r.Check(cityStations.Select(s => s.ActivityId).Distinct().Count() == cityStations.Length,
+                "City activity identifiers must be unique");
             One<DialoguePanel>();
             One<ProjectileLibrary>();
             One<PlayerAbilities>();
@@ -264,17 +273,39 @@ namespace AshenRealm.EditorTools
             CheckPlacement(r, controller, knight, chest, lifecycle);
             CheckReach(r, combat, knight);
             CheckWorld(r, All<Zone>(), All<ZonePortal>(), All<EnemyAI>(), All<NpcActor>(), All<EncounterSite>());
+            foreach (ClassDefinition definition in Catalog.Classes)
+            {
+                AbilityDefinition[] kit = AbilityBook.All(definition);
+                r.Check(kit.Length == 4 && kit.All(a => a != null) && kit.Select(a => a.Effect).Distinct().Count() == 4,
+                    $"{definition.Name}: four distinct usable skills are required");
+                foreach (AbilityDefinition ability in kit)
+                    r.Check(ability.Cost >= 0 && ability.Cooldown > 0f, $"{ability.Name}: invalid skill cost or cooldown");
+            }
+            foreach (EnemyDefinition foe in Catalog.Enemies)
+            {
+                r.Check(foe.Moves != null && foe.Moves.Any(m => m.MinPhase == 1), $"{foe.Name}: no opening-phase move");
+                foreach (EnemyMove move in foe.Moves)
+                    r.Check(move.Windup > 0f && move.Recovery >= 0f && move.MinPhase >= 1 && move.MinPhase <= 3 && move.Radius > 0f,
+                        $"{foe.Name}/{move.Name}: invalid attack timing, radius or phase");
+                if (foe.Rank >= EnemyRank.Elite)
+                    r.Check(foe.Moves.Select(m => m.Kind).Distinct().Count() >= 3 && foe.Moves.Any(m => m.MinPhase > 1),
+                        $"{foe.Name}: a major foe needs distinct mechanics and a later-phase move");
+            }
+            foreach (EnemyAI foe in All<EnemyAI>())
+                r.Check(foe.GetComponentInChildren<EnemyAttackTelegraph>(true) != null,
+                    $"{foe.name}: readable attack telegraphs are missing");
         }
 
         /// <summary>Every player-facing string must be drawable by the font the WebGL build embeds.</summary>
         static void CheckText(Report r, GameObject[] roots)
         {
             var strings = new List<(string where, string text)>();
-            foreach (FieldInfo field in typeof(GameText).GetFields(BindingFlags.Public | BindingFlags.Static))
+            foreach (Type source in new[] { typeof(GameText), typeof(CityText) })
+            foreach (FieldInfo field in source.GetFields(BindingFlags.Public | BindingFlags.Static))
             {
                 object value = field.GetValue(null);
-                if (value is string s) strings.Add(($"GameText.{field.Name}", s));
-                else if (value is string[] array) strings.AddRange(array.Select(a => ($"GameText.{field.Name}", a)));
+                if (value is string s) strings.Add(($"{source.Name}.{field.Name}", s));
+                else if (value is string[] array) strings.AddRange(array.Select(a => ($"{source.Name}.{field.Name}", a)));
             }
             foreach (var text in roots.SelectMany(go => go.GetComponentsInChildren<UnityEngine.UI.Text>(true)))
             {
@@ -300,7 +331,11 @@ namespace AshenRealm.EditorTools
                 foreach (ClassCard card in Catalog.Cards)
                     CheckSpectral(r, font, $"Card {card.Art}", card.Name + card.Role + card.PassiveName + card.PassiveText);
                 foreach (ClassDefinition c in Catalog.Classes)
+                {
                     CheckSpectral(r, font, $"Story of {c.Name}", c.Backstory + c.Goal + c.Ability1.Name + c.Ability1.Description + c.Ability2.Name + c.Ability2.Description);
+                    foreach (AbilityDefinition skill in AbilityBook.All(c))
+                        CheckSpectral(r, font, $"Ability {c.Name}/{skill.Name}", skill.Name + skill.Description);
+                }
                 CheckSpectral(r, font, "Prologue", StoryText.Prologue);
             }
 
@@ -314,6 +349,7 @@ namespace AshenRealm.EditorTools
 
             strings.AddRange(Catalog.AllStrings().Where(s => s != null).Select(s => ("Catalog", s)));
             strings.AddRange(StoryText.AllStrings().Where(s => s != null).Select(s => ("StoryText", s)));
+            strings.AddRange(Catalog.Classes.SelectMany(AbilityBook.All).Select(a => ("AbilityBook", a.Name + a.Description)));
 
             foreach (var (where, text) in strings)
             {
@@ -381,7 +417,10 @@ namespace AshenRealm.EditorTools
                 Count(inventory, "portraits", Catalog.Classes.Length);
                 Count(inventory, "statistics", 10);
                 Count(inventory, "statButtons", 6);
-                foreach (string field in new[] { "abilityLabels", "abilityDescriptions", "upgradeLabels", "upgradeButtons" }) Count(inventory, field, 2);
+                foreach (string field in new[] { "abilityLabels", "abilityDescriptions", "upgradeLabels", "upgradeButtons", "abilityIcons", "equipQButtons", "equipRButtons", "equipQLabels", "equipRLabels" }) Count(inventory, field, 4);
+                Count(inventory, "skillIcons", Enum.GetValues(typeof(AbilityEffect)).Length);
+                Count(inventory, "classWeaponIcons", Catalog.Classes.Length);
+                Count(inventory, "goodsWeaponIcons", Catalog.ItemsOf(ItemSlot.Weapon).Length);
                 var so = new SerializedObject(inventory);
                 r.Check(so.FindProperty("inventoryPage").objectReferenceValue != so.FindProperty("abilitiesPage").objectReferenceValue,
                     "Inventory and abilities must have separate pages");

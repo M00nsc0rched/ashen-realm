@@ -1,4 +1,5 @@
 using AshenRealm.Core;
+using AshenRealm.Story;
 using UnityEngine;
 
 namespace AshenRealm.AI
@@ -7,7 +8,7 @@ namespace AshenRealm.AI
     /// Procedural animation for every humanoid rig: walk cycle, overhead chop, hit flinch,
     /// blocked recoil and death fall. Pure presentation — timing comes from <see cref="CursedKnightAI"/>.
     /// </summary>
-    public sealed class KnightAnimator : MonoBehaviour, ICreatureAnimator
+    public sealed class KnightAnimator : MonoBehaviour, ICreatureAnimator, IEnemyAttackAnimator
     {
         [Header("Rig")]
         [SerializeField] Transform model;
@@ -32,9 +33,13 @@ namespace AshenRealm.AI
         float recoilTime = -1f;
         float deathTime = -1f;
         Vector3 hitAngles, hitVelocity;
+        MoveKind attackStyle;
+        Vector3 modelRestPos;
+        float burrow;
 
         void Awake()
         {
+            modelRestPos = model.localPosition;
             torsoRest = torso.localRotation;
             torsoRestPos = torso.localPosition;
             headRest = head.localRotation;
@@ -44,6 +49,9 @@ namespace AshenRealm.AI
             legRightRest = legRight.localRotation;
             if (cape != null) capeRest = cape.localRotation;
         }
+
+        public void SetAttackStyle(MoveKind kind) => attackStyle = kind;
+        public void SetBurrow(float amount) => burrow = Mathf.Clamp01(amount);
 
         public void SetLocomotion(float normalizedSpeed) =>
             locomotion = Mathf.MoveTowards(locomotion, Mathf.Clamp01(normalizedSpeed), Time.deltaTime * 4f);
@@ -113,11 +121,49 @@ namespace AshenRealm.AI
             head.localRotation = headRest * Quaternion.Euler(headEuler);
             if (cape != null)
                 cape.localRotation = capeRest * Quaternion.Euler(10f * moving + Mathf.Sin(Time.time * 2.3f) * 3f, 0f, 0f);
+            model.localPosition = modelRestPos + Vector3.down * (burrow * 1.8f);
         }
 
         void EvaluateAttack(float dt, ref Vector3 torsoEuler, ref Vector3 armEuler)
         {
             attackTime += dt;
+            if (attackStyle != MoveKind.Melee)
+            {
+                float draw = Ease(attackTime / Mathf.Max(0.05f, attackWindup));
+                float release = attackTime <= attackWindup ? 0f : Ease((attackTime - attackWindup) / Mathf.Max(0.1f, attackRecovery));
+                float hold = draw * (1f - release);
+                switch (attackStyle)
+                {
+                    case MoveKind.Sweep:
+                        armEuler = new Vector3(-65f, -85f + release * 160f, 65f) * hold;
+                        torsoEuler += new Vector3(4f, (-65f + release * 150f) * hold, 0f);
+                        break;
+                    case MoveKind.Counter:
+                        armEuler = new Vector3(-105f, -25f, -45f) * hold;
+                        armLeft.localRotation = armLeftRest * Quaternion.Euler(-95f * hold, 0f, 45f * hold);
+                        torsoEuler += new Vector3(0f, -20f * hold, 0f);
+                        break;
+                    case MoveKind.Charge:
+                    case MoveKind.Pounce:
+                        armEuler = new Vector3(-85f, 0f, -18f) * hold;
+                        torsoEuler += new Vector3(28f * hold, 0f, 0f);
+                        break;
+                    case MoveKind.Ground:
+                    case MoveKind.Ring:
+                    case MoveKind.Burrow:
+                        armEuler = new Vector3(-175f, 0f, 25f) * hold;
+                        armLeft.localRotation = armLeftRest * Quaternion.Euler(-170f * hold, 0f, -25f * hold);
+                        torsoEuler += new Vector3(-14f * hold, 0f, 0f);
+                        break;
+                    default:
+                        armEuler = new Vector3(-80f, 0f, 5f) * hold;
+                        armLeft.localRotation = armLeftRest * Quaternion.Euler(-60f * hold, 0f, -35f * hold);
+                        torsoEuler += new Vector3(-6f * hold, 18f * hold, 0f);
+                        break;
+                }
+                if (attackTime >= attackWindup + attackRecovery) attackTime = -1f;
+                return;
+            }
             const float strikeTime = 0.14f;
             float raise, lean, twist;
             if (attackTime < attackWindup)

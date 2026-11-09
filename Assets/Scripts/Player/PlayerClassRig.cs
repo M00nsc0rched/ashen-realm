@@ -22,6 +22,8 @@ namespace AshenRealm.Player
         [SerializeField] GameObject[] weaponSets;
         [Tooltip("The goods of the Cold Forge, in Catalog order.")]
         [SerializeField] GameObject[] boughtWeapons;
+        [Tooltip("The alchemist moves the flask to the right hand when carrying a torch in the left.")]
+        [SerializeField] GameObject torchFlask;
 
         void Start()
         {
@@ -70,14 +72,16 @@ namespace AshenRealm.Player
             if (session == null) return;
             int classIndex = (int)session.Class.Id;
             bool torch = PlayerTorch.Instance != null && PlayerTorch.Instance.Equipped;
+            bool flaskInRight = session.Class.Id == CharacterClass.Alchemist && torch && session.Weapon == null;
             for (int i = 0; i < weaponSets.Length; i++)
             {
                 bool right = i % HandsPerClass == 0;
                 weaponSets[i].SetActive(i / HandsPerClass == classIndex &&
-                    (right ? session.Weapon == null : !torch));
+                    (right ? session.Weapon == null && !flaskInRight : !torch));
             }
             ItemDefinition[] goods = Catalog.ItemsOf(ItemSlot.Weapon);
             for (int i = 0; i < boughtWeapons.Length; i++) boughtWeapons[i].SetActive(i < goods.Length && goods[i] == session.Weapon);
+            torchFlask.SetActive(flaskInRight);
         }
 
         /// <summary>What one blow would do with this item in place of what its slot holds now, forge work included.</summary>

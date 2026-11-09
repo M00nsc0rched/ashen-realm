@@ -41,6 +41,12 @@ namespace AshenRealm.UI
         [SerializeField] Text potionLabel;
         [SerializeField] Image ability1Cooldown;
         [SerializeField] Image ability2Cooldown;
+        [SerializeField] Image ability1Icon;
+        [SerializeField] Image ability2Icon;
+        [SerializeField] Sprite[] skillIcons;
+        [SerializeField] Image weaponEmblem;
+        [SerializeField] Sprite[] classWeaponIcons;
+        [SerializeField] Sprite[] goodsWeaponIcons;
 
         [Header("Center")]
         [SerializeField] Image crosshair;
@@ -72,6 +78,7 @@ namespace AshenRealm.UI
         float enemyBarTimer;
         int focusRevision;
         float crosshairScale = 1f;
+        int firstSkill = -1, secondSkill = -1;
 
         void OnEnable()
         {
@@ -94,8 +101,9 @@ namespace AshenRealm.UI
             string alignment = session.Alignment == Alignment.Marked ? GameText.AlignmentMarked
                 : session.Alignment == Alignment.Hallowed ? GameText.AlignmentHallowed : GameText.AlignmentMortal;
             statusText.text = $"{alignment}  {session.Honor}\n{GameText.GoldLabel}  {session.Gold}\n{GameText.PotionLabel}  {session.Potions}";
-            ability1Label.text = session.Class.Ability1.Name;
-            ability2Label.text = session.Class.Ability2.Name;
+            RefreshSkills();
+            int goodsIndex = System.Array.IndexOf(Catalog.ItemsOf(ItemSlot.Weapon), session.Weapon);
+            weaponEmblem.sprite = goodsIndex >= 0 ? goodsWeaponIcons[goodsIndex] : classWeaponIcons[(int)session.Class.Id];
             potionLabel.text = $"{GameText.Potion} {session.Potions}";
         }
 
@@ -142,6 +150,7 @@ namespace AshenRealm.UI
 
         void UpdateBars(float dt)
         {
+            RefreshSkills();
             float health = playerHealth.Normalized;
             SetFill(healthFill, health);
 
@@ -161,6 +170,23 @@ namespace AshenRealm.UI
                     ? Color.Lerp(staminaExhaustedColor, staminaColor, Mathf.PingPong(Time.time * 3f, 1f) * 0.4f)
                     : staminaColor;
                 staminaFillImage.color = target;
+            }
+        }
+
+        void RefreshSkills()
+        {
+            AbilityDefinition first = abilities.ActiveAbility(0), second = abilities.ActiveAbility(1);
+            if (first != null && firstSkill != (int)first.Effect)
+            {
+                firstSkill = (int)first.Effect;
+                ability1Label.text = first.Name;
+                ability1Icon.sprite = skillIcons[firstSkill];
+            }
+            if (second != null && secondSkill != (int)second.Effect)
+            {
+                secondSkill = (int)second.Effect;
+                ability2Label.text = second.Name;
+                ability2Icon.sprite = skillIcons[secondSkill];
             }
         }
 

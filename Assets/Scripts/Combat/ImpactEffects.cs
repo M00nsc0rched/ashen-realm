@@ -38,5 +38,38 @@ namespace AshenRealm.Combat
                 system.Emit(emit, 1);
             }
         }
+
+        /// <summary>Short coloured spell traces share the existing impact renderer and particle budget.</summary>
+        public void EmitAbility(Vector3 centre, Color color, float radius)
+        {
+            if (system == null) return;
+            int count = radius > 2f ? 28 : 14;
+            var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false, startColor = color };
+            for (int i = 0; i < count; i++)
+            {
+                float angle = i * Mathf.PI * 2f / count;
+                Vector3 outward = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                emit.position = centre + outward * radius;
+                emit.velocity = outward * 0.25f + Vector3.up * 0.35f;
+                emit.startSize = 0.075f;
+                emit.startLifetime = 0.8f;
+                system.Emit(emit, 1);
+            }
+        }
+
+        public void EmitAbilityRay(Vector3 from, Vector3 to, Color color)
+        {
+            if (system == null) return;
+            var emit = new ParticleSystem.EmitParams { applyShapeToPosition = false, startColor = color };
+            int count = Mathf.Clamp(Mathf.CeilToInt(Vector3.Distance(from, to) * 3f), 8, 36);
+            for (int i = 0; i < count; i++)
+            {
+                emit.position = Vector3.Lerp(from, to, i / (float)(count - 1));
+                emit.velocity = Vector3.up * 0.08f;
+                emit.startSize = 0.055f;
+                emit.startLifetime = 0.3f;
+                system.Emit(emit, 1);
+            }
+        }
     }
 }

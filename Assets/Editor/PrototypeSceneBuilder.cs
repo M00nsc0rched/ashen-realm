@@ -50,6 +50,7 @@ namespace AshenRealm.EditorTools
                 Progress("Preparing folders", 0.02f);
                 GeneratedAssets.EnsureFolders();
                 GeneratedAssets.BeginMeshPass();
+                EquipmentIconBuilder.Reset();
 
                 Progress("Pixel-art textures, sky and UI sprites", 0.06f);
                 var detailArray = GeneratedAssets.SaveTextureArray(PixelTextures.CreateArray(), GeneratedAssets.DetailArrayPath);
@@ -100,6 +101,7 @@ namespace AshenRealm.EditorTools
                 // Scene-level references (stored as prefab instance overrides).
                 SceneWiring.Set(player.Lifecycle, "spawnPoint", spawn);
                 SceneWiring.Set(player.Combat, "impactEffects", impacts);
+                SceneWiring.Set(player.Abilities, "visualEffects", impacts);
                 SceneWiring.Set(player.Combat, "projectiles", projectiles);
                 SceneWiring.Set(knight, "target", player.Root.transform);
                 SceneWiring.Set(knight, "impactEffects", impacts);
@@ -115,6 +117,7 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(player.PixelCamera, "screenCamera", CreateScreenCamera());
 
                 var zoneManager = new GameObject("Zone Manager").AddComponent<ZoneManager>();
+                SceneWiring.Set(player.Abilities, "zones", zoneManager);
                 var storyGo = new GameObject("Story");
                 var session = storyGo.AddComponent<GameSession>();
                 var director = storyGo.AddComponent<StoryDirector>();
@@ -156,6 +159,7 @@ namespace AshenRealm.EditorTools
                 var cityObjective = Marker("City Objective", city.transform, cityLayout.TavernDoor, 0f);
                 foreach (var person in cityLayout.People)
                     ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.figure, city.transform, director, materials);
+                CityActivitiesGenerator.Build(city.transform, cityOrigin, materials);
                 ActorFactory.CreatePortal("Gate To Valley", cityLayout.Gate, 0f, new Vector3(9f, 7f, 1f), city.transform, zoneManager, 0, true,
                     GameText.GateToValley, "", "");
                 ActorFactory.CreatePortal("Tavern Door", cityLayout.TavernDoor, 0f, new Vector3(2.6f, 3.4f, 0.6f), city.transform, zoneManager, ZoneNumbers.Tavern, false,
@@ -441,8 +445,7 @@ namespace AshenRealm.EditorTools
             foreach (var encounter in layout.Encounters)
                 ActorFactory.CreateEncounter(encounter.id, encounter.position, zone.transform, director, materials);
 
-            HumanoidStyle merchantLook = EnemyFactory.Villager("Merchant", Pal.Robe, Pal.Bone, true);
-            ActorFactory.CreateNpc("merchant", layout.Merchant, 45f, merchantLook, zone.transform, director, materials);
+            ActorFactory.CreateDungeonMerchant(layout, biome, zone.transform, director, materials);
 
             var entry = Marker("Entry", zone.transform, layout.Entry + Vector3.up * 0.05f, layout.EntryYaw);
             var exit = Marker("Stair Arrival", zone.transform, layout.StairDownArrival + Vector3.up * 0.05f, 180f);

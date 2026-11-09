@@ -407,6 +407,118 @@ namespace AshenRealm.EditorTools
             b.Pop();
         }
 
+        // ---- The traders below ------------------------------------------------------------------------
+
+        /// <summary>
+        /// A recognisable face, broad traveller's hat, patched coat and stock ledger. Outfit zero is the city trader;
+        /// the five others carry the dust, damp and tools of their own depth. The right hand works on a separate pivot.
+        /// </summary>
+        public static void Merchant(MeshBuilder b, int outfit = 0)
+        {
+            Color cloth = MerchantCloth(outfit);
+            Color scarf = outfit == 2 ? new Color(0.75f, 0.65f, 0.38f) : outfit == 3 ? new Color(0.68f, 0.52f, 0.32f) :
+                outfit == 5 ? new Color(0.67f, 0.58f, 0.62f) : new Color(0.65f, 0.24f, 0.18f);
+            foreach (float x in new[] { -0.15f, 0.15f })
+            {
+                Paint(b, Pal.ClothDark, new Color(0.28f, 0.27f, 0.24f));
+                b.Box(new Vector3(x, 0.56f, 0f), new Vector3(0.2f, 0.7f, 0.23f));
+                Boots(b, x, 0f, new Color(0.32f, 0.2f, 0.12f));
+            }
+            Paint(b, Pal.ClothDark, cloth);
+            b.Box(new Vector3(0f, 1.2f, 0f), new Vector3(0.54f, 0.64f, 0.33f));
+            b.Box(new Vector3(-0.19f, 0.81f, 0.02f), new Vector3(0.22f, 0.34f, 0.36f));
+            b.Box(new Vector3(0.19f, 0.81f, 0.02f), new Vector3(0.22f, 0.34f, 0.36f));
+            Paint(b, Pal.ClothDark, scarf);
+            b.Box(new Vector3(0f, 1.49f, 0.08f), new Vector3(0.44f, 0.13f, 0.35f));
+            b.Box(new Vector3(-0.12f, 1.31f, 0.2f), new Vector3(0.15f, 0.34f, 0.045f));
+            Paint(b, Pal.Leather, new Color(0.34f, 0.22f, 0.13f));
+            b.Box(new Vector3(0f, 1f, 0f), new Vector3(0.58f, 0.08f, 0.37f));
+            b.Box(new Vector3(0.31f, 0.86f, 0.02f), new Vector3(0.2f, 0.27f, 0.2f));
+            b.Box(new Vector3(0f, 1.2f, -0.23f), new Vector3(0.41f, 0.53f, 0.19f));
+            Paint(b, Pal.Thatch, Linen);
+            Limb(b, new Vector3(-0.2f, 1.51f, -0.12f), new Vector3(-0.09f, 1.01f, 0.19f), 0.07f, 0.035f);
+            b.SetColor(Pal.Brass, 0.65f);
+            b.Box(new Vector3(0.02f, 1f, 0.2f), new Vector3(0.11f, 0.1f, 0.025f));
+
+            Paint(b, Pal.ClothDark, cloth * 0.95f);
+            Limb(b, new Vector3(-0.32f, 1.45f, 0f), new Vector3(-0.37f, 1.18f, 0.1f), 0.17f, 0.17f);
+            Paint(b, Pal.Leather, Skin);
+            Limb(b, new Vector3(-0.37f, 1.18f, 0.1f), new Vector3(-0.16f, 1.12f, 0.43f), 0.105f, 0.105f);
+            Hand(b, new Vector3(-0.15f, 1.12f, 0.46f), Skin);
+            Paint(b, Pal.Leather, new Color(0.32f, 0.17f, 0.12f));
+            b.Box(new Vector3(-0.16f, 1.15f, 0.48f), new Vector3(0.32f, 0.045f, 0.27f));
+            Paint(b, Pal.Bone, new Color(0.8f, 0.71f, 0.52f));
+            b.Box(new Vector3(-0.16f, 1.18f, 0.48f), new Vector3(0.27f, 0.018f, 0.23f));
+
+            Vector3 neck = new Vector3(0f, 1.53f, 0.01f);
+            Head(b, neck, AgedSkin * 1.08f);
+            Paint(b, Pal.ClothDark, GreyHair);
+            b.Box(neck + new Vector3(0f, 0.1f, 0.14f), new Vector3(0.23f, 0.13f, 0.05f));
+            b.Box(neck + new Vector3(0f, 0.27f, -0.13f), new Vector3(0.28f, 0.18f, 0.07f));
+            Paint(b, Pal.Leather, outfit == 3 ? new Color(0.24f, 0.34f, 0.36f) : cloth * 0.82f);
+            b.Prism(new Vector3(0f, 1.85f, 0.01f), 0.37f, 0.37f, 0.045f, 10);
+            b.Prism(new Vector3(0f, 1.88f, 0.01f), 0.19f, 0.14f, 0.23f, 8);
+            Paint(b, Pal.ClothDark, scarf);
+            b.Prism(new Vector3(0f, 1.91f, 0.01f), 0.192f, 0.18f, 0.065f, 8);
+            if (outfit == 2)
+            {
+                // The spore gatherer's hood and a pale cap pinned to the hat.
+                b.SetColor(Pal.FungalCap, 0.67f);
+                b.Prism(new Vector3(-0.21f, 1.92f, -0.07f), 0.16f, 0.055f, 0.12f, 8);
+                b.SetColor(Pal.FungalGlow, 0.48f);
+                b.Box(new Vector3(-0.21f, 1.89f, -0.07f), new Vector3(0.06f, 0.12f, 0.06f));
+            }
+            else if (outfit == 3)
+            {
+                Paint(b, Pal.Thatch, new Color(0.7f, 0.58f, 0.39f));
+                b.Prism(new Vector3(0.28f, 0.87f, 0.15f), 0.14f, 0.14f, 0.055f, 10);
+                b.SetColor(Pal.Steel, 0.6f);
+                b.Box(new Vector3(0.33f, 0.88f, 0.2f), new Vector3(0.04f, 0.18f, 0.04f));
+            }
+            else if (outfit == 4)
+            {
+                // Ash mask below visible brass goggles, rather than a featureless black hood.
+                Paint(b, Pal.ClothDark, new Color(0.61f, 0.53f, 0.39f));
+                b.Box(neck + new Vector3(0f, 0.13f, 0.155f), new Vector3(0.24f, 0.1f, 0.06f));
+                foreach (float x in new[] { -0.065f, 0.065f })
+                {
+                    b.SetColor(Pal.Brass, 0.65f);
+                    b.Box(neck + new Vector3(x, 0.24f, 0.151f), new Vector3(0.105f, 0.08f, 0.035f));
+                    b.SetColor(Pal.Black, 0.25f);
+                    b.Box(neck + new Vector3(x, 0.24f, 0.173f), new Vector3(0.065f, 0.045f, 0.015f));
+                }
+            }
+            else if (outfit == 5 || outfit == 1)
+            {
+                b.SetColor(Pal.Bone, 0.7f);
+                b.Box(new Vector3(0.09f, 1.31f, 0.19f), new Vector3(0.055f, 0.19f, 0.04f));
+                b.Box(new Vector3(0.09f, 1.35f, 0.19f), new Vector3(0.14f, 0.045f, 0.04f));
+            }
+        }
+
+        static Color MerchantCloth(int outfit) => outfit switch
+        {
+            1 => new Color(0.43f, 0.32f, 0.5f),
+            2 => new Color(0.28f, 0.46f, 0.38f),
+            3 => new Color(0.31f, 0.43f, 0.57f),
+            4 => new Color(0.55f, 0.32f, 0.23f),
+            5 => new Color(0.5f, 0.4f, 0.44f),
+            _ => new Color(0.48f, 0.34f, 0.21f)
+        };
+
+        public static void MerchantWorkingArm(MeshBuilder b, int outfit)
+        {
+            b.Push(-new Vector3(0.32f, 1.45f, 0f), Quaternion.identity, Vector3.one);
+            Paint(b, Pal.ClothDark, MerchantCloth(outfit) * 0.95f);
+            Limb(b, new Vector3(0.32f, 1.45f, 0f), new Vector3(0.37f, 1.21f, 0.15f), 0.17f, 0.17f);
+            Paint(b, Pal.Leather, AgedSkin * 1.08f);
+            Limb(b, new Vector3(0.37f, 1.21f, 0.15f), new Vector3(0.22f, 1.08f, 0.48f), 0.105f, 0.105f);
+            Hand(b, new Vector3(0.21f, 1.08f, 0.5f), AgedSkin * 1.08f);
+            b.SetColor(Pal.Brass, 0.7f);
+            b.Box(new Vector3(0.21f, 1.04f, 0.53f), new Vector3(0.09f, 0.025f, 0.09f));
+            b.Pop();
+        }
+
         // ---- The Grey Chapel --------------------------------------------------------------------------
 
         /// <summary>One of the Choir: grey wool to the floor, a pointed hood with nothing to see in it, a rope at the waist.</summary>

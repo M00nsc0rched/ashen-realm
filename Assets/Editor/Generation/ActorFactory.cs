@@ -103,12 +103,12 @@ namespace AshenRealm.EditorTools
             var shieldPivot = Child("Shield Pivot (Left Hand)", weaponRig, new Vector3(-0.48f, -0.44f, 0.6f), Quaternion.Euler(8f, -40f, 8f));
 
             var swordBuilder = new MeshBuilder();
-            PlayerWeaponMeshes.KnightAxe(swordBuilder);
-            PlayerWeaponMeshes.Glove(swordBuilder);
+            PlayerWeaponMeshes.CrescentPolearm(swordBuilder);
+            PlayerWeaponMeshes.ClassHand(swordBuilder, CharacterClass.Knight);
             var swordMesh = GeneratedAssets.SaveMesh(swordBuilder, "Player_Sword");
-            var sword = MeshChild("Knight Axe", swordPivot, swordMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.82f, false);
+            var sword = MeshChild("Knight Crescent Polearm", swordPivot, swordMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.82f, false);
 
-            var tip = Child("Blade Tip", sword.transform, new Vector3(0f, 0.92f, 0f), Quaternion.identity);
+            var tip = Child("Blade Tip", sword.transform, new Vector3(-0.18f, 1.4f, 0f), Quaternion.identity);
             var trail = tip.gameObject.AddComponent<TrailRenderer>();
             trail.sharedMaterial = materials.Trail;
             trail.time = 0.12f;
@@ -126,29 +126,42 @@ namespace AshenRealm.EditorTools
             trail.emitting = false;
 
             var shieldBuilder = new MeshBuilder();
-            PropMeshes.Shield(shieldBuilder);
-            PlayerWeaponMeshes.Glove(shieldBuilder);
+            PlayerWeaponMeshes.SunShield(shieldBuilder);
+            PlayerWeaponMeshes.ClassHand(shieldBuilder, CharacterClass.Knight);
             var shieldMesh = GeneratedAssets.SaveMesh(shieldBuilder, "Player_Shield");
-            var shield = MeshChild("Shield", shieldPivot, shieldMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.8f, false);
+            var shield = MeshChild("Sun Shield", shieldPivot, shieldMesh, materials.World, Vector3.zero, Quaternion.identity, Vector3.one * 0.8f, false);
 
             // The other classes' weapons share the same pivots; PlayerClassRig leaves one pair enabled.
-            GameObject Held(string name, Transform pivot, System.Action<MeshBuilder> build, Vector3 scale)
+            GameObject Held(string name, Transform pivot, System.Action<MeshBuilder> build, Vector3 scale,
+                CharacterClass handClass = CharacterClass.Gravethief, bool openHand = false)
             {
                 var builder = new MeshBuilder();
                 build(builder);
-                PlayerWeaponMeshes.Glove(builder);
+                PlayerWeaponMeshes.ClassHand(builder, handClass, openHand);
                 return MeshChild(name, pivot, GeneratedAssets.SaveMesh(builder, "Player_" + name.Replace(" ", "")), materials.World, Vector3.zero, Quaternion.identity, scale, false);
             }
             var daggerRight = Held("Dagger Right", swordPivot, PropMeshes.Dagger, Vector3.one);
-            var daggerLeft = Held("Dagger Left", shieldPivot, PropMeshes.Dagger, Vector3.one);
-            var staff = Held("Witch Staff", swordPivot, PropMeshes.WitchStaff, Vector3.one);
-            var castingHand = Held("Casting Hand", shieldPivot, PropMeshes.CastingHand, Vector3.one);
-            var mace = Held("Mace", swordPivot, PropMeshes.Mace, Vector3.one);
-            var lantern = Held("Hand Lantern", shieldPivot, PropMeshes.HandLantern, Vector3.one);
-            var boneStaff = Held("Necromancer Staff", swordPivot, PlayerWeaponMeshes.BoneStaff, Vector3.one);
-            var boneTalisman = Held("Bone Talisman", shieldPivot, PlayerWeaponMeshes.BoneTalisman, Vector3.one);
-            var reagent = Held("Reagent Bottle", swordPivot, PlayerWeaponMeshes.ReagentBottle, Vector3.one);
-            var alchemistKit = Held("Alchemist Kit", shieldPivot, PlayerWeaponMeshes.AlchemistKit, Vector3.one);
+            var daggerLeft = Held("Bracing Hand", shieldPivot, _ => { }, Vector3.one, CharacterClass.Gravethief, true);
+            var staff = Held("Witch Antler Staff", swordPivot, PlayerWeaponMeshes.AntlerStaff, Vector3.one, CharacterClass.Witch);
+            var castingHand = Held("Casting Hand", shieldPivot, _ => { }, Vector3.one, CharacterClass.Witch, true);
+            var mace = Held("Warden Crescent Right", swordPivot, PlayerWeaponMeshes.WardenBlade, Vector3.one, CharacterClass.Warden);
+            var lantern = Held("Warden Crescent Left", shieldPivot, b =>
+            {
+                b.Push(Matrix4x4.Scale(new Vector3(-1f, 1f, 1f)));
+                PlayerWeaponMeshes.WardenBlade(b);
+                b.Pop();
+            }, Vector3.one, CharacterClass.Warden);
+            var boneStaff = Held("Necromancer Sickle Right", swordPivot, PlayerWeaponMeshes.NecromancerSickle, Vector3.one, CharacterClass.Necromancer);
+            var boneTalisman = Held("Necromancer Sickle Left", shieldPivot, b =>
+            {
+                b.Push(Matrix4x4.Scale(new Vector3(-1f, 1f, 1f)));
+                PlayerWeaponMeshes.NecromancerSickle(b);
+                b.Pop();
+            }, Vector3.one, CharacterClass.Necromancer);
+            var reagent = Held("Alchemist Ready Hand", swordPivot, _ => { }, Vector3.one, CharacterClass.Alchemist, true);
+            var alchemistKit = Held("Reagent Bottle", shieldPivot, PlayerWeaponMeshes.ReagentBottle, Vector3.one, CharacterClass.Alchemist);
+            var torchFlask = Held("Alchemist Torch Flask", swordPivot, PlayerWeaponMeshes.ReagentBottle, Vector3.one, CharacterClass.Alchemist);
+            torchFlask.SetActive(false);
 
             // The forge's goods, in Catalog order. They take the place of the class's right-hand weapon.
             GameObject[] bought =
@@ -190,6 +203,7 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(classRig, "weaponSets", new[] { sword, shield, daggerRight, daggerLeft, staff, castingHand, mace, lantern,
                 boneStaff, boneTalisman, reagent, alchemistKit });
             SceneWiring.Set(classRig, "boughtWeapons", bought);
+            SceneWiring.Set(classRig, "torchFlask", torchFlask);
             rig.ClassRig = classRig;
             TorchBuilder.Build(root, cameraGo.transform, torch, classRig, rig.Controller, materials.World);
 
@@ -348,21 +362,19 @@ namespace AshenRealm.EditorTools
 
         // ---- People, encounters and bolts --------------------------------------------------------------
 
-        static Mesh FigureMesh(HumanoidStyle look, string name, System.Action<MeshBuilder> extra = null)
-        {
-            var b = new MeshBuilder();
-            CreatureMeshes.Figure(b, look);
-            extra?.Invoke(b);
-            return GeneratedAssets.SaveMesh(b, name);
-        }
-
         public static NpcActor CreateNpc(string id, Vector3 position, float yaw, HumanoidStyle look, Transform parent, StoryDirector director, GeneratedMaterials materials) =>
             CreateNpc(id, position, yaw, b => CreatureMeshes.Figure(b, look), parent, director, materials);
 
         public static NpcActor CreateNpc(string id, Vector3 position, float yaw, System.Action<MeshBuilder> figure, Transform parent, StoryDirector director, GeneratedMaterials materials)
+            => CreateNpcBody(id, position, yaw, figure, parent, director, materials, "Person_" + id, 0, null);
+
+        static NpcActor CreateNpcBody(string id, Vector3 position, float yaw, System.Action<MeshBuilder> figure,
+            Transform parent, StoryDirector director, GeneratedMaterials materials, string assetName, int outfit,
+            System.Func<Vector3, Vector3, Color> light)
         {
             var body = new MeshBuilder();
             figure(body);
+            if (light != null) body.Bake(light);
             var root = new GameObject("NPC " + id);
             root.transform.SetParent(parent, true);
             root.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
@@ -370,12 +382,22 @@ namespace AshenRealm.EditorTools
             capsule.height = 1.9f;
             capsule.radius = 0.4f;
             capsule.center = new Vector3(0f, 0.95f, 0f);
-            GameObject model = MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, "Person_" + id), materials.World);
-            AddIdleAnimation(root, model.transform, id, materials);
+            GameObject model = MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, assetName), materials.World);
+            AddIdleAnimation(root, model.transform, id, materials, outfit, light);
+            if (id == "merchant" && light == null) NpcCampGenerator.CityCounter(root.transform, materials);
             var npc = root.AddComponent<NpcActor>();
             SceneWiring.Set(npc, "npcId", id);
             SceneWiring.Set(npc, "director", director);
             return npc;
+        }
+
+        public static NpcActor CreateDungeonMerchant(DungeonLayout layout, BiomeStyle biome, Transform zone,
+            StoryDirector director, GeneratedMaterials materials)
+        {
+            var light = NpcCampGenerator.Build(layout, biome, zone, materials);
+            int outfit = (int)biome.Decor + 1;
+            return CreateNpcBody("merchant", layout.Merchant, 45f, b => PeopleMeshes.Merchant(b, outfit), zone,
+                director, materials, "Person_Merchant_" + biome.Name, outfit, light);
         }
 
         /// <summary>A waiting traveller, with the same living pose as the people who can be spoken to.</summary>
@@ -397,13 +419,29 @@ namespace AshenRealm.EditorTools
             return root;
         }
 
-        static void AddIdleAnimation(GameObject root, Transform model, string id, GeneratedMaterials materials)
+        static void AddIdleAnimation(GameObject root, Transform model, string id, GeneratedMaterials materials,
+            int outfit = 0, System.Func<Vector3, Vector3, Color> light = null)
         {
             var idle = root.AddComponent<NpcIdleAnimator>();
             SceneWiring.Set(idle, "model", model);
             float phase = 0f;
             foreach (char letter in id) phase += letter * 0.13f;
             SceneWiring.Set(idle, "phase", phase);
+            NpcRoutine routine = id == "merchant" ? NpcRoutine.Trading : id == "crier" ? NpcRoutine.Reading :
+                id == "widow" || id == "monk" ? NpcRoutine.Praying : id == "sergeant" || id == "wanderer" ? NpcRoutine.Seated :
+                id.Contains("Guard") || id == "gravedigger" ? NpcRoutine.Watching : NpcRoutine.Attentive;
+            SceneWiring.Set(idle, "routine", routine);
+            if (id == "merchant")
+            {
+                var hand = Child("Counting Shoulder", model, new Vector3(0.32f, 1.45f, 0f), Quaternion.identity);
+                var countingArm = new MeshBuilder();
+                PeopleMeshes.MerchantWorkingArm(countingArm, outfit);
+                // Bake with body coordinates, although the mesh is local to its shoulder.
+                if (light != null) countingArm.Bake((p, n) => light(p + new Vector3(0.32f, 1.45f, 0f), n));
+                else countingArm.Bake((p, n) => new Color(1.1f, 0.92f, 0.74f));
+                MeshChild("Counting Hand", hand, GeneratedAssets.SaveMesh(countingArm, "Person_Merchant_Arm_" + outfit), materials.World);
+                SceneWiring.Set(idle, "gestureArm", hand);
+            }
             if (id != "smith") return;
 
             var shoulder = Child("Hammer Shoulder", model, new Vector3(0.36f, 1.54f, 0f), Quaternion.identity);
@@ -450,83 +488,11 @@ namespace AshenRealm.EditorTools
             capsule.radius = 0.5f;
             capsule.center = new Vector3(0f, 0.95f, 0f);
 
-            var rng = new System.Random(id.Length * 131);
-            HumanoidStyle look = EnemyFactory.Villager("Encounter_" + id, Pal.ClothDark, Pal.Plaster);
-            System.Action<MeshBuilder> extra = null;
-            switch (id)
-            {
-                case "well":
-                    look = EnemyFactory.Villager("Encounter_well", Pal.Mountain);
-                    extra = b =>
-                    {
-                        b.Push(new Vector3(1.3f, 0f, 0.4f), Quaternion.identity, Vector3.one);
-                        b.SetColor(Pal.StoneMoss, 0.4f);
-                        b.Prism(Vector3.zero, 0.8f, 0.8f, 0.8f, 8);
-                        b.SetColor(Pal.Water, 0.3f);
-                        b.Prism(new Vector3(0f, 0.8f, 0f), 0.66f, 0.66f, 0.02f, 8, false);
-                        b.Pop();
-                    };
-                    break;
-                case "beggar":
-                    look = EnemyFactory.Villager("Encounter_beggar", Pal.Thatch);
-                    break;
-                case "cage":
-                    extra = b =>
-                    {
-                        for (int i = 0; i < 12; i++)
-                        {
-                            float a = i * Mathf.PI / 6f;
-                            b.ShadedBox(new Vector3(Mathf.Cos(a) * 1.1f, 1.6f, Mathf.Sin(a) * 1.1f), new Vector3(0.07f, 3.2f, 0.07f), Pal.SteelDark, rng, 0.3f, 0.45f);
-                        }
-                    };
-                    look = EnemyFactory.Villager("Encounter_cage", Pal.FurGrey, Pal.FurGrey);
-                    break;
-                case "sporewife":
-                    look = EnemyFactory.Villager("Encounter_sporewife", Pal.FungalRock);
-                    extra = b => PropMeshes.Mushroom(b, rng, new Vector3(0.9f, 0f, 0.2f), 1.8f);
-                    break;
-                case "ferryman":
-                    look = EnemyFactory.Villager("Encounter_ferryman", Pal.ClothDark, Pal.Bone, true);
-                    break;
-                case "forgewidow":
-                    look = EnemyFactory.Villager("Encounter_forgewidow", Pal.Leather);
-                    extra = b => PropMeshes.Brazier(b, rng);
-                    break;
-                case "bonechoir":
-                    look = new HumanoidStyle { Name = "Encounter_bonechoir", Skeletal = true, Trim = Pal.Brass, Crowned = true };
-                    break;
-                case "shrine":
-                    look = null;
-                    break;
-            }
-
-            Mesh clearMesh;
-            if (look == null)
-            {
-                var shrine = new MeshBuilder();
-                for (int i = 0; i < 10; i++)
-                    PropMeshes.Skull(shrine, rng, new Vector3(Mathf.Cos(i * 2.4f) * (0.5f - i * 0.04f), 0.12f + i * 0.14f, Mathf.Sin(i * 2.4f) * (0.5f - i * 0.04f)));
-                shrine.Push(new Vector3(0f, 1.5f, 0f), Quaternion.identity, Vector3.one * 0.6f);
-                PropMeshes.Candles(shrine, rng);
-                shrine.Pop();
-                clearMesh = GeneratedAssets.SaveMesh(shrine, "Encounter_shrine");
-            }
-            else
-            {
-                clearMesh = FigureMesh(look, "Encounter_" + id, extra);
-            }
-
-            var clear = MeshChild("Clear", root.transform, clearMesh, materials.World);
+            var clear = EncounterPeopleGenerator.Create(id, root.transform, materials, false);
             GameObject warped = null;
             if (StoryText.Encounter(id).Warped != null)
             {
-                var silhouette = new HumanoidStyle { Name = "Silhouette", Robed = true, Hooded = true, Cloth = Pal.Shadow, Trim = Pal.Shadow, Skin = Pal.Shadow, Eyes = Pal.Glow };
-                warped = MeshChild("Warped", root.transform, FigureMesh(silhouette, "Encounter_Silhouette", b =>
-                {
-                    b.Push(new Vector3(0f, 1.74f, 0f), Quaternion.identity, Vector3.one);
-                    CreatureMeshes.Eyes(b, silhouette);
-                    b.Pop();
-                }), materials.World);
+                warped = EncounterPeopleGenerator.Create(id, root.transform, materials, true);
             }
 
             var site = root.AddComponent<EncounterSite>();
@@ -538,6 +504,7 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(site, "warpedFigure", warped);
                 warped.SetActive(false);
             }
+            WorldVista.Add(parent, "Encounter_" + id, position + new Vector3(0.35f, 1.6f, -3.25f), position + Vector3.up * 1.05f);
             return site;
         }
 

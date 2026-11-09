@@ -1,4 +1,5 @@
 using AshenRealm.Core;
+using AshenRealm.Story;
 using UnityEngine;
 
 namespace AshenRealm.Player
@@ -154,17 +155,25 @@ namespace AshenRealm.Player
 
             // Sword.
             EvaluateSlash(out Vector3 slashPos, out Vector3 slashEuler);
+            GameSession session = GameSession.Instance;
+            bool classKit = session != null && session.Weapon == null;
+            bool freeLeft = PlayerTorch.Instance == null || !PlayerTorch.Instance.Equipped;
+            bool twins = classKit && (session.Class.Id == CharacterClass.Warden || session.Class.Id == CharacterClass.Necromancer);
+            bool leftStrike = freeLeft && classKit && (session.Class.Id == CharacterClass.Alchemist || (twins && slashVariant % 2 == 1));
+            float rightStrike = leftStrike ? 0.18f : 1f;
             Vector3 sprintPos = new Vector3(0.04f, -0.06f, -0.02f) * sprintWeight;
             Vector3 sprintEuler = new Vector3(18f, -12f, -10f) * sprintWeight;
-            swordPivot.localPosition = swordRestPos + common + slashPos + swordBlockOffset * block + sprintPos + swordKickPos;
-            swordPivot.localRotation = Quaternion.Euler(swayEuler + slashEuler + swordBlockEuler * block + sprintEuler
+            swordPivot.localPosition = swordRestPos + common + slashPos * rightStrike + swordBlockOffset * block + sprintPos + swordKickPos;
+            swordPivot.localRotation = Quaternion.Euler(swayEuler + slashEuler * rightStrike + swordBlockEuler * block + sprintEuler
                                                         + new Vector3(swordKickPos.z * 120f, 0f, 0f)) * swordRestRot;
 
             // Shield.
             Vector3 shieldPos = Vector3.Lerp(shieldRestPos, shieldBlockPosition, block);
             Quaternion shieldRot = Quaternion.Slerp(shieldRestRot, Quaternion.Euler(shieldBlockEuler), block);
-            shieldPivot.localPosition = shieldPos + common * 0.8f + shieldKickPos;
-            shieldPivot.localRotation = Quaternion.Euler(swayEuler * 0.8f + new Vector3(shieldKickPos.z * 90f, 0f, 0f)) * shieldRot;
+            Vector3 leftSlash = leftStrike ? new Vector3(-slashPos.x, slashPos.y, slashPos.z) : Vector3.zero;
+            Vector3 leftEuler = leftStrike ? new Vector3(slashEuler.x, -slashEuler.y, -slashEuler.z) : Vector3.zero;
+            shieldPivot.localPosition = shieldPos + common * 0.8f + shieldKickPos + leftSlash;
+            shieldPivot.localRotation = Quaternion.Euler(swayEuler * 0.8f + leftEuler + new Vector3(shieldKickPos.z * 90f, 0f, 0f)) * shieldRot;
         }
 
         void UpdateSlashTime(float dt)

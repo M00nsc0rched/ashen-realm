@@ -63,7 +63,10 @@ namespace AshenRealm.EditorTools
             RectTransform portraitBox = Frame("Portrait", gearPage, 0f, 0f, 330f, 535f, art);
             Image portrait = HudBuilder.Img(MenuBuilder.Box("Class Art", portraitBox, 17f, 13f, 296f, 455f).gameObject, art.Cards[0], Color.white);
             portrait.preserveAspect = true;
-            Text weapon = Text("Weapon", portraitBox, 23f, 461f, 286f, 50f, "", 21, art);
+            Image weaponImage = HudBuilder.Img(MenuBuilder.Box("Weapon Icon", portraitBox, 20f, 465f, 48f, 48f).gameObject,
+                EquipmentIconBuilder.ClassSprites()[0], Color.white);
+            weaponImage.preserveAspect = true;
+            Text weapon = Text("Weapon", portraitBox, 78f, 460f, 235f, 60f, "", 18, art);
             RectTransform stats = Frame("Statistics", gearPage, 344f, 0f, 376f, 535f, art);
             var statistics = new Text[10];
             for (int i = 0; i < statistics.Length; i++)
@@ -86,20 +89,31 @@ namespace AshenRealm.EditorTools
 
             RectTransform abilityPage = MenuBuilder.Box("Abilities Page", panel, 26f, 152f, 1388f, 535f);
             RectTransform skills = Frame("Class Abilities", abilityPage, 0f, 0f, 720f, 535f, art);
-            Text("Skills Heading", skills, 25f, 12f, 670f, 54f, InventoryText.Abilities, 36, art, TextAnchor.MiddleCenter, true);
-            var abilityLabels = new Text[2];
-            var abilityDescriptions = new Text[2];
-            var upgradeLabels = new Text[2];
-            var upgradeButtons = new Button[2];
-            for (int i = 0; i < 2; i++)
+            Text("Skills Heading", skills, 25f, 8f, 670f, 48f, InventoryText.Abilities, 36, art, TextAnchor.MiddleCenter, true);
+            var abilityLabels = new Text[AbilityBook.KnownCount];
+            var abilityDescriptions = new Text[AbilityBook.KnownCount];
+            var upgradeLabels = new Text[AbilityBook.KnownCount];
+            var upgradeButtons = new Button[AbilityBook.KnownCount];
+            var abilityIcons = new Image[AbilityBook.KnownCount];
+            var equipQ = new Button[AbilityBook.KnownCount];
+            var equipR = new Button[AbilityBook.KnownCount];
+            var equipQLabels = new Text[AbilityBook.KnownCount];
+            var equipRLabels = new Text[AbilityBook.KnownCount];
+            Sprite[] skillIcons = AbilityIconBuilder.Create();
+            for (int i = 0; i < AbilityBook.KnownCount; i++)
             {
-                RectTransform row = Frame("Ability " + i, skills, 22f, 83f + i * 171f, 676f, 153f, art);
-                abilityLabels[i] = Text("Name", row, 20f, 11f, 635f, 36f, "", 28, art, heading: true);
-                abilityDescriptions[i] = Text("Description", row, 20f, 52f, 635f, 45f, "", 21, art, TextAnchor.UpperLeft);
-                upgradeButtons[i] = MenuBuilder.GoldButton("Upgrade", row, 306f, 100f, 345f, 43f, "", 22, art, null, out upgradeLabels[i]);
-                UnityEventTools.AddIntPersistentListener(upgradeButtons[i].onClick, inventory.UpgradeAbility, i);
+                RectTransform row = Frame("Ability " + i, skills, 22f, 65f + i * 116f, 676f, 110f, art);
+                abilityIcons[i] = HudBuilder.Img(MenuBuilder.Box("Icon", row, 15f, 18f, 64f, 64f).gameObject,
+                    skillIcons[(int)AbilityBook.At(Catalog.Classes[0], i).Effect], Color.white);
+                abilityLabels[i] = Text("Name", row, 94f, 0f, 560f, 27f, "", 23, art, heading: true);
+                abilityDescriptions[i] = Text("Description", row, 94f, 27f, 558f, 38f, "", 16, art, TextAnchor.UpperLeft);
+                equipQ[i] = MenuBuilder.GoldButton("Equip Q", row, 94f, 67f, 106f, 40f, InventoryText.EquipQ, 19, art, null, out equipQLabels[i]);
+                equipR[i] = MenuBuilder.GoldButton("Equip R", row, 216f, 67f, 106f, 40f, InventoryText.EquipR, 19, art, null, out equipRLabels[i]);
+                upgradeButtons[i] = MenuBuilder.GoldButton("Upgrade", row, 340f, 67f, 312f, 40f, "", 19, art, null, out upgradeLabels[i]);
+                UnityEventTools.AddIntPersistentListener(upgradeButtons[i].onClick, inventory.UpgradeKnownAbility, i);
+                UnityEventTools.AddIntPersistentListener(equipQ[i].onClick, inventory.EquipQ, i);
+                UnityEventTools.AddIntPersistentListener(equipR[i].onClick, inventory.EquipR, i);
             }
-            Text("Free Actions", skills, 34f, 435f, 650f, 72f, InventoryText.BasicDescription, 24, art, TextAnchor.UpperLeft);
             RectTransform properties = Frame("Properties", abilityPage, 734f, 0f, 654f, 535f, art);
             Text("Properties Heading", properties, 20f, 15f, 614f, 56f, InventoryText.Properties, 36, art, TextAnchor.MiddleCenter, true);
             string[] statNames = { InventoryText.RaiseHealth, InventoryText.RaiseFocus, InventoryText.RaiseAttack,
@@ -127,6 +141,9 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(inventory, "portraits", art.Cards);
             SceneWiring.Set(inventory, "statistics", statistics);
             SceneWiring.Set(inventory, "weapon", weapon);
+            SceneWiring.Set(inventory, "weaponImage", weaponImage);
+            SceneWiring.Set(inventory, "classWeaponIcons", EquipmentIconBuilder.ClassSprites());
+            SceneWiring.Set(inventory, "goodsWeaponIcons", EquipmentIconBuilder.GoodsSprites());
             SceneWiring.Set(inventory, "relic", relic);
             SceneWiring.Set(inventory, "torchLabel", torchLabel);
             SceneWiring.Set(inventory, "potionLabel", potionLabel);
@@ -135,6 +152,12 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(inventory, "abilityDescriptions", abilityDescriptions);
             SceneWiring.Set(inventory, "upgradeLabels", upgradeLabels);
             SceneWiring.Set(inventory, "upgradeButtons", upgradeButtons);
+            SceneWiring.Set(inventory, "abilityIcons", abilityIcons);
+            SceneWiring.Set(inventory, "skillIcons", skillIcons);
+            SceneWiring.Set(inventory, "equipQButtons", equipQ);
+            SceneWiring.Set(inventory, "equipRButtons", equipR);
+            SceneWiring.Set(inventory, "equipQLabels", equipQLabels);
+            SceneWiring.Set(inventory, "equipRLabels", equipRLabels);
             SceneWiring.Set(inventory, "statButtons", statButtons);
             SceneWiring.Set(inventory, "levelCost", levelCost);
             SceneWiring.Set(inventory, "message", message);

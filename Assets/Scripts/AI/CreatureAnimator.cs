@@ -8,7 +8,7 @@ namespace AshenRealm.AI
     /// Procedural animation for the non-humanoid rigs: a trot for beasts, wingbeats and hover for flyers, squash and
     /// stretch for blobs. Pure presentation; timing comes from <see cref="EnemyAI"/>.
     /// </summary>
-    public sealed class CreatureAnimator : MonoBehaviour, ICreatureAnimator
+    public sealed class CreatureAnimator : MonoBehaviour, ICreatureAnimator, IEnemyAttackAnimator
     {
         [SerializeField] EnemyBody body;
         [SerializeField] Transform model;
@@ -21,7 +21,9 @@ namespace AshenRealm.AI
 
         Quaternion[] limbRest;
         Quaternion headRest, tailRest;
-        Vector3 modelRest;
+        Vector3 modelRest, modelScale;
+        MoveKind attackStyle;
+        float burrow;
         float locomotion, phase;
         float attackTime = -1f, attackWindup = 0.5f, attackRecovery = 0.5f;
         float recoilTime = -1f, deathTime = -1f;
@@ -34,7 +36,11 @@ namespace AshenRealm.AI
             if (head != null) headRest = head.localRotation;
             if (tail != null) tailRest = tail.localRotation;
             modelRest = model.localPosition;
+            modelScale = model.localScale;
         }
+
+        public void SetAttackStyle(MoveKind kind) => attackStyle = kind;
+        public void SetBurrow(float amount) => burrow = Mathf.Clamp01(amount);
 
         public void SetLocomotion(float normalizedSpeed) =>
             locomotion = Mathf.MoveTowards(locomotion, Mathf.Clamp01(normalizedSpeed), Time.deltaTime * 4f);
@@ -105,6 +111,7 @@ namespace AshenRealm.AI
                 case EnemyBody.Flyer: AnimateFlyer(moving, lunge); break;
                 default: AnimateBlob(moving, lunge); break;
             }
+            model.localPosition += Vector3.down * (burrow * 1.8f);
         }
 
         void AnimateBeast(float moving, float lunge)
@@ -115,7 +122,8 @@ namespace AshenRealm.AI
                 float sign = i == 0 || i == 3 ? 1f : -1f; // trot: diagonal pairs move together
                 limbs[i].localRotation = limbRest[i] * Quaternion.Euler(swing * sign * 34f, 0f, 0f);
             }
-            model.localPosition = modelRest + hitOffset * 0.5f + new Vector3(0f, Mathf.Abs(Mathf.Cos(phase)) * 0.05f * moving, lunge * 0.45f);
+            float leap = attackStyle == MoveKind.Pounce && attackTime >= attackWindup ? Mathf.Sin(Mathf.Clamp01((attackTime - attackWindup) / Mathf.Max(0.1f, attackRecovery)) * Mathf.PI) * 0.6f : 0f;
+            model.localPosition = modelRest + hitOffset * 0.5f + new Vector3(0f, leap + Mathf.Abs(Mathf.Cos(phase)) * 0.05f * moving, lunge * (attackStyle == MoveKind.Charge ? 0.7f : 0.45f));
             model.localRotation = Quaternion.Euler(lunge * 12f + Mathf.Sin(Time.time * 2f) * 0.8f, 0f, 0f);
             if (head != null) head.localRotation = headRest * Quaternion.Euler(lunge * 18f + Mathf.Sin(Time.time * 1.7f) * 3f, 0f, 0f);
             if (tail != null) tail.localRotation = tailRest * Quaternion.Euler(0f, Mathf.Sin(Time.time * 6f) * 22f, 0f);
@@ -135,7 +143,7 @@ namespace AshenRealm.AI
         {
             float wobble = Mathf.Sin(phase * 0.6f) * (0.05f + moving * 0.09f);
             float stretch = lunge * 0.28f;
-            model.localScale = new Vector3(1f + wobble - stretch * 0.5f, 1f - wobble + Mathf.Max(0f, -stretch) * 0.8f, 1f + wobble + Mathf.Max(0f, stretch));
+            model.localScale = Vector3.Scale(modelScale, new Vector3(1f + wobble - stretch * 0.5f, 1f - wobble + Mathf.Max(0f, -stretch) * 0.8f, 1f + wobble + Mathf.Max(0f, stretch)));
             model.localPosition = modelRest + hitOffset * 0.3f + new Vector3(0f, 0f, lunge * 0.35f);
         }
 
@@ -154,7 +162,7 @@ namespace AshenRealm.AI
                     model.localPosition = modelRest + Vector3.up * Mathf.Lerp(hoverHeight, 0.2f, fall);
                     break;
                 default:
-                    model.localScale = new Vector3(1f + fall * 0.5f, Mathf.Lerp(1f, 0.12f, fall), 1f + fall * 0.5f);
+                    model.localScale = Vector3.Scale(modelScale, new Vector3(1f + fall * 0.5f, Mathf.Lerp(1f, 0.12f, fall), 1f + fall * 0.5f));
                     break;
             }
         }

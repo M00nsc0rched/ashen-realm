@@ -69,6 +69,18 @@ namespace AshenRealm.EditorTools
                 case EnemyBody.Flyer: animator = BuildFlyer(root.transform, id, d.Scale, renderers); break;
                 default: animator = BuildBlob(root.transform, id, d.Scale, renderers); break;
             }
+            if (d.Rank >= EnemyRank.Elite)
+            {
+                Transform model = root.transform.Find("Model");
+                Transform attachment = d.Body == EnemyBody.Humanoid ? model.Find("Hips/Torso") : model;
+                renderers.Add(Part("Signature Regalia", attachment, Shared("Creature_Signature_" + id, b =>
+                {
+                    if (d.Body == EnemyBody.Humanoid) b.Push(Vector3.down * 1.02f, Quaternion.identity, Vector3.one);
+                    EnemySignatureMeshes.Regalia(b, id);
+                    if (d.Body == EnemyBody.Humanoid) b.Pop();
+                })));
+            }
+            EnemyAttackTelegraph warning = BuildTelegraph(root.transform);
 
             SceneWiring.Set(status, "health", health);
             SceneWiring.Set(ai, "enemyId", id);
@@ -78,6 +90,7 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(ai, "target", player);
             SceneWiring.Set(ai, "projectiles", projectiles);
             SceneWiring.Set(ai, "impactEffects", impacts);
+            SceneWiring.Set(ai, "telegraph", warning);
             SceneWiring.Set(ai, "patrolPoints", patrol);
             SceneWiring.Set(ai, "eyeHeight", Mathf.Max(1.2f, cc.height * 0.8f));
             SceneWiring.Set(flash, "health", health);
@@ -124,7 +137,9 @@ namespace AshenRealm.EditorTools
             renderers.Add(Part("Arm R Mesh", armR, arm));
             if (s.Held != HeldItem.None)
             {
-                Mesh held = Shared("Held_" + s.Held, b => CreatureMeshes.Held(b, s.Held));
+                bool signature = id == "brine" || id == "pyraxes" || id == "cinderprophet";
+                Mesh held = Shared(signature ? "Held_" + id : "Held_" + s.Held,
+                    b => { if (signature) EnemySignatureMeshes.Weapon(b, id); else CreatureMeshes.Held(b, s.Held); });
                 var grip = Child("Held", armR, new Vector3(0f, -0.72f, 0.03f), Quaternion.Euler(s.Held == HeldItem.GreatSword ? 160f : 75f, 0f, 0f));
                 if (s.Held == HeldItem.GreatSword) grip.localScale = Vector3.one * 1.25f;
                 renderers.Add(Part("Held Mesh", grip, held));
@@ -219,6 +234,45 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(animator, "body", EnemyBody.Blob);
             SceneWiring.Set(animator, "model", model);
             return animator;
+        }
+
+        EnemyAttackTelegraph BuildTelegraph(Transform root)
+        {
+            var marker = Child("Attack Warning", root, Vector3.zero, Quaternion.identity);
+            var warning = marker.gameObject.AddComponent<EnemyAttackTelegraph>();
+            foreach (string field in new[] { "area", "inner", "lane" })
+            {
+                var part = Child(field, marker, Vector3.zero, Quaternion.identity);
+                Mesh mesh = Shared(field == "lane" ? "Warning_Lane" : "Warning_Ring", b =>
+                {
+                    b.SetColor(Pal.Plaster, 0.7f);
+                    b.Current.Emission = 0.45f;
+                    if (field == "lane")
+                    {
+                        b.Box(new Vector3(-0.5f, 0f, 0f), new Vector3(0.045f, 0.015f, 1f));
+                        b.Box(new Vector3(0.5f, 0f, 0f), new Vector3(0.045f, 0.015f, 1f));
+                        b.Box(new Vector3(0f, 0f, -0.5f), new Vector3(1f, 0.015f, 0.04f));
+                        b.Box(new Vector3(0f, 0f, 0.5f), new Vector3(1f, 0.015f, 0.04f));
+                    }
+                    else
+                    {
+                        for (int i = 0; i < 48; i++)
+                        {
+                            float a = i * Mathf.PI / 24f, c = (i + 1) * Mathf.PI / 24f;
+                            Vector3 u = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+                            Vector3 v = new Vector3(Mathf.Cos(c), 0f, Mathf.Sin(c));
+                            b.QuadOutward(u, v, v * 0.965f, u * 0.965f, Vector3.down);
+                        }
+                    }
+                });
+                part.gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var renderer = part.gameObject.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = materials.World;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                SceneWiring.Set(warning, field, part);
+                part.gameObject.SetActive(false);
+            }
+            return warning;
         }
 
         Renderer Part(string name, Transform parent, Mesh mesh, bool castShadows = true)

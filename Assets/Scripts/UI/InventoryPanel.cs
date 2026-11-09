@@ -20,6 +20,9 @@ namespace AshenRealm.UI
         [SerializeField] Sprite[] portraits;
         [SerializeField] Text[] statistics;
         [SerializeField] Text weapon;
+        [SerializeField] Image weaponImage;
+        [SerializeField] Sprite[] classWeaponIcons;
+        [SerializeField] Sprite[] goodsWeaponIcons;
         [SerializeField] Text relic;
         [SerializeField] Text torchLabel;
         [SerializeField] Text potionLabel;
@@ -28,6 +31,12 @@ namespace AshenRealm.UI
         [SerializeField] Text[] abilityDescriptions;
         [SerializeField] Text[] upgradeLabels;
         [SerializeField] Button[] upgradeButtons;
+        [SerializeField] Image[] abilityIcons;
+        [SerializeField] Sprite[] skillIcons;
+        [SerializeField] Button[] equipQButtons;
+        [SerializeField] Button[] equipRButtons;
+        [SerializeField] Text[] equipQLabels;
+        [SerializeField] Text[] equipRLabels;
         [SerializeField] Text levelCost;
         [SerializeField] Button[] statButtons;
         [SerializeField] Text message;
@@ -87,15 +96,22 @@ namespace AshenRealm.UI
             statistics[8].text = string.Format(InventoryText.GoldFormat, 20);
             statistics[9].text = string.Format(InventoryText.SoulsFormat, 6);
             weapon.text = InventoryText.Weapon + "\n" + InventoryText.ClassWeapons[0];
+            weaponImage.sprite = classWeaponIcons[0];
             relic.text = InventoryText.Relic + "\n" + InventoryText.Empty;
             torchLabel.text = InventoryText.TorchTake;
             potionLabel.text = string.Format(InventoryText.PotionFormat, 1);
-            AbilityDefinition[] definitions = { definition.Ability1, definition.Ability2 };
+            AbilityDefinition[] definitions = AbilityBook.All(definition);
             for (int i = 0; i < definitions.Length; i++)
             {
                 abilityLabels[i].text = string.Format(InventoryText.AbilityFormat, definitions[i].Name, definitions[i].Cost, 1);
                 abilityDescriptions[i].text = definitions[i].Description;
                 upgradeLabels[i].text = string.Format(InventoryText.UpgradeFormat, 25);
+                upgradeButtons[i].interactable = false;
+                abilityIcons[i].sprite = skillIcons[(int)definitions[i].Effect];
+                equipQLabels[i].text = i == 0 ? InventoryText.ActiveQ : InventoryText.EquipQ;
+                equipRLabels[i].text = i == 1 ? InventoryText.ActiveR : InventoryText.EquipR;
+                equipQButtons[i].interactable = i != 0;
+                equipRButtons[i].interactable = i != 1;
             }
             levelCost.text = string.Format(InventoryText.LevelCostFormat, 12);
             message.text = string.Empty;
@@ -130,18 +146,26 @@ namespace AshenRealm.UI
             statistics[8].text = string.Format(InventoryText.GoldFormat, session.Gold);
             statistics[9].text = string.Format(InventoryText.SoulsFormat, keeper.Souls);
             weapon.text = InventoryText.Weapon + "\n" + (session.Weapon?.Name ?? InventoryText.ClassWeapons[(int)session.Class.Id]);
+            int goodsIndex = Array.IndexOf(Catalog.ItemsOf(ItemSlot.Weapon), session.Weapon);
+            weaponImage.sprite = goodsIndex >= 0 ? goodsWeaponIcons[goodsIndex] : classWeaponIcons[(int)session.Class.Id];
             relic.text = InventoryText.Relic + "\n" + (session.Relic?.Name ?? InventoryText.Empty);
             torchLabel.text = p.TorchEquipped ? InventoryText.TorchPutAway : InventoryText.TorchTake;
             potionLabel.text = string.Format(InventoryText.PotionFormat, session.Potions);
             potionButton.interactable = session.Potions > 0 && health.Normalized < 1f;
-            AbilityDefinition[] abilities = { session.Class.Ability1, session.Class.Ability2 };
+            AbilityDefinition[] abilities = AbilityBook.All(session.Class);
             for (int i = 0; i < abilities.Length; i++)
             {
-                int tier = p.AbilityTier(i);
+                int tier = p.KnownAbilityTier(i);
                 abilityLabels[i].text = string.Format(InventoryText.AbilityFormat, abilities[i].Name, abilities[i].Cost, tier);
                 abilityDescriptions[i].text = abilities[i].Description;
-                upgradeLabels[i].text = tier >= 3 ? InventoryText.TierMaximum : string.Format(InventoryText.UpgradeFormat, p.AbilityUpgradeCost(i));
-                upgradeButtons[i].interactable = tier < 3 && keeper.Souls >= p.AbilityUpgradeCost(i);
+                abilityIcons[i].sprite = skillIcons[(int)abilities[i].Effect];
+                upgradeLabels[i].text = tier >= 3 ? InventoryText.TierMaximum : string.Format(InventoryText.UpgradeFormat, p.KnownAbilityUpgradeCost(i));
+                upgradeButtons[i].interactable = tier < 3 && keeper.Souls >= p.KnownAbilityUpgradeCost(i);
+                bool first = p.EquippedAbilityIndex(0) == i, second = p.EquippedAbilityIndex(1) == i;
+                equipQLabels[i].text = first ? InventoryText.ActiveQ : InventoryText.EquipQ;
+                equipRLabels[i].text = second ? InventoryText.ActiveR : InventoryText.EquipR;
+                equipQButtons[i].interactable = !first;
+                equipRButtons[i].interactable = !second;
             }
             levelCost.text = string.Format(InventoryText.LevelCostFormat, p.UpgradeCost);
             foreach (Button button in statButtons) button.interactable = keeper.Souls >= p.UpgradeCost;
@@ -161,6 +185,13 @@ namespace AshenRealm.UI
             else message.text = string.Empty;
             SaveAndRefresh();
         }
+        public void UpgradeKnownAbility(int index)
+        {
+            message.text = Progression.TryUpgradeKnownAbility(index) ? string.Empty : InventoryText.CannotAfford;
+            SaveAndRefresh();
+        }
+        public void EquipQ(int index) { Progression.TryEquipAbility(0, index); message.text = InventoryText.LoadoutSaved; SaveAndRefresh(); }
+        public void EquipR(int index) { Progression.TryEquipAbility(1, index); message.text = InventoryText.LoadoutSaved; SaveAndRefresh(); }
         void SaveAndRefresh() { keeper.Save(); Refresh(); }
         void Update() { if (IsOpen) MenuFocus.Keep(firstButton); }
         void SetVisible(bool visible)

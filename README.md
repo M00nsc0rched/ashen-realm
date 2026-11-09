@@ -44,7 +44,7 @@ author's design sketches. The one third-party asset is the Spectral font (SIL Op
 | Jump | Space | **UGRÁS** | South button |
 | Attack | left mouse while the cursor is captured (hold to keep swinging) | **TÁMADÁS** (the only way in touch mode) | right trigger |
 | Block | hold right mouse while the cursor is captured | hold **VÉDÉS** | left trigger |
-| Class abilities (cost focus) | Q, R | the two ability buttons (named after the ability) | right / left shoulder |
+| Equipped class abilities (cost focus) | Q, R | the two ability buttons (named after the ability) | right / left shoulder |
 | Healing potion | F | **FŐZET** | North button |
 | Interact, talk | E | **HASZNÁL** | West button |
 | Answer in a dialogue, use a menu | click, or 1-5 in a dialogue | tap | D-pad and South button |
@@ -56,7 +56,7 @@ Touch controls appear automatically on devices and in the Device Simulator; pres
 touch layout with the mouse. In touch mode the mouse never attacks: drag to look, press **TÁMADÁS** to strike.
 
 The game text is Hungarian. HUD strings live in `Assets/Scripts/Core/GameText.cs`, menu strings in `Assets/Scripts/Core/MenuText.cs`
-and `InventoryText.cs`.
+and `InventoryText.cs`, and city service prompts in `CityText.cs`.
 
 **Beállítások** (from the main menu or the pause menu): language (Hungarian for now), look speed, save and load, on-screen
 buttons shown or hidden with their opacity and a layout editor that drags each one anywhere, HUD shown or hidden with its
@@ -65,26 +65,39 @@ that browser's site data.
 
 The pause button opens **Lemerülés menüje**. **Készlet és képességek** shows the class portrait, current stats, equipment,
 potions and the carried torch. Its **KÉPESSÉGEK** tab spends Souls on six stat upgrades and three tiers of each class ability.
-Growth and the torch choice are saved with the soul; class unlocks belong to the permanent ledger.
+Each class has four abilities (24 across the six classes), with its own icon for each one. Prepare any two in the Q/R slots;
+changing slots is free and keeps each skill's running cooldown. Tiers, the chosen pair, growth and the torch choice are saved
+with the soul; class unlocks belong to the permanent ledger. Equipment icons are rendered from the same mesh recipes as
+the held weapons, including anything bought in town.
 
 ## What to try
 - The game opens on the main menu: **Új lélek** starts a soul, the roster continues one, **Kódex** lists what you have met.
-- Choose a class. Each has its own health, weapon, starting honor and two abilities.
+- Choose a class. Each has its own health, starting honor, card-matched equipment and four abilities; two are prepared at once.
+  Try the knight's crescent polearm and sun shield, the witch's antler staff, the warden's twin blades, or the necromancer's
+  chained sickles. The alchemist keeps the green flask visible even when carrying a torch.
 - Look south at the dark, closed mountain tunnel and the waiting caravan that brought you here.
 - Visit the three furnished cottages beside the valley road; each door returns to its own doorstep.
 - Explore the hamlet's working yards, the pilgrims' spring, the broken viaduct and the sword garden. Look for objects with
   **MEGVIZSGÁLÁS**: the places and the people who left them have short stories to discover.
 - Follow the dirt road north from the fenced spawn lane toward the ruined chapel.
-- The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. It telegraphs an overhead chop: block it (stamina!) or step back,
-  then strike. 4 sword hits defeat it, and the gate behind the chapel opens.
+- The **Cursed Knight** (Átkozott Lovag) patrols the chapel entrance. Its overhead chop, broad sweep and short rush have
+  different wind-ups: block with stamina or step aside, then strike during recovery. Defeating it opens the gate behind the chapel.
 - Inside the chapel, aim at the **chest** at the altar and press E / HASZNÁL ("LÁDA KINYITÁSA") for gold and a healing draught.
 - In **Üregkapu**, talk to the Dark Wanderer and the townsfolk. Temper your weapon, buy potions, buy back your honor.
 - Leave the market road for the Well of Names and Lantern Court; look up at the rooflines, hanging signs and window light.
   The tavern, forge, chapel and three homes each have their own furnishings and a discoverable memento.
+- Use the well for health and focus, buy a two-potion travel package, light a memorial candle for honor, or rest over tea
+  under the lantern tree. These paid services renew when you begin another descent. The watch board offers three saved
+  contracts for 3, 5 and 7 dungeon foes; return to the board for each gold and Souls reward.
 - Sunset fades along the road. By the city it is evening; returning to the valley keeps that light. The first city arrival
   takes out your torch, which the inventory can put away or draw again. The townsfolk breathe and turn; the smith works his hammer.
 - The tavern door is the stair down. Every depth has packs, a named terror, chests and encounters whose text changes
   with your honor. A Legendary Guardian bars each stair; the Gloamlord waits at the bottom.
+- Dungeon merchants count coins in furnished workshops and wear different clothes in each depth. Story encounters have
+  dressed, working figures: a bucket-lifting woman, beggar, sporewife, ferryman, forgewidow, bone choir and an injured caged wolf.
+  Dishonor changes their appearance as well as their words.
+- Watch each foe's wind-up and floor warning. Wolves leap, ghouls rush, slimes burrow, archers fire volleys and casters mark
+  the ground. Named terrors and guardians have different tactics and health phases; the Gloamlord adds attacks over three phases.
 - The five depths have different architecture and routes: a memorial nave in the Catacombs, a luminous fungal grove,
   the drowned docks, the chained furnace, and the ribbed cathedral of Marrow. Side galleries and loops give the journey
   landmarks to find beyond its guardian and stair.

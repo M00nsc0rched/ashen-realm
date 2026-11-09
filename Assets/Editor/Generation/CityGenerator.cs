@@ -277,7 +277,7 @@ namespace AshenRealm.EditorTools
             layout.Gate = origin + new Vector3(0f, 0f, -Half + 0.2f);
             layout.GateYaw = 180f;
 
-            layout.People.Add(("merchant", origin + new Vector3(-4.4f, 0f, -11.5f), 120f, b => CreatureMeshes.Figure(b, EnemyFactory.Villager("Merchant", Pal.Robe, Pal.Bone, true))));
+            layout.People.Add(("merchant", origin + new Vector3(-4.4f, 0f, -11.5f), 120f, b => PeopleMeshes.Merchant(b)));
         }
 
         /// <summary>

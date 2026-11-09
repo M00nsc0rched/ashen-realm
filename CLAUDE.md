@@ -2,7 +2,7 @@
 
 Original first-person dark fantasy RPG. Primary target: **web browser (WebGL)**, desktop and mobile; iPhone native
 remains supported. Unity **6000.6.8f1**, URP 17.6, Input System 1.20, uGUI 2.6.
-Current milestone: Checkpoint M, the redesigned valley, village, city, interiors and all five depths, all in
+Current milestone: Checkpoint N, matching class equipment, four-skill loadouts, distinct enemy tactics and living inhabitants, all in
 `Assets/Scenes/Prototype_Valley.unity`. See `docs/PROGRESS.md` for validation status and `docs/GRAVEBORNE.md` for the port's scope.
 Do not expand scope beyond that plan (multiplayer, weather) unless asked.
 
@@ -28,6 +28,12 @@ Long thin bars and a compass at the top centre, round emblem top-left, pause top
   references UI scripts or devices directly.
 - Damage flows through `IDamageable.ApplyDamage(DamageInfo)`; mitigation via `IDamageFilter` on the same GameObject as `Health`.
 - Animation is procedural and purely visual (`FirstPersonWeaponAnimator`, `KnightAnimator`); timing lives in gameplay code.
+- Class weapons follow the six paintings in `Art/Menu/Cards`. `CardWeaponMeshes` and `EquipmentIconBuilder` share mesh recipes;
+  the Alchemist holds a left flask and moves it right when drawing the torch. Keep hand and equipment images consistent.
+- `AbilityBook` gives each class four skills; `PlayerProgression` saves their tiers and two equipped Q/R indices. Keep the old
+  two-tier migration and per-skill cooldowns when changing loadouts. Persistent skill fields must stop on travel, death or class change.
+- `EnemyPatterns` owns distinct tactics and phase moves. Floor warnings must match the real damage after knockback;
+  keep animation separate from attack timing, and preserve the tutorial knight's original first chop.
 - Every serialized reference must be assigned unless the field has `[Optional]`. `Ashen Realm > Validate Prototype` enforces it.
 - The world has thirteen zones far apart along X (`World/ZoneNumbers`): valley 0, Hollowgate 1, tavern 2, forge 3, chapel 4,
   depths 5-9, and the three valley homes appended at 10-12. Keep these ids stable; restrict depth checks to `FirstDepth .. FirstDepth + DepthCount`.
@@ -72,6 +78,8 @@ Long thin bars and a compass at the top centre, round emblem top-left, pause top
 - Game language is **Hungarian**. HUD strings go in `Core/GameText`, menu strings in `Core/MenuText` and `Core/InventoryText` (never a literal in a builder or
   script). The web build font covers only U+0020-U+007E and U+00A0-U+017F: no em dash, ellipsis or minus sign; the
   validator enforces it. Write HUD prompts in upper case there (no runtime case mapping).
+- City activity text lives in `Core/CityText`; `CityActivityLedger` stays outside the inactive zones to record actual dungeon kills.
+  Its saved service limits and contract rewards are per descent and claims must remain idempotent.
 - Mouse buttons only fight while the cursor is captured in desktop mode; in touch mode only the TÁMADÁS button attacks.
 - Use only first-party Unity packages. Use the modern Input System (no `UnityEngine.Input`). HUD text uses legacy
   `UnityEngine.UI.Text` with the built-in `LegacyRuntime.ttf` (no TMP essentials import needed); menus use the same `Text`

@@ -77,6 +77,7 @@ namespace AshenRealm.Player
             data.Food = Mathf.Clamp(data.Food, 0, 100);
             data.AbilityOneTier = Mathf.Clamp(data.AbilityOneTier, 1, 3);
             data.AbilityTwoTier = Mathf.Clamp(data.AbilityTwoTier, 1, 3);
+            EnsureAbilities();
             ApplyRuntime();
         }
 
@@ -84,12 +85,29 @@ namespace AshenRealm.Player
         {
             if (Session == null || combat == null || health == null || abilities == null) return;
             combat.ApplyProgression(data.AttackBonus, data.MagicBonus + IntellectFocus, data.DefenseBonus, data.SpeedBonus);
-            abilities.ApplyProgression(data.FocusBonus + IntellectFocus, data.AbilityOneTier, data.AbilityTwoTier);
+            EnsureAbilities();
+            abilities.ApplyProgression(data.FocusBonus + IntellectFocus, data.AbilityTiers, data.EquippedAbilities);
             health.SetMax(Mathf.Max(1, MaxHealth), false);
             if (PlayerTorch.Instance != null) PlayerTorch.Instance.SetEquipped(data.TorchEquipped);
         }
 
-        public int AbilityTier(int slot) => slot == 0 ? data.AbilityOneTier : data.AbilityTwoTier;
+        void EnsureAbilities()
+        {
+            if (data.AbilityTiers == null || data.AbilityTiers.Length != AbilityBook.KnownCount)
+                data.AbilityTiers = new[] { Mathf.Clamp(data.AbilityOneTier, 1, 3), Mathf.Clamp(data.AbilityTwoTier, 1, 3), 1, 1 };
+            for (int i = 0; i < data.AbilityTiers.Length; i++) data.AbilityTiers[i] = Mathf.Clamp(data.AbilityTiers[i], 1, 3);
+            if (data.EquippedAbilities == null || data.EquippedAbilities.Length != 2 ||
+                data.EquippedAbilities[0] < 0 || data.EquippedAbilities[0] >= AbilityBook.KnownCount ||
+                data.EquippedAbilities[1] < 0 || data.EquippedAbilities[1] >= AbilityBook.KnownCount ||
+                data.EquippedAbilities[0] == data.EquippedAbilities[1]) data.EquippedAbilities = new[] { 0, 1 };
+            data.AbilityOneTier = data.AbilityTiers[0];
+            data.AbilityTwoTier = data.AbilityTiers[1];
+        }
+
+        public int EquippedAbilityIndex(int slot) { EnsureAbilities(); return data.EquippedAbilities[Mathf.Clamp(slot, 0, 1)]; }
+        public int KnownAbilityTier(int index) { EnsureAbilities(); return data.AbilityTiers[Mathf.Clamp(index, 0, AbilityBook.KnownCount - 1)]; }
+        public int KnownAbilityUpgradeCost(int index) => KnownAbilityTier(index) >= 3 ? 0 : KnownAbilityTier(index) == 1 ? 25 : 48;
+        public int AbilityTier(int slot) => KnownAbilityTier(EquippedAbilityIndex(slot));
         public int AbilityUpgradeCost(int slot) => AbilityTier(slot) >= 3 ? 0 : AbilityTier(slot) == 1 ? 25 : 48;
 
         public bool TryRaiseStat(int statIndex)
@@ -114,8 +132,26 @@ namespace AshenRealm.Player
 
         public bool TryUpgradeAbility(int slot)
         {
-            if (slot < 0 || slot > 1 || AbilityTier(slot) >= 3 || !SoulKeeper.Instance.TrySpendSouls(AbilityUpgradeCost(slot))) return false;
-            if (slot == 0) data.AbilityOneTier++; else data.AbilityTwoTier++;
+            return slot >= 0 && slot < 2 && TryUpgradeKnownAbility(EquippedAbilityIndex(slot));
+        }
+
+        public bool TryUpgradeKnownAbility(int index)
+        {
+            if (index < 0 || index >= AbilityBook.KnownCount || KnownAbilityTier(index) >= 3 ||
+                !SoulKeeper.Instance.TrySpendSouls(KnownAbilityUpgradeCost(index))) return false;
+            data.AbilityTiers[index]++;
+            ApplyRuntime();
+            SoulKeeper.Instance.Save();
+            return true;
+        }
+
+        public bool TryEquipAbility(int slot, int index)
+        {
+            if (slot < 0 || slot >= 2 || index < 0 || index >= AbilityBook.KnownCount) return false;
+            EnsureAbilities();
+            int other = 1 - slot;
+            if (data.EquippedAbilities[other] == index) data.EquippedAbilities[other] = data.EquippedAbilities[slot];
+            data.EquippedAbilities[slot] = index;
             ApplyRuntime();
             SoulKeeper.Instance.Save();
             return true;

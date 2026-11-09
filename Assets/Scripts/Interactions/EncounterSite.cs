@@ -40,6 +40,7 @@ namespace AshenRealm.Interactions
             resolved = true;
             clearFigure.SetActive(false);
             if (warpedFigure != null) warpedFigure.SetActive(false);
+            if (TryGetComponent<Collider>(out var collider)) collider.enabled = false;
         }
 
         void Update()

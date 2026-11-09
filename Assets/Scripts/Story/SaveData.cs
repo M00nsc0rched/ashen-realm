@@ -46,6 +46,8 @@ namespace AshenRealm.Story
         public int Level = 1, Food = 100, Intellect = 10;
         public int HealthBonus, FocusBonus, AttackBonus, DefenseBonus, MagicBonus, SpeedBonus;
         public int AbilityOneTier = 1, AbilityTwoTier = 1;
+        public int[] AbilityTiers;
+        public int[] EquippedAbilities;
         public bool TorchEquipped;
     }
 }

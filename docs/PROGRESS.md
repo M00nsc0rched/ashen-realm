@@ -1,6 +1,6 @@
 # Ashen Realm — Progress
 
-_Last updated: 2026-11-08_
+_Last updated: 2026-11-09_
 
 ## Environment (confirmed)
 - Unity project: `E:\Ashen Realm\AshenRealm`, Editor **6000.6.8f1** (installed via Unity Hub), URP template.
@@ -10,6 +10,38 @@ _Last updated: 2026-11-08_
   so a native iOS build (Xcode) cannot be performed on this machine.
 - Git: current source branch `menus-and-houses`; the playable site is a separate build on `gh-pages` (E: has no file ownership,
   so the project path is in the global `safe.directory` list).
+
+## Checkpoint N — distinct hands, skills, foes and inhabitants (2026-11-09)
+- Equipment now follows the actual six class paintings: crescent polearm/sun shield; one grave dagger/free hand; antler staff/crystal;
+  paired Warden blades; paired chained Necromancer sickles; and the Alchemist's green flask in the left hand. With a torch the flask
+  moves to the right. Dual weapons alternate visually. HUD/inventory equipment images are rendered from the same mesh recipes.
+- Each class has four usable skills, twelve new effects in all, with twenty-four individual icons. The menu equips two active Q/R skills
+  and buys their tiers. Four tier values and the two loadout slots persist; old two-skill saves migrate. Swapping skills preserves cooldowns;
+  persistent fields end on travel, death or class change.
+- Every bestiary family has separate tactical patterns: lunges, charges, sweeps, committed ground strikes, rings, volleys, counters,
+  burrowing and teleporting. Elites and guardians unlock phase moves. Major foes have distinct regalia and weapons; Mycel keeps its
+  authored scale. The valley knight alternates the original chop, sweep and shield rush. Floor warnings reveal their committed reach.
+- Six merchants have distinct clothes, visible working hands and equipped workshops. All eight story encounters now have their own
+  clear/warped figures, occupations, props and movement; the caged wolf is a quadruped. Departed encounter figures leave no invisible collider.
+- Hollowgate has five working activities: well water, watch contracts, travel supplies, memorial candles and lantern-court rest. Services
+  have saved per-descent limits. Three watch contracts require distinct actual dungeon kills, persist progress and pay their reward once.
+
+### Checkpoint N validation
+| Check | Result |
+|---|---|
+| C# compilation | Runtime and Editor preflights and final Unity compilation passed |
+| Generation and validator | final main project passed, 8936 checks; all 5715 floor cells and 337 dungeon gameplay points connected |
+| Automated playtest | final pass: 608 checks, 0 failures; actual new skill effects, full SoulKeeper loadout/tier persistence, all three contracts, NPC work loops, class hands/torch and enemy movement/damage |
+| Combat review | fixed warnings drifting from knocked-back enemies; targeted tests cover moving windups, rush lanes, ring safe centres, blocked/clear burrow landings and interruptible healing |
+| Visual review | all six class kits and shared equipment images, twenty-four skill icons, five guardian silhouettes, five merchant workshops and eight encounter figures reviewed; enlarged four-row menus reviewed at desktop and phone-landscape sizes |
+| Build source audit | all 656 non-meta asset files (148 C# files, three shaders and the generated world included) are byte-identical in the cached build copy; all 690 asset/folder GUIDs match |
+| Build source audit | all 656 non-meta asset files (148 C# files, three shaders and the generated world included) are byte-identical in the cached build copy; all 690 asset/folder GUIDs match |
+| WebGL release build | succeeded in 19.8 min, 32.0 MiB, 0 build errors; the final data package matches the prepared release blob |
+| Browser test | local Chromium WebGL passed: evening city/animated torch and held polearm, inventory, four skills, Q/R assignment, actual Hamukor cast, five-second secret-menu hold, save and page-reload resume with the new Q/R pair |
+
+The four skill rows keep separate name/description lines and use 40-pixel-high Q/R/upgrade buttons. The original two-tier save
+format still migrates. No package, world-version, zone-id, material-count or permanent-light-budget change was needed.
+Real-phone touch input, Safari and Firefox have not been tested for this checkpoint.
 
 ## Checkpoint M — places worth exploring (2026-11-08)
 - All thirteen zones are redesigned through their generators. The valley gains a pilgrims' spring, a western loop and broken viaduct,

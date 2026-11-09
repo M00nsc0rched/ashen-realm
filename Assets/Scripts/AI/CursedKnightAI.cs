@@ -69,9 +69,14 @@ namespace AshenRealm.AI
         float stuckTime, avoidTime;
         float avoidSign = 1f;
         Vector3 lastPosition;
+        Vector3 committedDirection;
+        int attackSequence;
+        MoveKind currentPattern;
+        float moveWindup, moveRecovery;
 
         public State CurrentState => state;
         public Health Health => health;
+        public MoveKind CurrentPattern => currentPattern;
         /// <summary>True while the knight is actively fighting the player.</summary>
         public bool IsEngaged => state == State.Chase || state == State.Attack;
         public string DisplayName => GameText.KnightName;
@@ -165,53 +170,65 @@ namespace AshenRealm.AI
                 }
 
                 case State.Attack:
-                    UpdateAttack(ref lookDirection);
+                    UpdateAttack(ref lookDirection, ref desiredVelocity);
                     break;
             }
 
             if (staggered) desiredVelocity = Vector3.zero;
-            Move(desiredVelocity, lookDirection, staggered || state == State.Attack, dt);
+            Move(desiredVelocity, lookDirection, staggered || (state == State.Attack && currentPattern != MoveKind.Charge), dt);
         }
 
         void RecoverAfterTargetLost()
         {
             // The knight forgets the fight and recovers, so the player can retry after respawning.
             health.ResetHealth();
+            attackSequence = 0;
             SetState(patrolPoints.Length > 0 ? State.Patrol : State.Idle);
         }
 
         void BeginAttack()
         {
             attackResolved = false;
+            currentPattern = attackSequence % 3 == 0 ? MoveKind.Melee : attackSequence % 3 == 1 ? MoveKind.Sweep : MoveKind.Charge;
+            attackSequence++;
+            moveWindup = currentPattern == MoveKind.Melee ? attackWindup : currentPattern == MoveKind.Sweep ? 0.95f : 1.05f;
+            moveRecovery = currentPattern == MoveKind.Melee ? attackRecovery : 0.8f;
+            committedDirection = transform.forward;
             nextAttackTime = Time.time + attackInterval;
             SetState(State.Attack);
-            animator.PlayAttack(attackWindup, attackRecovery);
+            animator.SetAttackStyle(currentPattern);
+            animator.PlayAttack(moveWindup, moveRecovery);
         }
 
-        void UpdateAttack(ref Vector3 lookDirection)
+        void UpdateAttack(ref Vector3 lookDirection, ref Vector3 desiredVelocity)
         {
-            if (target != null && stateTime < attackWindup * 0.7f)
-                lookDirection = Flat(target.position - transform.position);
+            if (target != null && stateTime < moveWindup * 0.45f)
+                committedDirection = Flat(target.position - transform.position).normalized;
+            lookDirection = committedDirection;
+            if (currentPattern == MoveKind.Charge && stateTime > moveWindup - 0.28f && stateTime <= moveWindup)
+                desiredVelocity = committedDirection * 3.4f;
 
-            if (!attackResolved && stateTime >= attackWindup)
+            if (!attackResolved && stateTime >= moveWindup)
             {
                 attackResolved = true;
                 ResolveAttackHit();
             }
 
-            if (stateTime >= attackWindup + attackRecovery)
+            if (stateTime >= moveWindup + moveRecovery)
                 SetState(State.Chase);
         }
 
         /// <summary>Overlap sphere in front of the knight at the moment the blade comes down.</summary>
         void ResolveAttackHit()
         {
-            Vector3 center = transform.position + transform.forward * (attackReach * 0.65f) + Vector3.up * 1.2f;
-            int count = Physics.OverlapSphereNonAlloc(center, attackHitRadius, overlapBuffer, ~0, QueryTriggerInteraction.Ignore);
+            bool sweeping = currentPattern == MoveKind.Sweep;
+            Vector3 center = transform.position + transform.forward * (sweeping ? 0.35f : attackReach * 0.65f) + Vector3.up * 1.2f;
+            int count = Physics.OverlapSphereNonAlloc(center, sweeping ? 2f : attackHitRadius, overlapBuffer, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
             {
                 Collider c = overlapBuffer[i];
                 if (c.transform.IsChildOf(transform)) continue;
+                if (sweeping && Vector3.Angle(committedDirection, Flat(c.transform.position - transform.position)) > 100f) continue;
                 var damageable = c.GetComponentInParent<IDamageable>();
                 if (damageable == null || !damageable.IsAlive) continue;
 
