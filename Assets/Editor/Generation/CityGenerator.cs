@@ -21,6 +21,8 @@ namespace AshenRealm.EditorTools
         public Vector3 ChapelArrival;
         public Vector3 Gallows;
         public readonly List<(string id, Vector3 position, float yaw, System.Action<MeshBuilder> figure)> People = new List<(string, Vector3, float, System.Action<MeshBuilder>)>();
+        public readonly List<(string name, Vector3 position, float yaw, System.Action<MeshBuilder> figure)> Ambient =
+            new List<(string, Vector3, float, System.Action<MeshBuilder>)>();
     }
 
     /// <summary>
@@ -81,6 +83,7 @@ namespace AshenRealm.EditorTools
             BuildDistricts(layout);
             BuildStreetCharacter();
             BuildCourtyards();
+            AddTownsfolk(layout);
             BuildMountains();
 
             // Amber windows stain the nearest stone while the rest keeps the blue evening light.
@@ -353,6 +356,28 @@ namespace AshenRealm.EditorTools
             layout.People.Add(("widow", origin + new Vector3(7f, 0f, -49.6f), 272f, PeopleMeshes.Widow));
         }
 
+        /// <summary>
+        /// The gate's watch, the lamplighter, and the people who only live here. Some stand a step off the plan's spots: the
+        /// washerwoman north of the well's collider, the porter in the road before a stall rather than inside it.
+        /// </summary>
+        void AddTownsfolk(CityLayout layout)
+        {
+            layout.People.Add(("gateguard", origin + new Vector3(5.5f, 0f, -58f), 270f, PeopleMeshes.GateGuard));
+            layout.People.Add(("citylamplighter", origin + new Vector3(12f, 0f, 17f), 200f, PeopleMeshes.Lamplighter));
+            foreach (var (name, x, z, yaw, figure) in new (string, float, float, float, System.Action<MeshBuilder>)[]
+            {
+                ("City Guard", -5.5f, -58f, 90f, PeopleMeshes.CityGuard),
+                ("Washerwoman", -15.5f, 21.6f, 180f, PeopleMeshes.Washerwoman),
+                ("Mourner", -2.5f, -8.5f, 0f, PeopleMeshes.Mourner),
+                ("Drunk", 6f, 27f, 200f, PeopleMeshes.Drunk),
+                ("Porter", 3.5f, -30f, 90f, PeopleMeshes.Porter),
+                ("Choir Acolyte", -22f, 9.5f, 90f, PeopleMeshes.Monk),
+                ("Smith Apprentice", 26.4f, 12f, 270f, PeopleMeshes.SmithApprentice),
+                ("Beggar", -7.5f, -47f, 90f, PeopleMeshes.Beggar),
+            })
+                layout.Ambient.Add((name, origin + new Vector3(x, 0f, z), yaw, figure));
+        }
+
         /// <summary>One stall, its counter's front towards the road. The collider stops at the counter, so people behind it can be spoken to.</summary>
         void Stall(float x, float z, float yaw, bool lantern, bool swept)
         {
@@ -542,7 +567,10 @@ namespace AshenRealm.EditorTools
             foliageFree.Push(new Vector3(0f, -2f, hillZ), Quaternion.identity, Vector3.one);
             PropMeshes.Mountain(foliageFree, new System.Random(Seedless), 70f, hillHeight);
             foliageFree.Pop();
-            foliageFree.Push(new Vector3(0f, hillHeight * 0.84f, hillZ - 8f), Quaternion.identity, Vector3.one);
+            // The keep is wider than the peak's summit, so it stands on a crag of its own that reaches below the plain.
+            const float keepBase = hillHeight * 0.84f;
+            foliageFree.Push(new Vector3(0f, keepBase, hillZ - 8f), Quaternion.identity, Vector3.one);
+            TownMeshes.KeepCrag(foliageFree, new System.Random(Seedless + 1), new Vector2(41f, 14f), new Vector2(82f, 46f), keepBase + 14f, 0f);
             TownMeshes.Keep(foliageFree, rng);
             foliageFree.Pop();
 

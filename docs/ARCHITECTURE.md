@@ -43,9 +43,22 @@ the zone; underground the sun is off and the equipped torch supplies local light
 zone's entry, and guardians heal when the player dies. An indoor zone (the tavern, forge, chapel or valley homes) has no sun: its fires and lanterns
 are baked into the vertex colours by `MeshBuilder.Bake`, with one or two real lights left on top so the fire still moves. Entering one
 calls `PlayerCombat.SetArmed(false)`: the weapon pivots go down and out of sight, attacks, blocks and abilities stop, and the fighting
-touch buttons fade. The independently mounted carried torch keeps the inventory choice. A door that needs its own spot on the far side
+touch buttons fade. Hollowgate's streets put the weapons away the same way (`ZoneManager.WeaponsAway`), and with the weapons
+away no skill casts at all. The independently mounted carried torch keeps the saved inventory choice, but `PlayerTorch` hides it
+and its light under a roof (`InHand`); the city and the depths keep it in hand. A door that needs its own spot on the far side
 (the public houses and the valley homes) carries it as `ZonePortal.arrival`.
 `PlayerInteractor` ignores Unity's Ignore Raycast layer, so a collider there stops the player but not the crosshair: the chapel's rail.
+When nothing interactable is aimed at, it falls back to its `fallback` while the player carries it: the ridden horse, for dismounting.
+
+The riding horse (`Player/RidingHorse`, `AI/HorseAnimator`) is one object in the valley zone, hidden until the soul has `horse_owned`
+(bought from Hilda through `StoryDirector`'s `NpcService.Stable` case and the shared `Paid` path). Use parents it under the player root,
+facing forward, so the eye above the saddle sees its real neck and ears and its real shadow runs on the ground; the controller takes the
+horse's `FirstPersonController.Saddle` (canter 7, gallop 12.5 m/s at 8 stamina a second, 110 degrees a second of turning, a 2.6 m x 0.5 m
+body, eye 2.45 m) and turns on sideways input. `Rein` sweeps a capsule ahead of the head (or the rump when backing) and brakes before it
+touches anything that is not walkable ground. `ZoneManager.Travel` and `Place` call `RidingHorse.Release` before moving the player, and
+`Enter` calls `ArriveInValley`, which stands an unridden horse at the nearest post's `Standing Spot`; `PlayerLifecycle.ReturnedToSpawn`
+(a respawn or the kill plane) does the same. Nothing else about the horse is saved. Damage throws the rider off at a free spot (left,
+right, behind) and dismounting re-arms by `ZoneManager.WeaponsAway`.
 
 `ArrivalGenerator` places the two wagons, waiting travellers and black tunnel at the southern road. The tunnel's invisible collider
 blocks the old route; `HamletGenerator` gives each roadside cottage a furnished room and its own return doorstep.
@@ -214,6 +227,9 @@ supplied eight-frame warm/cold atlases with the `AshenRealm/TorchStrip` shader; 
 `NpcIdleAnimator` moves the figure without moving its
 interaction collider; the smith also has a hammer arm and timed particle sparks. `EncounterIdleAnimator` gives story figures
 their own working motions, independently of the stable encounter capsule.
+`HorseAnimator` drives the horse rig `Model/Body/{Neck/Ears, Tail, four legs}` (meshes from `HorseMeshes`, front -Z, turned round under
+`Model`): standing it breathes, flicks its ears and swishes its tail; ridden, a paired canter blends into a gallop from the rider's speed
+and step cycle. The paddock's three horses are one static mesh per coat.
 
 ## Editor generation (`Assets/Editor`)
 | File | Role |
@@ -266,6 +282,13 @@ Cursed Knight patrolling its entrance. Branches: camp with campfire (26,−42), 
 (−32,−6) with an inspectable blade, hamlet of three half-timbered houses with lantern posts (34,−14), windmill on a
 rise (54,8) beside wheat fields. Playable area ≈ 206×206 m enclosed by rim hills and four invisible boundary walls;
 distant mountain ring at 215–330 m.
+
+North of the ridge the same zone continues for about 500 m (`ValleyPlaces`): the Old Toll Gate (0, 92), whose `TollGate` barrier
+opens for good on the Cursed Knight's flag; Patkós Stable with its paddock and hitching rail; Kévés Farm and the burned farm; Gallows
+Crossroads; Feketefenyves; Tükörtó with its jetty and an invisible shore ring; the watchtower; the Ash Field; and Hollowgate's gate at
+(0, 590) with the city's silhouette beyond. `ValleyGenerator.MainRoad` is 3.6 m wide, room for a horse. Four `Horse Posts` (city gate,
+south of the toll gate, the stable's rail, the hamlet) each have a `Standing Spot` facing the post. Trees, grass, flowers, wheat,
+haystacks and cairns are instanced (`ScatterData`, `ScatterRenderer`, 66 m cells); their colliders are grouped per cell.
 
 The valley's side route links a pilgrims' spring, the broken viaduct and the sword garden; the hamlet has a shared well,
 working yards and gardens. The arrival tunnel stays physically closed. Hollowgate adds the Well of Names and Lantern Court

@@ -1,6 +1,6 @@
 # Ashen Realm — Progress
 
-_Last updated: 2026-11-09_
+_Last updated: 2026-11-17_
 
 ## Environment (confirmed)
 - Unity project: `E:\Ashen Realm\AshenRealm`, Editor **6000.6.8f1** (installed via Unity Hub), URP template.
@@ -10,6 +10,40 @@ _Last updated: 2026-11-09_
   so a native iOS build (Xcode) cannot be performed on this machine.
 - Git: current source branch `menus-and-houses`; the playable site is a separate build on `gh-pages` (E: has no file ownership,
   so the project path is in the global `safe.directory` list).
+
+## Checkpoint O — owner fixes, the north land, its people and the horse (2026-11-17)
+- Six owner-reported fixes: skills (the workbook ability catalog and its effects), Hollowgate's keep no longer floats (it stands on a
+  crag of its own), sprint (a stance blocks running, a class or gear pace below 1 no longer does), the torch put away indoors without
+  losing the saved choice, no attacking, blocking or casting on the city's streets, and smaller, peripheral hands (measured by
+  `HandCoveragePlaytestChecks`). The focus-cost cap: a skill dearer than the whole bar is paid by a full bar; below it a cast spends
+  exactly the workbook cost.
+- A1, the bigger valley: the lower valley stays a closed bowl; north of the old ridge the same zone continues to Hollowgate's new gate at
+  (0, 590). The Old Toll Gate (0, 92) is the only pass and stays barred until the Cursed Knight falls. Trees, grass, flowers and wheat
+  are instanced by `ScatterRenderer`; tree colliders are grouped per 66 m cell. World version 6.
+- A2, its places: Patkós Stable and paddock, Kévés Farm and the burned farm, Gallows Crossroads, Feketefenyves with its kiln, arch, den
+  and lamplighter post, Tükörtó with the jetty, the drowned bell tower and a closed shore, the watchtower, the Ash Field, two wayside
+  shrines and Hollowgate's silhouette over the gate, with vistas, discoveries and three horse posts.
+- A3, its people: seven new speakers in three moods (five in the north land, two at the city gate and in the streets) and ambient
+  figures at work; far-away people are neither drawn nor animated but stay solid.
+- B, the horse: Patkós Hilda sells one grey mare for 60 gold. Use mounts and dismounts; the rider sees the real neck and ears low in the
+  middle of the frame, canters at 7 m/s and gallops at 12.5 m/s on the run input for 8 stamina a second, and turns with sideways input.
+  The horse stops before its head touches a wall, tree, fence or the lake shore. No fighting from the saddle; a hit throws the rider off.
+  It lives only in the valley: doors, the city gate, loading and respawning put the rider on foot, and it waits at the horse post nearest
+  to where the player arrives (a fourth post stands in the hamlet). The paddock shows three still horses in bay, black and grey.
+
+### Checkpoint O validation
+| Check | Result |
+|---|---|
+| C# compilation | Runtime and Editor compiled in the batch copy, no errors |
+| Generation and validator | VALIDATION PASSED, 13220 checks (the horse, four posts, mounted-body room at every standing spot, Hilda's service, vertex budget) |
+| Automated playtest | PLAYTEST PASSED, 1452 PASS lines, 0 failures; 28 new horse checks including the full main-road ride, doors, death, save/load and touch mode |
+| Visual review | paddock, the mare at the city-gate post, the mounted view north at 16:9 and phone aspect, and the gallop from outside |
+| WebGL release build | succeeded in 25 min after a fresh generation and validation (13220 checks), 35.7 MB in all, `WebGL.data` 26.2 MB (23.6 MB at Checkpoint N; the budget is 28 MB) |
+| Browser test | local Chromium WebGL: menu, class choice and a new Knight in the valley, no console errors. After A1 the instanced trees drew correctly and the spawn ran at 30 fps on Intel HD 4600, the same as Checkpoint N. The north land, the people and riding were not played by hand in the browser; the playtest covers them |
+
+Measured by the playtest: canter 13.5 m in two seconds against 8.1 m walking; gallop 24.1 m at 12.5 m/s for 0.67 stamina a metre against
+running 14.2 m for 2.53; turning 110 degrees a second; from the saddle the horse covers 2.9% of the frame at 16:9 and 3.9% at 4:3, never
+above 37% of its height. Real-phone touch input, Safari and Firefox have not been tested for this checkpoint.
 
 ## Checkpoint N — distinct hands, skills, foes and inhabitants (2026-11-09)
 - Equipment now follows the actual six class paintings: crescent polearm/sun shield; one grave dagger/free hand; antler staff/crystal;

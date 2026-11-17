@@ -329,16 +329,22 @@ namespace AshenRealm.EditorTools
             var ability2Button = TouchButtonWidget(touchRoot, "Ability 2", GameText.Attack, PlayerButton.Ability2, new Vector2(1f, 0f), new Vector2(-650f, 320f), 140f, 19, input, sprites, font);
             Image AbilityGlyph(Transform button, AbilityEffect effect)
             {
-                var glyph = Anchored("Ability Icon", button, Vector2.one * 0.5f, Vector2.one * 0.5f, new Vector2(0f, 18f), new Vector2(64f, 64f));
+                var glyph = Anchored("Ability Icon", button, Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(88f, 88f));
                 Text label = button.GetComponentInChildren<Text>();
                 label.rectTransform.anchorMin = label.rectTransform.anchorMax = Vector2.one * 0.5f;
-                label.rectTransform.anchoredPosition = new Vector2(0f, -34f);
-                label.rectTransform.sizeDelta = new Vector2(115f, 42f);
+                label.rectTransform.anchoredPosition = new Vector2(0f, -90f);
+                label.rectTransform.sizeDelta = new Vector2(170f, 36f);
                 label.fontSize = 17;
-                return Img(glyph.gameObject, AbilityIconBuilder.Create()[(int)effect], Color.white);
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 13;
+                label.resizeTextMaxSize = 17;
+                label.verticalOverflow = VerticalWrapMode.Truncate;
+                Image icon = Img(glyph.gameObject, AbilityIconBuilder.CreateHud()[System.Array.IndexOf(AbilityIconBuilder.Effects(), effect)], Color.white);
+                icon.preserveAspect = true;
+                return icon;
             }
-            Image ability1Icon = AbilityGlyph(ability1Button.transform, AbilityEffect.ShieldBash);
-            Image ability2Icon = AbilityGlyph(ability2Button.transform, AbilityEffect.Rally);
+            Image ability1Icon = AbilityGlyph(ability1Button.transform, AbilityBook.At(Catalog.Classes[0], 0).Effect);
+            Image ability2Icon = AbilityGlyph(ability2Button.transform, AbilityBook.At(Catalog.Classes[0], 1).Effect);
             var potionButton = TouchButtonWidget(touchRoot, "Potion", GameText.Potion, PlayerButton.Potion, new Vector2(0f, 0f), new Vector2(110f, 660f), 110f, 20, input, sprites, font);
             var ability1Shade = CooldownShade(ability1Button.transform, sprites);
             var ability2Shade = CooldownShade(ability2Button.transform, sprites);
@@ -456,7 +462,13 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(hud, "ability2Cooldown", ability2Shade);
             SceneWiring.Set(hud, "ability1Icon", ability1Icon);
             SceneWiring.Set(hud, "ability2Icon", ability2Icon);
-            SceneWiring.Set(hud, "skillIcons", AbilityIconBuilder.Create());
+            SceneWiring.Set(hud, "skillIcons", AbilityIconBuilder.CreateHud());
+            var hudSettings = new UnityEditor.SerializedObject(hud);
+            var iconEffects = hudSettings.FindProperty("skillIconEffects");
+            AbilityEffect[] effects = AbilityIconBuilder.Effects();
+            iconEffects.arraySize = effects.Length;
+            for (int i = 0; i < effects.Length; i++) iconEffects.GetArrayElementAtIndex(i).intValue = (int)effects[i];
+            hudSettings.ApplyModifiedPropertiesWithoutUndo();
             SceneWiring.Set(hud, "weaponEmblem", weaponEmblem);
             SceneWiring.Set(hud, "classWeaponIcons", EquipmentIconBuilder.ClassSprites());
             SceneWiring.Set(hud, "goodsWeaponIcons", EquipmentIconBuilder.GoodsSprites());

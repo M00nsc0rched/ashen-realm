@@ -4,13 +4,128 @@ namespace AshenRealm.Story
 {
     public enum CharacterClass { Knight, Gravethief, Witch, Warden, Necromancer, Alchemist }
     public enum Alignment { Marked, Mortal, Hallowed }
-    public enum AbilityEffect { ShieldBash, Rally, Backstab, PoisonBlade, LifeDrain, Hex, Smite, Mend, BoneSpear, BoneArmor, AcidFlask, HealingBrew,
-        Whirlwind, IronSkin, FanOfKnives, Caltrops, FrostLance, ChainLightning, Sanctuary, Consecration, BoneNova, SoulHarvest, FireBomb, FlashPowder }
+    public enum AbilityEffect
+    {
+        ShieldBash = 0,
+        Rally = 1,
+        Backstab = 2,
+        PoisonBlade = 3,
+        LifeDrain = 4,
+        Hex = 5,
+        Smite = 6,
+        Mend = 7,
+        BoneSpear = 8,
+        BoneArmor = 9,
+        AcidFlask = 10,
+        HealingBrew = 11,
+        Whirlwind = 12,
+        IronSkin = 13,
+        FanOfKnives = 14,
+        Caltrops = 15,
+        FrostLance = 16,
+        ChainLightning = 17,
+        Sanctuary = 18,
+        Consecration = 19,
+        BoneNova = 20,
+        SoulHarvest = 21,
+        FireBomb = 22,
+        FlashPowder = 23,
+        Strike = 24,
+        Guard = 25,
+        Execute = 26,
+        WarCry = 27,
+        Zeal = 28,
+        Aelanwyr = 29,
+        Bash = 30,
+        LeapSlam = 31,
+        Taunt = 32,
+        IgnorePain = 33,
+        FuriousCharge = 34,
+        SeismicSlam = 35,
+        Revenge = 36,
+        StalwartWard = 37,
+        UndyingRage = 38,
+        Bloodthirst = 39,
+        ShieldCharge = 40,
+        Rend = 41,
+        Cleave = 42,
+        PlagueTouch = 43,
+        SiphonCut = 44,
+        ShadowStrike = 45,
+        Impale = 46,
+        SmokeScreen = 47,
+        VenomStrike = 48,
+        GrimHarvest = 49,
+        Puncture = 50,
+        BladeFury = 51,
+        Nightstalker = 52,
+        ExploitWeakness = 53,
+        DeathBlossom = 54,
+        ShadowDance = 55,
+        Lacerate = 56,
+        HollowFire = 57,
+        Meditate = 58,
+        FrozenOrb = 59,
+        Blizzard = 60,
+        Inferno = 61,
+        WitchBoneSpear = 62,
+        CorpseExplosion = 63,
+        Teeth = 64,
+        AmplifyDamage = 65,
+        IronMaiden = 66,
+        EnergyShield = 67,
+        StaticField = 68,
+        GlacialSpike = 69,
+        FireWall = 70,
+        LowerResist = 71,
+        Convince = 72,
+        WardingPrayer = 73,
+        ZealotSRally = 74,
+        HolyBolt = 75,
+        BlessedHammer = 76,
+        FistOfTheHeavens = 77,
+        Prayer = 78,
+        Cleansing = 79,
+        Vigor = 80,
+        Redemption = 81,
+        Conviction = 82,
+        HolyShield = 83,
+        Salvation = 84,
+        ZealotSOath = 85,
+        DivineGrace = 86,
+        LastRites = 87,
+        AuraOfLight = 88,
+        NecromancerTeeth = 89,
+        NecromancerCorpseExplosion = 90,
+        NecromancerBoneSpirit = 91,
+        NecromancerAmplifyDamage = 92,
+        NecromancerLowerResist = 93,
+        NecromancerBoneWall = 94,
+        NecromancerBonePrison = 95,
+        NecromancerClayGolem = 96,
+        NecromancerDimVision = 97,
+        NecromancerWeaken = 98,
+        NecromancerLifeTap = 99,
+        NecromancerDecrepify = 100,
+        Charm = 101,
+        BitterTonic = 102,
+        WardingTonic = 103,
+        NourishingStew = 104,
+        MiasmaVial = 105,
+        BrewOfVigor = 106,
+        SolventVial = 107,
+        ShatterGlass = 108,
+        DraughtOfFervor = 109,
+        MarrowCordial = 110,
+    }
+    public enum AbilityKind { Physical, Magic, Defense, Buff, Heal, Charm }
+    public enum AbilityDelivery { Melee, Bolt, Fan, Chain, Nova, Field, Charge, Leap, Self, Target, Orb }
+    public enum NecromancerPath { None, Attack, Defense }
     public enum EnemyBody { Humanoid, Beast, Flyer, Blob }
     public enum EnemyRank { Common, Elite, Guardian, Boss }
     public enum MoveKind { Melee, Bolt, Heal, Buff, Ward, Charge, Sweep, Pounce, Ground, Teleport, Volley, Ring, Counter, Burrow }
     public enum BoltKind { Arrow, Fire, Shadow, Holy, Venom, Brine }
-    public enum NpcService { None, Tavern, Forge, Chapel, Market }
+    public enum NpcService { None, Tavern, Forge, Chapel, Market, Stable }
     public enum ItemSlot { Weapon, Relic }
 
     // Plain data records for the tables in Catalog and StoryText (grouped here on purpose: none of them is a Unity
@@ -18,11 +133,50 @@ namespace AshenRealm.Story
 
     public sealed class AbilityDefinition
     {
+        public string Id;
+        public string Source;
+        public CharacterClass Owner;
+        public bool Common, Hidden, Signature, IsRecipe;
+        public NecromancerPath Path;
+        public AbilityKind Kind;
+        public AbilityDelivery Delivery;
+        public int PlantCost, IntellectRequired;
+        public float Range, Radius;
         public AbilityEffect Effect;
         public string Name;
         public string Description;
         public int Cost;
         public float Cooldown;
+        public AbilityTierDefinition[] Tiers;
+
+        /// <summary>Workbook tiers are numbered I-III. Single-tier follower skills and recipes clamp to I.</summary>
+        public AbilityTierDefinition Tier(int tier)
+        {
+            if (Tiers == null || Tiers.Length == 0) return new AbilityTierDefinition();
+            return Tiers[System.Math.Max(0, System.Math.Min(tier - 1, Tiers.Length - 1))];
+        }
+    }
+
+    /// <summary>Workbook points and turn counts. Chance/ratio fields are fractions in the range 0-1.</summary>
+    public sealed class AbilityTierDefinition
+    {
+        public float Power;
+        public int Hits = 1;
+        public float Accuracy = 1f;
+        public float CriticalChance, StunChance, Lifesteal, ExecuteThreshold;
+        public float PoisonPerTurn;
+        public int PoisonTurns;
+        public float AttackReduction;
+        public int AttackReductionTurns;
+        public float ShieldDefMultiplier, RegenerationPerTurn;
+        public int RegenerationTurns;
+        public float AttackBonus;
+        public int AttackBonusTurns;
+        public float HealFlat, HealMagMultiplier, SelfDamage, RestoreFocus, ConvertChance;
+        public float StealFraction, StealBossFraction;
+        public int StealTurns;
+        public bool Holy, CleansePoison;
+        public string Summary;
     }
 
     public sealed class ClassDefinition

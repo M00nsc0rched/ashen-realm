@@ -17,6 +17,8 @@ namespace AshenRealm.Interactions
         [SerializeField] float reach = 3f;
         [SerializeField] float probeRadius = 0.2f;
         [SerializeField] LayerMask mask = ~0;
+        [Tooltip("Answers Use when nothing is aimed at, while the player carries it (the ridden horse, for dismounting).")]
+        [SerializeField] MonoBehaviour fallback;
 
         IPlayerInput input;
         IInteractable current;
@@ -46,14 +48,16 @@ namespace AshenRealm.Interactions
         {
             if (aimOrigin == null) return null;
             int layers = mask.value & ~(1 << SeeThroughLayer);
-            if (!Physics.SphereCast(aimOrigin.position, probeRadius, aimOrigin.forward, out RaycastHit hit, reach, layers, QueryTriggerInteraction.Collide))
-                return null;
-            if (hit.collider.transform.IsChildOf(transform.root)) return null;
-
-            var interactable = hit.collider.GetComponentInParent<IInteractable>();
-            if (interactable == null || !interactable.CanInteract(transform.root.gameObject)) return null;
-            return interactable;
+            IInteractable interactable = null;
+            if (Physics.SphereCast(aimOrigin.position, probeRadius, aimOrigin.forward, out RaycastHit hit, reach, layers, QueryTriggerInteraction.Collide)
+                && !hit.collider.transform.IsChildOf(transform.root))
+                interactable = hit.collider.GetComponentInParent<IInteractable>();
+            if (interactable != null && interactable.CanInteract(transform.root.gameObject)) return interactable;
+            return Carried();
         }
+
+        IInteractable Carried() =>
+            fallback is IInteractable carried && fallback.transform.IsChildOf(transform.root) && carried.CanInteract(transform.root.gameObject) ? carried : null;
 
         void SetTarget(IInteractable target)
         {

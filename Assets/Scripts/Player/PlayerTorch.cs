@@ -5,7 +5,10 @@ using UnityEngine;
 
 namespace AshenRealm.Player
 {
-    /// <summary>The carried torch is a real inventory choice; travelling never silently takes it out of the hand.</summary>
+    /// <summary>
+    /// The carried torch is a real inventory choice. Under a roof it waits at the door with the weapons and comes back on the
+    /// way out; the saved choice never changes for that. The depths are no house: there it burns as chosen.
+    /// </summary>
     public sealed class PlayerTorch : MonoBehaviour
     {
         [SerializeField] Transform mount;
@@ -21,12 +24,14 @@ namespace AshenRealm.Player
         MaterialPropertyBlock properties;
         Vector3 restPosition;
         Quaternion restRotation;
-        bool equipped;
+        bool equipped, indoors;
         float elapsed;
         int frame = -1;
 
         public static PlayerTorch Instance { get; private set; }
         public bool Equipped => equipped;
+        /// <summary>Equipped and not put away indoors: what the hand really holds.</summary>
+        public bool InHand => equipped && !indoors;
         public int AnimationFrame => frame;
         public Light Light => torchLight;
 
@@ -60,13 +65,17 @@ namespace AshenRealm.Player
             classRig.RefreshHeldModels();
         }
 
-        /// <summary>Keep the inventory decision in houses as well as outdoors and underground.</summary>
-        public void SetZone(Zone zone) => Refresh();
+        public void SetZone(Zone zone)
+        {
+            indoors = zone != null && zone.Indoors;
+            Refresh();
+            classRig.RefreshHeldModels();
+        }
 
         void Refresh()
         {
-            mount.gameObject.SetActive(equipped);
-            torchLight.enabled = equipped;
+            mount.gameObject.SetActive(InHand);
+            torchLight.enabled = InHand;
             CharacterClass id = GameSession.Instance != null ? GameSession.Instance.Class.Id : CharacterClass.Knight;
             bool cold = id == CharacterClass.Witch || (int)id == 4;
             properties.SetTexture(TextureId, cold ? coldStrip : warmStrip);
@@ -77,7 +86,7 @@ namespace AshenRealm.Player
 
         void LateUpdate()
         {
-            if (!equipped) return;
+            if (!InHand) return;
             elapsed += Time.deltaTime;
             int next = Mathf.FloorToInt(elapsed * 10f) % 8;
             if (next != frame)

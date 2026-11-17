@@ -17,14 +17,39 @@ namespace AshenRealm.EditorTools
         static readonly Color Skirt = new Color(0.33f, 0.33f, 0.24f);
         static readonly Color Coat = new Color(0.3f, 0.22f, 0.15f);
         static readonly Color Soot = new Color(0.15f, 0.13f, 0.14f);
+        static readonly Color Shirt = new Color(0.46f, 0.38f, 0.3f);
+        static readonly Color Wool = new Color(0.3f, 0.29f, 0.3f);
+
+        static (Color from, Color to)[] dyes;
 
         /// <summary>Takes a family's texture with a colour of its own: skin and linen have no family in the palette.</summary>
         static void Paint(MeshBuilder b, Pal texture, Color color)
         {
             b.SetColor(texture);
-            Color linear = color.linear;
+            Color linear = Dye(color).linear;
             linear.a = 1f;
             b.Current.Color = linear;
+        }
+
+        /// <summary>A painted colour that is a shade of a dyed one becomes the same shade of its new colour.</summary>
+        static Color Dye(Color color)
+        {
+            if (dyes == null) return color;
+            foreach (var (from, to) in dyes)
+            {
+                float shade = (color.r + color.g + color.b) / (from.r + from.g + from.b);
+                if (Mathf.Abs(color.r - from.r * shade) + Mathf.Abs(color.g - from.g * shade) + Mathf.Abs(color.b - from.b * shade) < 0.01f)
+                    return to * shade;
+            }
+            return color;
+        }
+
+        /// <summary>The same cut in other cloth, for the valley's and the city's other people.</summary>
+        static void Dyed(MeshBuilder b, System.Action<MeshBuilder> recipe, params (Color from, Color to)[] swaps)
+        {
+            dyes = swaps;
+            try { recipe(b); }
+            finally { dyes = null; }
         }
 
         static void Limb(MeshBuilder b, Vector3 from, Vector3 to, float width, float depth)
@@ -337,7 +362,7 @@ namespace AshenRealm.EditorTools
         public static void Smith(MeshBuilder b)
         {
             var rng = new System.Random(107);
-            Color shirt = new Color(0.46f, 0.38f, 0.3f);
+            Color shirt = Shirt;
             foreach (float x in new[] { -0.16f, 0.16f })
             {
                 Paint(b, Pal.ClothDark, Soot * 2f);
@@ -378,7 +403,7 @@ namespace AshenRealm.EditorTools
         {
             var rng = new System.Random(109);
             b.Push(-new Vector3(0.36f, 1.54f, 0f), Quaternion.identity, Vector3.one);
-            Paint(b, Pal.ClothDark, new Color(0.46f, 0.38f, 0.3f) * 0.92f);
+            Paint(b, Pal.ClothDark, Shirt * 0.92f);
             Limb(b, new Vector3(0.36f, 1.54f, 0f), new Vector3(0.42f, 1.5f, 0.3f), 0.18f, 0.18f);
             Paint(b, Pal.Leather, Skin);
             Limb(b, new Vector3(0.42f, 1.5f, 0.3f), new Vector3(0.3f, 1.42f, 0.66f), 0.14f, 0.14f);
@@ -389,16 +414,20 @@ namespace AshenRealm.EditorTools
             b.Pop();
         }
 
-        public static void CaravanDriver(MeshBuilder b)
+        public static void CaravanDriver(MeshBuilder b) => Driver(b, Pal.Leather, Pal.Thatch);
+
+        static void Driver(MeshBuilder b, Pal cloth, Pal skin)
         {
-            CreatureMeshes.Figure(b, EnemyFactory.Villager("CaravanDriver", Pal.Leather, Pal.Thatch));
+            CreatureMeshes.Figure(b, EnemyFactory.Villager("CaravanDriver", cloth, skin));
             b.SetColor(Pal.Leather, 0.42f);
             b.Box(new Vector3(0.3f, 0.7f, -0.1f), new Vector3(0.25f, 0.34f, 0.21f));
         }
 
-        public static void CaravanGuard(MeshBuilder b)
+        public static void CaravanGuard(MeshBuilder b) => Guard(b, Pal.ClothDark, Pal.SteelDark);
+
+        static void Guard(MeshBuilder b, Pal cloth, Pal skin)
         {
-            CreatureMeshes.Figure(b, EnemyFactory.Villager("CaravanGuard", Pal.ClothDark, Pal.SteelDark));
+            CreatureMeshes.Figure(b, EnemyFactory.Villager("CaravanGuard", cloth, skin));
             b.Push(new Vector3(0.42f, 0.95f, 0.13f), Quaternion.Euler(0f, 0f, -8f), Vector3.one);
             b.SetColor(Pal.WoodDark, 0.4f);
             b.Prism(new Vector3(0f, -0.8f, 0f), 0.025f, 0.02f, 1.85f, 6);
@@ -525,7 +554,7 @@ namespace AshenRealm.EditorTools
         public static void Monk(MeshBuilder b)
         {
             var rng = new System.Random(108);
-            Color wool = new Color(0.3f, 0.29f, 0.3f);
+            Color wool = Wool;
             Paint(b, Pal.ClothDark, wool);
             b.Prism(Vector3.zero, 0.42f, 0.28f, 1.02f, 8, false, false, 0.2f);
             b.Prism(new Vector3(0f, 1.02f, 0f), 0.28f, 0.32f, 0.5f, 8, false, false, 0.2f);
@@ -555,6 +584,149 @@ namespace AshenRealm.EditorTools
             b.Box(new Vector3(0f, 1.72f, -0.14f), new Vector3(0.14f, 0.3f, 0.1f));
             b.SetColor(Pal.Black, 0.2f);
             b.Box(new Vector3(0f, 1.62f, 0.15f), new Vector3(0.15f, 0.2f, 0.05f));
+        }
+
+        // ---- The valley and the city's other people: the same cuts in other cloth, with what their hands hold ----------
+
+        static Color C(float r, float g, float b) => new Color(r, g, b);
+
+        static void Pole(MeshBuilder b, Vector3 from, Vector3 to, float width, Pal family, float shade)
+        {
+            b.SetColor(family, shade);
+            Limb(b, from, to, width, width);
+        }
+
+        /// <summary>The smith's build with his hammer arm lowered, the maul resting by the leg.</summary>
+        static void Labourer(MeshBuilder b)
+        {
+            Smith(b);
+            b.Push(new Vector3(0.36f, 1.54f, 0f), Quaternion.Euler(62f, 0f, 0f), Vector3.one);
+            SmithHammerArm(b);
+            b.Pop();
+        }
+
+        /// <summary>Patkós Hilda: Aggie's build in a stable woman's blue shirt and a horse-blanket apron, her hair still red.</summary>
+        public static void Stablemaster(MeshBuilder b) => Dyed(b, Landlord, (Linen, C(0.5f, 0.53f, 0.56f)), (Skirt, C(0.3f, 0.22f, 0.15f)),
+            (Apron, C(0.44f, 0.17f, 0.1f)), (GreyHair, C(0.46f, 0.24f, 0.13f)));
+
+        /// <summary>Kévés Ábel leaning on his spade in a straw shirt and an olive smock.</summary>
+        public static void Farmer(MeshBuilder b) => Dyed(b, Gravedigger, (Linen, C(0.6f, 0.55f, 0.38f)), (Apron, C(0.27f, 0.28f, 0.17f)),
+            (DarkHair, C(0.4f, 0.34f, 0.28f)));
+
+        /// <summary>Csend: the hooded sitter in lake-grey wool, a rod out over the water and its line straight down.</summary>
+        public static void Fisher(MeshBuilder b)
+        {
+            Dyed(b, Wanderer, (Soot, C(0.13f, 0.17f, 0.2f)));
+            Pole(b, new Vector3(0.02f, 0.8f, 0.56f), new Vector3(0.2f, 2.1f, 2.9f), 0.035f, Pal.WoodDark, 0.4f);
+            Pole(b, new Vector3(0.2f, 2.1f, 2.9f), new Vector3(0.2f, -0.5f, 2.9f), 0.012f, Pal.Bone, 0.55f);
+        }
+
+        /// <summary>Öreg Barta in a watch coat, the day's tallies held up to read.</summary>
+        public static void Watchman(MeshBuilder b) => Dyed(b, Crier, (Coat, C(0.27f, 0.27f, 0.22f)), (Soot, C(0.22f, 0.2f, 0.16f)));
+
+        public static void Woodcutter(MeshBuilder b) => Dyed(b, Labourer, (Shirt, C(0.5f, 0.22f, 0.16f)), (DarkHair, C(0.36f, 0.24f, 0.13f)));
+
+        public static void SmithApprentice(MeshBuilder b) => Dyed(b, x =>
+        {
+            x.Push(Vector3.zero, Quaternion.identity, Vector3.one * 0.93f);
+            Labourer(x);
+            x.Pop();
+        }, (Shirt, C(0.56f, 0.5f, 0.4f)), (DarkHair, C(0.48f, 0.32f, 0.16f)));
+
+        public static void GateGuard(MeshBuilder b) => Guard(b, Pal.ClothRed, Pal.SteelDark);
+
+        public static void CityGuard(MeshBuilder b) => Guard(b, Pal.ClothRed, Pal.Steel);
+
+        /// <summary>Nell with her lighting pole, a wick burning at its tip (emissive only, no light of its own).</summary>
+        public static void Lamplighter(MeshBuilder b)
+        {
+            Dyed(b, Landlord, (Linen, C(0.58f, 0.52f, 0.44f)), (Skirt, C(0.17f, 0.19f, 0.27f)), (Apron, C(0.22f, 0.17f, 0.15f)),
+                (GreyHair, C(0.24f, 0.17f, 0.12f)));
+            Pole(b, new Vector3(0.06f, 0.55f, 0.36f), new Vector3(0.36f, 2.95f, 0.52f), 0.04f, Pal.WoodDark, 0.38f);
+            b.SetColor(Pal.Brass, 0.5f);
+            b.Box(new Vector3(0.36f, 2.98f, 0.52f), new Vector3(0.08f, 0.08f, 0.08f));
+            b.SetColor(Pal.FireYellow, 0.8f);
+            b.Box(new Vector3(0.36f, 3.06f, 0.52f), new Vector3(0.04f, 0.08f, 0.04f));
+        }
+
+        public static void FarmWife(MeshBuilder b) => Dyed(b, Landlord, (Linen, C(0.72f, 0.66f, 0.54f)), (Skirt, C(0.38f, 0.2f, 0.15f)),
+            (Apron, C(0.6f, 0.56f, 0.46f)), (GreyHair, C(0.6f, 0.48f, 0.3f)));
+
+        public static void Washerwoman(MeshBuilder b) => Dyed(b, Landlord, (Linen, C(0.76f, 0.74f, 0.68f)), (Skirt, C(0.25f, 0.27f, 0.34f)),
+            (Apron, C(0.48f, 0.46f, 0.42f)));
+
+        public static void StableHand(MeshBuilder b) => Driver(b, Pal.ClothDark, Pal.Leather);
+
+        public static void HiredHand(MeshBuilder b) => Driver(b, Pal.RobeRot, Pal.Leather);
+
+        public static void Reaper(MeshBuilder b)
+        {
+            Driver(b, Pal.Robe, Pal.Leather);
+            // The snath across the body, the blade low in front.
+            b.Push(new Vector3(0.42f, 1.05f, 0.15f), Quaternion.Euler(78f, 0f, 0f), Vector3.one);
+            CreatureMeshes.Held(b, HeldItem.Scythe);
+            b.Pop();
+        }
+
+        /// <summary>A pilgrim in the Choir's cut of undyed brown wool, the staff planted beside.</summary>
+        public static void Pilgrim(MeshBuilder b)
+        {
+            Dyed(b, Monk, (Wool, C(0.42f, 0.33f, 0.22f)));
+            Pole(b, new Vector3(0.47f, 0f, 0.3f), new Vector3(0.5f, 1.95f, 0.32f), 0.05f, Pal.Wood, 0.42f);
+        }
+
+        public static void Pedlar(MeshBuilder b)
+        {
+            Dyed(b, Crier, (Coat, C(0.4f, 0.27f, 0.16f)));
+            b.SetColor(Pal.Leather, 0.35f);
+            b.Box(new Vector3(0f, 1.2f, -0.37f), new Vector3(0.52f, 0.72f, 0.34f));
+            b.SetColor(Pal.ClothRed, 0.32f);
+            b.Push(new Vector3(-0.3f, 1.67f, -0.37f), Quaternion.Euler(0f, 0f, -90f), Vector3.one);
+            b.Prism(Vector3.zero, 0.11f, 0.11f, 0.6f, 8);
+            b.Pop();
+            b.SetColor(Pal.Brass, 0.4f);
+            b.Prism(new Vector3(0.33f, 0.86f, -0.37f), 0.08f, 0.1f, 0.14f, 8);
+        }
+
+        public static void Porter(MeshBuilder b)
+        {
+            Dyed(b, Crier, (Coat, C(0.34f, 0.31f, 0.25f)));
+            Paint(b, Pal.Thatch, C(0.62f, 0.54f, 0.4f));
+            b.Box(new Vector3(0f, 1.5f, -0.37f), new Vector3(0.6f, 0.42f, 0.38f));
+        }
+
+        public static void NetMender(MeshBuilder b)
+        {
+            Dyed(b, Widow, (Soot, C(0.13f, 0.16f, 0.19f)));
+            // The net hangs from her hands to a heap on the boards.
+            b.SetColor(Pal.Thatch, 0.3f);
+            b.Box(new Vector3(0f, 0.52f, 0.4f), new Vector3(0.62f, 0.86f, 0.02f));
+            b.Prism(new Vector3(0f, 0f, 0.62f), 0.32f, 0.2f, 0.12f, 8);
+            b.SetColor(Pal.Wood, 0.55f);
+            for (int i = 0; i < 4; i++) b.Box(new Vector3(-0.24f + i * 0.16f, 0.9f, 0.42f), new Vector3(0.06f, 0.06f, 0.06f));
+        }
+
+        public static void Mourner(MeshBuilder b) => Dyed(b, Widow, (Soot, C(0.1f, 0.09f, 0.11f)), (GreyHair, C(0.66f, 0.64f, 0.6f)));
+
+        public static void CharcoalBurner(MeshBuilder b) => Dyed(b, Gravedigger, (Linen, C(0.3f, 0.28f, 0.27f)), (Apron, C(0.14f, 0.12f, 0.11f)),
+            (DarkHair, C(0.13f, 0.11f, 0.1f)), (GreyHair, C(0.3f, 0.28f, 0.27f)));
+
+        /// <summary>An old soldier on a crate by the tavern, his bottle in the hand that is not holding up his head.</summary>
+        public static void Drunk(MeshBuilder b)
+        {
+            Dyed(b, Sergeant, (GreyHair, DarkHair));
+            var rng = new System.Random(110);
+            b.ShadedBox(new Vector3(0f, 0.27f, -0.02f), new Vector3(0.62f, 0.54f, 0.5f), Pal.Wood, rng, 0.3f, 0.4f);
+            b.SetColor(Pal.Black, 0.3f);
+            b.Prism(new Vector3(-0.14f, 0.66f, 0.72f), 0.055f, 0.055f, 0.2f, 6);
+            b.Prism(new Vector3(-0.14f, 0.86f, 0.72f), 0.055f, 0.022f, 0.12f, 6);
+        }
+
+        public static void Beggar(MeshBuilder b)
+        {
+            Dyed(b, Wanderer, (Soot, C(0.24f, 0.2f, 0.15f)));
+            b.SetColor(Pal.Wood, 0.4f);
+            b.Prism(new Vector3(0f, 0f, 0.86f), 0.1f, 0.15f, 0.07f, 8, true, false);
         }
     }
 }

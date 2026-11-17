@@ -15,6 +15,9 @@ namespace AshenRealm.Core
         [SerializeField] Color fogColor = new Color(0.52f, 0.45f, 0.40f);
         [SerializeField] float fogStart = 20f;
         [SerializeField] float fogEnd = 330f;
+        [Tooltip("Valley z where the walk north starts (the spawn) and where evening is complete (the city gate).")]
+        [SerializeField] float eveningStartZ = -86f;
+        [SerializeField] float eveningEndZ = 590f;
 
         Zone currentZone;
         Transform traveller;
@@ -60,7 +63,7 @@ namespace AshenRealm.Core
 
         void ApplyOutside()
         {
-            float travelled = traveller == null ? 0f : Mathf.InverseLerp(-86f, 92f, traveller.position.z);
+            float travelled = traveller == null ? 0f : Mathf.InverseLerp(eveningStartZ, eveningEndZ, traveller.position.z);
             eveningProgress = eveningLocked ? 1f : Mathf.Max(eveningProgress, travelled);
             float t = Mathf.SmoothStep(0f, 1f, eveningProgress);
             Color duskAmbient = new Color(0.49f, 0.4f, 0.43f);

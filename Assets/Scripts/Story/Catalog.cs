@@ -23,8 +23,6 @@ namespace AshenRealm.Story
                 Ending = "A seb nem zárult be, de a kezed benne volt, és vissza is jött. A tizenkettedik hamuszürke páncél felért a lépcsőn. Aggie Voss nem húzza át a nevedet.",
                 MaxHealth = 100f, MaxFocus = 6, FocusPerSecond = 0.4f, StartHonor = 30,
                 Damage = 25f, AttackCooldown = 0.6f, AttackDuration = 0.5f, BlockReduction = 0.85f, MoveMultiplier = 1f,
-                Ability1 = new AbilityDefinition { Effect = AbilityEffect.ShieldBash, Name = "Pajzsdöfés", Description = "Kábító taszítás.", Cost = 1, Cooldown = 4f },
-                Ability2 = new AbilityDefinition { Effect = AbilityEffect.Rally, Name = "Gyülekező", Description = "Regeneráció és nagyobb sebzés.", Cost = 2, Cooldown = 14f },
             },
             new ClassDefinition
             {
@@ -35,8 +33,6 @@ namespace AshenRealm.Story
                 Ending = "Négy évszázad leltára a hátadon, és a Mélysötét legalsó széke üres. A város sértve érzi magát. A város fizet, ha eladsz neki valamit.",
                 MaxHealth = 80f, MaxFocus = 8, FocusPerSecond = 0.6f, StartHonor = 0,
                 Damage = 17f, AttackCooldown = 0.36f, AttackDuration = 0.32f, BlockReduction = 0.6f, MoveMultiplier = 1.12f,
-                Ability1 = new AbilityDefinition { Effect = AbilityEffect.Backstab, Name = "Hátbaszúrás", Description = "Kegyetlen döfés. Hátulról háromszoros.", Cost = 3, Cooldown = 5f },
-                Ability2 = new AbilityDefinition { Effect = AbilityEffect.PoisonBlade, Name = "Mérgezett Penge", Description = "A pengéd méreggel vonja be a sebeket.", Cost = 2, Cooldown = 12f },
             },
             new ClassDefinition
             {
@@ -45,10 +41,8 @@ namespace AshenRealm.Story
                 Backstory = "Van valami a legmélyebb szinten, amiről a Kórus négy könyvtárat égetett fel, hogy senki ne olvashasson róla - ő pedig mégis olvasott róla. Nem gyógyírt keres, és nem fegyvert. Magát a dolgot keresi, és pontosan senkinek nem mondta el őszintén, mihez kezd vele, ha egyszer a kezében tartja.",
                 Goal = "Elérni a legalsó szint elátkozott hatalmát.",
                 Ending = "A trón alatt ott volt a dolog, amiért a Kórus négy könyvtárat égetett el. A kezedben tartod. Senkinek nem mondod el, mi az. Soha nem is tervezted.",
-                MaxHealth = 70f, MaxFocus = 12, FocusPerSecond = 1f, StartHonor = -20,
+                MaxHealth = 70f, MaxFocus = 25, FocusPerSecond = 1f, StartHonor = -20,
                 Damage = 22f, AttackCooldown = 0.75f, AttackDuration = 0.45f, BlockReduction = 0.6f, MoveMultiplier = 0.95f, Ranged = true,
-                Ability1 = new AbilityDefinition { Effect = AbilityEffect.LifeDrain, Name = "Életszívás", Description = "Elszívod az ellenfél életerejét.", Cost = 6, Cooldown = 6f },
-                Ability2 = new AbilityDefinition { Effect = AbilityEffect.Hex, Name = "Rontás", Description = "Megátkozod az ellenfelet; gyengébben üt.", Cost = 3, Cooldown = 8f },
             },
             new ClassDefinition
             {
@@ -59,8 +53,6 @@ namespace AshenRealm.Story
                 Ending = "A Gloamlord nem nekromanta volt, csak egy ember, akit odaültettek. A tanítás hazudott. A lámpás nem. Visszaviszed, és elmondod nekik, mit láttál a fényénél.",
                 MaxHealth = 90f, MaxFocus = 9, FocusPerSecond = 0.5f, StartHonor = 40,
                 Damage = 22f, AttackCooldown = 0.65f, AttackDuration = 0.5f, BlockReduction = 0.7f, MoveMultiplier = 1f,
-                Ability1 = new AbilityDefinition { Effect = AbilityEffect.Smite, Name = "Sújtás", Description = "Szent tűz; ostorozza az élőholtakat.", Cost = 3, Cooldown = 5f },
-                Ability2 = new AbilityDefinition { Effect = AbilityEffect.Mend, Name = "Gyógyítás", Description = "Sebeket gyógyítasz.", Cost = 3, Cooldown = 9f },
             },
             new ClassDefinition
             {
@@ -71,8 +63,6 @@ namespace AshenRealm.Story
                 Ending = "A trón üres. A holtak végre a saját nevükön szólhatnak.",
                 MaxHealth = 75f, MaxFocus = 30, FocusPerSecond = 0.9f, StartHonor = -20,
                 Damage = 28f, AttackCooldown = 0.8f, AttackDuration = 0.5f, BlockReduction = 0.55f, MoveMultiplier = 1.03f, Ranged = true,
-                Ability1 = new AbilityDefinition { Effect = AbilityEffect.BoneSpear, Name = "Csontlándzsa", Description = "A holtak szilánkja messzire döf.", Cost = 3, Cooldown = 5f },
-                Ability2 = new AbilityDefinition { Effect = AbilityEffect.BoneArmor, Name = "Csontpáncél", Description = "Csontvért felezi a sebzést és enyhíti a sebeket.", Cost = 2, Cooldown = 12f },
             },
             new ClassDefinition
             {
@@ -83,10 +73,21 @@ namespace AshenRealm.Story
                 Ending = "A készítmény elkészült. Üregkapu nem kérdezi, miből főzted.",
                 MaxHealth = 85f, MaxFocus = 8, FocusPerSecond = 0.65f, StartHonor = 10,
                 Damage = 19f, AttackCooldown = 0.65f, AttackDuration = 0.45f, BlockReduction = 0.6f, MoveMultiplier = 1.14f, Ranged = true,
-                Ability1 = new AbilityDefinition { Effect = AbilityEffect.AcidFlask, Name = "Savüveg", Description = "Maró elegy és hosszan ható méreg.", Cost = 2, Cooldown = 6f },
-                Ability2 = new AbilityDefinition { Effect = AbilityEffect.HealingBrew, Name = "Gyógyfőzet", Description = "Azonnali gyógyulás, majd lassú regeneráció.", Cost = 3, Cooldown = 10f },
             },
         };
+
+        static Catalog()
+        {
+            // AbilityBook only reads generated workbook records and class enums during initialization.
+            // The legacy class preview expects two non-null entries, even when the actual second slot is empty.
+            foreach (ClassDefinition definition in Classes)
+            {
+                string[] ids = AbilityBook.DefaultLoadoutIds(definition.Id);
+                AbilityDefinition fallback = AbilityBook.Find(definition.Id == CharacterClass.Alchemist ? "starter_tonic" : "strike");
+                definition.Ability1 = AbilityBook.Find(ids[0]) ?? fallback;
+                definition.Ability2 = AbilityBook.Find(ids[1]) ?? fallback;
+            }
+        }
 
         public static ClassDefinition ClassOf(CharacterClass id) => Classes[System.Math.Max(0, System.Math.Min((int)id, Classes.Length - 1))];
 

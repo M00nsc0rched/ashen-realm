@@ -2,7 +2,7 @@
 
 Original first-person dark fantasy RPG. Primary target: **web browser (WebGL)**, desktop and mobile; iPhone native
 remains supported. Unity **6000.6.8f1**, URP 17.6, Input System 1.20, uGUI 2.6.
-Current milestone: Checkpoint N, matching class equipment, four-skill loadouts, distinct enemy tactics and living inhabitants, all in
+Current milestone: Checkpoint O, the north land beyond the Old Toll Gate, its people and a horse to buy and ride, on top of Checkpoint N, all in
 `Assets/Scenes/Prototype_Valley.unity`. See `docs/PROGRESS.md` for validation status and `docs/GRAVEBORNE.md` for the port's scope.
 Do not expand scope beyond that plan (multiplayer, weather) unless asked.
 
@@ -44,10 +44,27 @@ Long thin bars and a compass at the top centre, round emblem top-left, pause top
 - The houses (`TavernGenerator`, `ForgeGenerator`, `ChapelGenerator`, `HamletGenerator`, all on `RoomGenerator`) are indoor zones: no sun; their light
   baked into the vertices with `MeshBuilder.Bake`, because the shader's point lights only reach a metre or two. Whoever stands in one is baked
   with the same light (`PeopleMeshes`). Under a roof the weapons stay at the door: `ZoneManager` calls `PlayerCombat.SetArmed`.
-  The carried torch is a separate inventory choice and keeps its equipped state. `ArrivalGenerator` builds the closed, black southern
+  Hollowgate's streets (zone 1) are peaceful too (`ZoneManager.WeaponsAway`): weapons away, no attack, no skill, no fighting buttons.
+  The carried torch is a separate inventory choice: indoors `PlayerTorch` puts it and its light away (`InHand`) without changing the
+  saved choice, and brings it back outside; the city and the depths keep it. `ArrivalGenerator` builds the closed, black southern
   tunnel and the waiting caravan; its threshold collider must remain solid even though no bars are visible.
 - `AtmosphereController` carries sunset into evening as the player walks north. Entering the city sets `world_evening` in the soul's
   session flags; loading and returning to the valley must reapply it. First city arrival offers the torch once (`torch_presented`).
+- The valley is one zone of about 500 x 700 m: the lower valley, then the north land (`ValleyPlaces`) up to Hollowgate's gate at (0, 590).
+  The Old Toll Gate (0, 92) is the only pass between them; `TollGate` keeps its solid barrier until the Cursed Knight's flag, checked
+  whenever the valley is active, so a loaded soul finds it open. Trees, grass, flowers, wheat, haystacks and cairns are instances
+  (`World/ScatterData`, drawn by `ScatterRenderer` with `RenderMeshInstanced`, culled per 66 m cell); tree colliders are grouped per cell.
+  The scatter draws from the generator's shared random sequence: a new clearing, or anything that draws from `rng` before `ScatterNorth`,
+  moves every later instance. Append, or give new things a `System.Random` of their own. The lake has an invisible shore ring (no swimming).
+- The north places have preview vistas (`WorldVista`) and inspectable discoveries; seven new speakers (`StoryText`, two in the city) and
+  ambient figures live there.
+  `NpcIdleAnimator` hides a person beyond 150 m but keeps the collider. `PeoplePlaytestChecks` aims at every person from a standing spot.
+- The horse (`Player/RidingHorse`): Patkós Hilda sells one for 60 gold (`NpcService.Stable`); owning it is only the session flag
+  `horse_owned`. It lives in the valley alone, so a portal, a load or a respawn dismounts first, and every arrival in the valley puts an
+  unridden horse at the nearest `Horse Post`'s `Standing Spot` (keep spots free for a 2.6 m x 0.5 m capsule and 4 m from arrivals).
+  Riding parents the same horse under the player (no view model) and switches `FirstPersonController` to its `Saddle` numbers; the head
+  and rump are probed ahead (`Rein`), because the capsule holds only the middle. In the saddle the weapons are away through `SetArmed`,
+  and any damage throws the rider off. On-foot movement must stay untouched: the earlier sprint and stamina playtests guard it.
 - Dialogues show a painted face from `UI/PortraitLibrary` when the speaker has one: `person_mood.jpg` in `Assets/Art/Menu/Portraits`, cut
   from the strips in `Vázlat_Kocsma`. Mood follows `Alignment`: 0 wary (Mortal), 1 warm (Hallowed), 2 hostile (Marked). The smith and the
   book-keeper have one picture, `person_0`, cut from the paintings in `Vázlat_Város`.

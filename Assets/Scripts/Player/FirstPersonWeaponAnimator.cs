@@ -157,7 +157,7 @@ namespace AshenRealm.Player
             EvaluateSlash(out Vector3 slashPos, out Vector3 slashEuler);
             GameSession session = GameSession.Instance;
             bool classKit = session != null && session.Weapon == null;
-            bool freeLeft = PlayerTorch.Instance == null || !PlayerTorch.Instance.Equipped;
+            bool freeLeft = PlayerTorch.Instance == null || !PlayerTorch.Instance.InHand;
             bool twins = classKit && (session.Class.Id == CharacterClass.Warden || session.Class.Id == CharacterClass.Necromancer);
             bool leftStrike = freeLeft && classKit && (session.Class.Id == CharacterClass.Alchemist || (twins && slashVariant % 2 == 1));
             float rightStrike = leftStrike ? 0.18f : 1f;

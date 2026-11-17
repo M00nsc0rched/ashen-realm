@@ -50,8 +50,8 @@ namespace AshenRealm.EditorTools
         const int CardQuality = 85;
         const string LockedCardArt = "CardLocked";
         const int PortraitMoods = 3;
-        static readonly string[] PortraitPeople = { "wanderer", "landlord", "quartermaster", "gravedigger", "crier", "widow" };
-        static readonly string[] OneFacePeople = { "smith", "choir" };
+        internal static readonly string[] PortraitPeople = { "wanderer", "landlord", "quartermaster", "gravedigger", "crier", "widow" };
+        internal static readonly string[] OneFacePeople = { "smith", "choir" };
         const float ChoiceLeft = 272f;    // where the class choice concept's content begins, in its own pixels
         const float ChoiceWidth = 1290f;
         static readonly Vector2 CardSize = new Vector2(421f, 616f); // the sprite with its margins, 395 wide at the frame

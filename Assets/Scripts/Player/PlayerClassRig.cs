@@ -71,7 +71,7 @@ namespace AshenRealm.Player
             GameSession session = GameSession.Instance;
             if (session == null) return;
             int classIndex = (int)session.Class.Id;
-            bool torch = PlayerTorch.Instance != null && PlayerTorch.Instance.Equipped;
+            bool torch = PlayerTorch.Instance != null && PlayerTorch.Instance.InHand;
             bool flaskInRight = session.Class.Id == CharacterClass.Alchemist && torch && session.Weapon == null;
             for (int i = 0; i < weaponSets.Length; i++)
             {

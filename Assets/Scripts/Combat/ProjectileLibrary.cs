@@ -9,11 +9,12 @@ namespace AshenRealm.Combat
     {
         [SerializeField] Projectile[] prefabs;
 
-        public void Launch(BoltKind kind, Vector3 origin, Vector3 aim, float damage, GameObject owner, bool fromPlayer, EnemyMove effects = null,
-            Action<float> onHit = null)
+        public Projectile Launch(BoltKind kind, Vector3 origin, Vector3 aim, float damage, GameObject owner, bool fromPlayer, EnemyMove effects = null,
+            Action<float> onHit = null, Func<Health, Vector3, float> resolveHit = null)
         {
             Projectile bolt = Instantiate(prefabs[(int)kind], origin, Quaternion.identity);
-            bolt.Launch(aim, damage, owner, fromPlayer, effects, onHit);
+            bolt.Launch(aim, damage, owner, fromPlayer, effects, onHit, resolveHit);
+            return bolt;
         }
     }
 }

@@ -1,28 +1,18 @@
+using System.Collections;
+using System.Collections.Generic;
 using AshenRealm.AI;
 using AshenRealm.Core;
 using AshenRealm.Input;
-using AshenRealm.Story;
 using AshenRealm.Player;
+using AshenRealm.Story;
 using AshenRealm.World;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace AshenRealm.Combat
 {
-    /// <summary>
-    /// The class kit beyond sword and shield: two abilities paid with focus (Graveborne's SP), each on a cooldown because
-    /// real time has no turns to spend, plus the potion. Focus trickles back on its own and returns faster with kills.
-    /// </summary>
+    /// <summary>Workbook tiers drive real-time deliveries; progression owns learning, recipes and Q/R.</summary>
     public sealed class PlayerAbilities : MonoBehaviour
     {
-        const float BackstabDamage = 30f;
-        const float BackstabBehindMultiplier = 3f;
-        const float SmiteDamage = 32f;
-        const float DrainDamage = 26f;
-        const float MendAmount = 38f;
-        const int FocusPerKill = 1;
-
         [SerializeField] PlayerInputHub inputSource;
         [SerializeField] PlayerCombat combat;
         [SerializeField] Health health;
@@ -30,449 +20,364 @@ namespace AshenRealm.Combat
         [SerializeField] Transform aimOrigin;
         [SerializeField] ImpactEffects visualEffects;
         [SerializeField] ZoneManager zones;
-
-        IPlayerInput input;
-        ClassDefinition definition;
-        float focus;
-        int gearFocus;
-        int growthFocus;
-        int activeTier = 1;
-        readonly int[] tiers = { 1, 1, 1, 1 };
-        readonly int[] equipped = { 0, 1 };
-        readonly float[] readyAt = new float[AbilityBook.KnownCount];
+        readonly Dictionary<string, float> readyAt = new Dictionary<string, float>();
         readonly Collider[] nearby = new Collider[64];
         readonly RaycastHit[] traces = new RaycastHit[32];
-        readonly HashSet<Health> hitOnce = new HashSet<Health>();
+        readonly HashSet<Health> unique = new HashSet<Health>();
+        readonly List<Projectile> bolts = new List<Projectile>();
+        readonly List<Coroutine> fields = new List<Coroutine>();
+        readonly int[] equipped = { -1, -1 };
+        int[] tiers = new int[0];
+        IPlayerInput input;
+        ClassDefinition definition;
+        PlayerProgression growth;
+        CharacterController capsule;
+        float focus;
+        int gearFocus, growthFocus, generation;
         Zone lastZone;
-
+        struct Cast
+        {
+            public AbilityDefinition Ability;
+            public AbilityTierDefinition Tier;
+            public float Factor, Bonus;
+            public int Generation;
+        }
         public float Focus => focus;
-        public float MaxFocus => definition != null ? Mathf.Max(1, definition.MaxFocus + gearFocus + growthFocus) : 1f;
+        public float MaxFocus => definition == null ? 1f : Mathf.Max(1, definition.MaxFocus + gearFocus + growthFocus);
         public float FocusNormalized => focus / MaxFocus;
-
-        void Awake() => input = inputSource;
-
+        public bool IsInTown => zones != null && zones.CurrentIndex >= ZoneNumbers.City && zones.CurrentIndex <= ZoneNumbers.Chapel;
+        void Awake() { input = inputSource; growth = GetComponent<PlayerProgression>(); capsule = GetComponent<CharacterController>(); }
         void OnEnable() => EnemyAI.Slain += OnEnemySlain;
-        void OnDisable() => EnemyAI.Slain -= OnEnemySlain;
-
-        void OnEnemySlain(EnemyAI _) => AddFocus(FocusPerKill);
-
+        void OnDisable() { EnemyAI.Slain -= OnEnemySlain; CancelCasts(); }
+        void OnEnemySlain(EnemyAI _) => AddFocus(1f);
         public void ApplyClass(ClassDefinition chosen)
         {
-            definition = chosen;
-            focus = chosen.MaxFocus;
-            for (int i = 0; i < readyAt.Length; i++) readyAt[i] = 0f;
-            StopAllCoroutines();
+            CancelCasts(); definition = chosen; tiers = new int[AbilityBook.Count(chosen)];
+            equipped[0] = equipped[1] = -1; readyAt.Clear(); focus = chosen.MaxFocus;
         }
-
-        /// <summary>What the weapon in hand and the relic add to the pool.</summary>
-        public void ApplyGear(int bonusFocus)
-        {
-            gearFocus = bonusFocus;
-            focus = Mathf.Min(focus, MaxFocus);
-        }
-
+        public void ApplyGear(int bonusFocus) { gearFocus = bonusFocus; focus = Mathf.Min(focus, MaxFocus); }
         public void ApplyProgression(int bonusFocus, int firstTier, int secondTier)
         {
             growthFocus = bonusFocus;
-            tiers[0] = Mathf.Clamp(firstTier, 1, 3);
-            tiers[1] = Mathf.Clamp(secondTier, 1, 3);
+            if (tiers.Length > 0) tiers[0] = firstTier;
+            if (tiers.Length > 1) tiers[1] = secondTier;
             focus = Mathf.Min(focus, MaxFocus);
         }
-
         public void ApplyProgression(int bonusFocus, int[] knownTiers, int[] loadout)
         {
             growthFocus = bonusFocus;
-            for (int i = 0; i < tiers.Length; i++) tiers[i] = Mathf.Clamp(knownTiers[i], 1, 3);
-            for (int i = 0; i < equipped.Length; i++) equipped[i] = Mathf.Clamp(loadout[i], 0, AbilityBook.KnownCount - 1);
+            int count = definition == null ? 0 : AbilityBook.Count(definition);
+            if (tiers.Length != count) tiers = new int[count];
+            for (int i = 0; i < count; i++) tiers[i] = knownTiers != null && i < knownTiers.Length ? Mathf.Clamp(knownTiers[i], 0, 3) : 0;
+            for (int i = 0; i < 2; i++) equipped[i] = loadout != null && i < loadout.Length && loadout[i] >= 0 && loadout[i] < count ? loadout[i] : -1;
             focus = Mathf.Min(focus, MaxFocus);
         }
-
-        public void AddFocus(float amount) => focus = Mathf.Min(MaxFocus, focus + amount);
-
+        // The owner's rule: a full bar always pays for a skill, whatever its workbook cost.
+        public float CastCost(AbilityDefinition a) => Mathf.Min(a.Cost, MaxFocus);
+        public void AddFocus(float amount) => focus = Mathf.Clamp(focus + amount, 0f, MaxFocus);
         public void SetFocus(float amount) => focus = Mathf.Clamp(amount, 0f, MaxFocus);
-
-        /// <summary>0 when the slot is usable, 1 right after use.</summary>
+        public AbilityDefinition ActiveAbility(int slot) => slot < 0 || slot > 1 ? null : AbilityBook.At(definition, equipped[slot]);
+        public AbilityDefinition AbilityAt(int index) => AbilityBook.At(definition, index);
+        public int EquippedAbilityIndex(int slot) => slot < 0 || slot > 1 ? -1 : equipped[slot];
         public float CooldownFraction(int slot)
         {
-            AbilityDefinition ability = Slot(slot);
-            return ability == null ? 0f : Mathf.Clamp01((readyAt[equipped[slot]] - Time.time) / ability.Cooldown);
+            var a = ActiveAbility(slot);
+            return a != null && readyAt.TryGetValue(a.Id, out float ready) ? Mathf.Clamp01((ready - Time.time) / Mathf.Max(0.1f, a.Cooldown)) : 0f;
         }
-
         public bool Affordable(int slot)
         {
-            AbilityDefinition ability = Slot(slot);
-            return ability != null && focus >= ability.Cost;
+            var a = ActiveAbility(slot);
+            if (a == null || growth == null || !growth.CanEquipSkill(a.Id) || focus < CastCost(a)) return false;
+            return health.Current > a.Tier(growth.SkillTier(a.Id)).SelfDamage * AbilityBook.PowerFactor(definition, a) && (!a.IsRecipe || growth.RecipeStock(a.Id) > 0);
         }
-
-        public AbilityDefinition ActiveAbility(int slot) => slot < 0 || slot >= 2 ? null : AbilityBook.At(definition, equipped[slot]);
-        public AbilityDefinition AbilityAt(int index) => AbilityBook.At(definition, index);
-        public int EquippedAbilityIndex(int slot) => equipped[Mathf.Clamp(slot, 0, 1)];
-        AbilityDefinition Slot(int slot) => ActiveAbility(slot);
-
         void Update()
         {
-            if (zones.Current != lastZone) { StopAllCoroutines(); lastZone = zones.Current; }
-            if (definition == null || !health.IsAlive) { StopAllCoroutines(); return; }
+            if (zones.Current != lastZone) { CancelCasts(); lastZone = zones.Current; }
+            if (definition == null || !health.IsAlive) { CancelCasts(); return; }
             focus = Mathf.Min(MaxFocus, focus + definition.FocusPerSecond * Time.deltaTime);
-
-            for (int slot = 0; slot < 2; slot++)
-                if (input.ConsumeAbility(slot)) TryUse(slot);
+            for (int i = 0; i < 2; i++) if (input.ConsumeAbility(i)) TryUse(i);
             if (input.ConsumePotion()) DrinkPotion();
         }
-
-        /// <summary>Spends focus and fires the ability, if it is ready.</summary>
         public bool TryUse(int slot)
         {
-            AbilityDefinition ability = Slot(slot);
-            if (ability == null || !combat.Armed || !health.IsAlive || status.Stunned) return false;
-            int known = equipped[slot];
-            if (Time.time < readyAt[known]) return false;
-            if (focus < ability.Cost)
+            var a = ActiveAbility(slot);
+            if (a == null || growth == null || !health.IsAlive || status.Stunned || Time.timeScale <= 0f) return false;
+            // With the weapons away (houses, the city) the skill buttons are gone too, so no key may cast either.
+            if (!combat.Armed) return false;
+            if (!growth.CanEquipSkill(a.Id)) { GameMessages.Notify(AbilityText.NotLearned); return false; }
+            if (readyAt.TryGetValue(a.Id, out float ready) && Time.time < ready) return false;
+            if (focus < CastCost(a)) { GameMessages.Notify(GameText.NoFocus); return false; }
+            var rank = a.Tier(growth.SkillTier(a.Id));
+            float factor = AbilityBook.PowerFactor(definition, a);
+            if (health.Current <= rank.SelfDamage * factor) { GameMessages.Notify(AbilityText.NotEnoughHealth); return false; }
+            bool usesCorpse = a.Id == "corpseexplosion" || a.Id == "n_corpseburst";
+            EnemyAI corpse = usesCorpse ? FindCorpse() : null;
+            if (usesCorpse && corpse == null) { GameMessages.Notify(AbilityText.NoCorpse); return false; }
+            if (a.IsRecipe && !growth.TryConsumeRecipe(a.Id)) { GameMessages.Notify(AbilityText.BrewFirst); return false; }
+            focus -= CastCost(a); readyAt[a.Id] = Time.time + Mathf.Max(0.1f, a.Cooldown);
+            if (rank.SelfDamage > 0f) health.ApplyDamage(new DamageInfo(rank.SelfDamage * factor, transform.position, Vector3.zero, gameObject, true));
+            var cast = new Cast { Ability = a, Tier = rank, Factor = factor, Bonus = growth.SkillPowerBonus(a.Id), Generation = generation };
+            if (a.Delivery == AbilityDelivery.Self) ApplySelf(cast);
+            else
             {
-                GameMessages.Notify(GameText.NoFocus);
-                return false;
+                combat.PlayAbilitySwing();
+                switch (a.Delivery)
+                {
+                    case AbilityDelivery.Bolt: case AbilityDelivery.Orb: Shoot(cast, aimOrigin.forward); break;
+                    case AbilityDelivery.Fan: StartCoroutine(Fan(cast)); break;
+                    case AbilityDelivery.Chain: StartCoroutine(Chain(cast)); break;
+                    case AbilityDelivery.Nova:
+                        Vector3? corpsePoint = corpse != null ? corpse.transform.position : (Vector3?)null;
+                        if (corpse != null) corpse.gameObject.SetActive(false);
+                        StartCoroutine(Nova(cast, corpsePoint)); break;
+                    case AbilityDelivery.Field:
+                        if (fields.Count >= 3) { StopCoroutine(fields[0]); fields.RemoveAt(0); }
+                        fields.Add(StartCoroutine(Field(cast, GroundAim(a.Range)))); break;
+                    case AbilityDelivery.Charge: case AbilityDelivery.Leap: StartCoroutine(Rush(cast)); break;
+                    default: StartCoroutine(Strikes(cast)); break;
+                }
             }
-
-            focus -= ability.Cost;
-            readyAt[known] = Time.time + ability.Cooldown;
-            activeTier = tiers[known];
-            Fire(ability.Effect);
-            if (visualEffects != null) visualEffects.EmitAbility(aimOrigin.position + aimOrigin.forward * 0.75f, EffectColor(ability.Effect), 0.25f);
+            Burst(aimOrigin.position + aimOrigin.forward * 0.65f, EffectColor(a.Effect), 0.25f);
             return true;
         }
-
-        void Fire(AbilityEffect effect)
+        bool Valid(Cast cast) => cast.Generation == generation && health.IsAlive && definition != null;
+        void CancelCasts()
         {
-            switch (effect)
+            generation++; StopAllCoroutines(); fields.Clear();
+            foreach (var bolt in bolts) if (bolt != null) Destroy(bolt.gameObject);
+            bolts.Clear();
+        }
+        void ApplySelf(Cast cast)
+        {
+            var r = cast.Tier; float f = cast.Factor;
+            if (r.CleansePoison) status.CleansePoison();
+            if (r.HealFlat > 0f || r.HealMagMultiplier > 0f) health.Heal((r.HealFlat + r.HealMagMultiplier * growth.Magic) * f);
+            if (r.RestoreFocus > 0f) AddFocus(r.RestoreFocus * f);
+            if (r.RegenerationPerTurn > 0f) status.ApplyRegen(r.RegenerationPerTurn * f / AbilityBook.TurnSeconds, r.RegenerationTurns * AbilityBook.TurnSeconds);
+            if (r.ShieldDefMultiplier > 0f) status.ApplyShield((growth.Defense * r.ShieldDefMultiplier + cast.Bonus) * f, AbilityBook.DefaultShieldTurns * AbilityBook.TurnSeconds);
+            if (r.AttackBonus > 0f) status.ApplyAttackBonus(r.AttackBonus * f, r.AttackBonusTurns * AbilityBook.TurnSeconds);
+            if (cast.Ability.Id == "nourishing_stew") growth.AddFood(35);
+            if (cast.Ability.Id == "cordial_marrow") growth.AddFood(50);
+            Ring(transform.position, 1.1f, EffectColor(cast.Ability.Effect));
+        }
+        IEnumerator Strikes(Cast cast)
+        {
+            for (int i = 0; i < Mathf.Max(1, cast.Tier.Hits) && Valid(cast); i++)
             {
-                case AbilityEffect.ShieldBash:
-                {
-                    combat.PlayAbilitySwing();
-                    GameObject foe = combat.Strike(Power(14f), 3f, 0.55f);
-                    if (foe != null && foe.TryGetComponent(out StatusEffects s)) s.ApplyStun(2.2f);
-                    break;
-                }
-                case AbilityEffect.Rally:
-                    status.ApplyFury(8f + (activeTier - 1) * 3f);
-                    status.ApplyRegen(Power(5f), 6f);
-                    GameMessages.Notify(GameText.RallyMessage);
-                    break;
-                case AbilityEffect.Backstab:
-                    combat.PlayAbilitySwing();
-                    combat.Strike(Power(BackstabDamage) * (FoeFacingAway() ? BackstabBehindMultiplier : 1f), 2.8f, 0.45f);
-                    break;
-                case AbilityEffect.PoisonBlade:
-                    combat.CoatBlade(10f + (activeTier - 1) * 5f);
-                    GameMessages.Notify(GameText.PoisonMessage);
-                    break;
-                case AbilityEffect.LifeDrain:
-                {
-                    combat.PlayAbilitySwing();
-                    float before = health.Current;
-                    GameObject foe = combat.Strike(Power(DrainDamage), 9f, 0.6f);
-                    if (foe != null) health.Heal(Power(DrainDamage));
-                    if (foe == null && Mathf.Approximately(before, health.Current)) GameMessages.Notify(GameText.NoTarget);
-                    break;
-                }
-                case AbilityEffect.Hex:
-                {
-                    combat.PlayAbilitySwing();
-                    GameObject foe = combat.Strike(Power(6f), 11f, 0.6f);
-                    if (foe != null && foe.TryGetComponent(out StatusEffects s)) s.ApplyWeaken(9f);
-                    else GameMessages.Notify(GameText.NoTarget);
-                    break;
-                }
-                case AbilityEffect.Smite:
-                {
-                    combat.PlayAbilitySwing();
-                    GameObject foe = FoeInReach(3.4f);
-                    bool undead = foe != null && foe.TryGetComponent(out EnemyAI ai) && ai.Definition.Undead;
-                    combat.Strike(Power(undead ? SmiteDamage * 2f : SmiteDamage), 3.4f, 0.5f);
-                    break;
-                }
-                case AbilityEffect.Mend:
-                    health.Heal(Power(MendAmount));
-                    GameMessages.Notify(GameText.MendMessage);
-                    break;
-                case AbilityEffect.BoneSpear:
-                    combat.PlayAbilitySwing();
-                    combat.Strike(Power(36f), 16f, 0.45f);
-                    break;
-                case AbilityEffect.BoneArmor:
-                    status.ApplyWard(8f + (activeTier - 1) * 4f);
-                    health.Heal(Power(10f));
-                    break;
-                case AbilityEffect.AcidFlask:
-                {
-                    combat.PlayAbilitySwing();
-                    GameObject foe = combat.Strike(Power(22f), 12f, 0.7f);
-                    if (foe != null && foe.TryGetComponent(out StatusEffects s)) s.ApplyPoison(Power(5f), 5f);
-                    break;
-                }
-                case AbilityEffect.HealingBrew:
-                    health.Heal(Power(28f));
-                    status.ApplyRegen(Power(3f), 5f);
-                    break;
-                case AbilityEffect.Whirlwind:
-                    combat.PlayAbilitySwing();
-                    Area(transform.position, 3.6f + activeTier * 0.25f, Power(27f), 360f, 0.35f, 0f, false);
-                    Ring(transform.position, 3.6f, EffectColor(effect));
-                    break;
-                case AbilityEffect.IronSkin:
-                    status.ApplyWard(7f + activeTier * 2f);
-                    status.ApplyFury(2f + activeTier);
-                    GetComponent<Stamina>()?.Refill();
-                    Ring(transform.position, 1.2f, EffectColor(effect));
-                    break;
-                case AbilityEffect.FanOfKnives:
-                {
-                    combat.PlayAbilitySwing();
-                    int count = 1 + activeTier * 2;
-                    for (int i = 0; i < count; i++)
-                    {
-                        Vector3 direction = Quaternion.AngleAxis(Mathf.Lerp(-16f, 16f, i / (float)(count - 1)), Vector3.up) * aimOrigin.forward;
-                        Health victim = Trace(direction, 12f, out Vector3 point);
-                        Hurt(victim, Power(11f), 0f, 0f);
-                        visualEffects?.EmitAbilityRay(aimOrigin.position + aimOrigin.forward * 0.5f, point, EffectColor(effect));
-                    }
-                    break;
-                }
-                case AbilityEffect.Caltrops:
-                    StartCoroutine(Field(transform.position, 2.9f, 7f + activeTier, Power(4f), effect, false));
-                    break;
-                case AbilityEffect.FrostLance:
-                {
-                    combat.PlayAbilitySwing();
-                    Health victim = Trace(aimOrigin.forward, 17f, out Vector3 point);
-                    Hurt(victim, Power(32f), 1.1f + activeTier * 0.3f, 4f);
-                    visualEffects?.EmitAbilityRay(aimOrigin.position + aimOrigin.forward * 0.5f, point, EffectColor(effect));
-                    break;
-                }
-                case AbilityEffect.ChainLightning:
-                {
-                    combat.PlayAbilitySwing();
-                    Health victim = Trace(aimOrigin.forward, 15f, out _);
-                    if (victim != null) StartCoroutine(Chain(victim, 2 + activeTier, Power(25f), definition, zones.Current));
-                    else GameMessages.Notify(GameText.NoTarget);
-                    break;
-                }
-                case AbilityEffect.Sanctuary:
-                    StartCoroutine(Field(transform.position, 3.3f, 6f + activeTier * 2f, Power(5f), effect, true));
-                    break;
-                case AbilityEffect.Consecration:
-                    StartCoroutine(Field(GroundTarget(9f), 3.8f, 5f + activeTier, Power(7f), effect, false));
-                    break;
-                case AbilityEffect.BoneNova:
-                    combat.PlayAbilitySwing();
-                    Area(transform.position, 4.3f, Power(26f), 360f, 0.9f + activeTier * 0.3f, 0f, false);
-                    Ring(transform.position, 4.3f, EffectColor(effect));
-                    break;
-                case AbilityEffect.SoulHarvest:
-                {
-                    combat.PlayAbilitySwing();
-                    float dealt = Area(transform.position, 5f, Power(24f), 360f, 0f, 4f, false);
-                    health.Heal(dealt * 0.35f);
-                    AddFocus(Mathf.Min(3f, dealt / 35f));
-                    Ring(transform.position, 5f, EffectColor(effect));
-                    break;
-                }
-                case AbilityEffect.FireBomb:
-                {
-                    combat.PlayAbilitySwing();
-                    Vector3 at = GroundTarget(12f);
-                    Area(at, 3.3f, Power(29f), 360f, 0f, 0f, false);
-                    StartCoroutine(Field(at, 3.3f, 3f + activeTier, Power(5f), effect, false));
-                    break;
-                }
-                case AbilityEffect.FlashPowder:
-                    combat.PlayAbilitySwing();
-                    Area(transform.position, 6.5f, Power(8f), 105f, 1.8f + activeTier * 0.4f, 5f, false);
-                    Ring(transform.position + aimOrigin.forward * 2f, 2.6f, EffectColor(effect));
-                    break;
+                var victim = Trace(aimOrigin.forward, cast.Ability.Range, cast.Ability.Kind == AbilityKind.Physical ? 0.5f : 0.22f);
+                if (victim != null) Hurt(victim, cast, victim.transform.position + Vector3.up);
+                else if (i == 0) GameMessages.Notify(GameText.NoTarget);
+                if (i + 1 < cast.Tier.Hits) { combat.PlayAbilitySwing(); yield return new WaitForSeconds(0.1f); }
             }
         }
-
+        IEnumerator Nova(Cast cast, Vector3? corpsePoint = null)
+        {
+            for (int i = 0; i < Mathf.Max(1, cast.Tier.Hits) && Valid(cast); i++)
+            {
+                Vector3 point = corpsePoint ?? transform.position;
+                Area(cast, point, cast.Ability.Radius, null);
+                Ring(point, cast.Ability.Radius, EffectColor(cast.Ability.Effect));
+                if (i + 1 < cast.Tier.Hits) yield return new WaitForSeconds(0.09f);
+            }
+        }
+        IEnumerator Fan(Cast cast)
+        {
+            int count = Mathf.Max(1, cast.Tier.Hits);
+            // The first knife flies at the crosshair and the rest open out to either side, so an even count never splits
+            // around the foe being aimed at.
+            float step = count > 1 ? 13f / ((count) / 2) : 0f;
+            for (int i = 0; i < count && Valid(cast); i++)
+            {
+                float angle = (i + 1) / 2 * step * (i % 2 == 1 ? -1f : 1f);
+                Shoot(cast, Quaternion.AngleAxis(angle, Vector3.up) * aimOrigin.forward);
+                yield return new WaitForSeconds(0.045f);
+            }
+        }
+        void Shoot(Cast cast, Vector3 direction)
+        {
+            bolts.RemoveAll(p => p == null);
+            Vector3 origin = aimOrigin.position + direction * 0.65f - aimOrigin.up * 0.08f;
+            var bolt = combat.LaunchAbilityBolt(Bolt(cast.Ability), origin, direction, (victim, point) =>
+            {
+                if (!Valid(cast)) return 0f;
+                float dealt = Hurt(victim, cast, point);
+                if (cast.Ability.Delivery == AbilityDelivery.Orb)
+                {
+                    Area(cast, point, cast.Ability.Radius, victim);
+                    Ring(point, cast.Ability.Radius, EffectColor(cast.Ability.Effect));
+                }
+                return dealt;
+            });
+            if (bolt != null) bolts.Add(bolt);
+        }
+        IEnumerator Chain(Cast cast)
+        {
+            var victim = Trace(aimOrigin.forward, cast.Ability.Range, 0.35f);
+            var struck = new HashSet<Health>(); Vector3 previous = aimOrigin.position;
+            for (int i = 0; i < cast.Tier.Hits && victim != null && Valid(cast); i++)
+            {
+                Vector3 point = victim.transform.position + Vector3.up;
+                for (int p = 0; p < 8; p++) Burst(Vector3.Lerp(previous, point, p / 7f), EffectColor(cast.Ability.Effect), 0.12f);
+                Hurt(victim, cast, point); struck.Add(victim); previous = point;
+                yield return new WaitForSeconds(0.1f); victim = Nearest(previous, 6f, struck);
+            }
+        }
+        IEnumerator Field(Cast cast, Vector3 point)
+        {
+            float duration = Mathf.Max(3f, cast.Tier.PoisonTurns * AbilityBook.TurnSeconds);
+            var struck = new HashSet<Health>();
+            for (float elapsed = 0f; elapsed < duration && Valid(cast); elapsed += 0.5f)
+            {
+                int count = Physics.OverlapSphereNonAlloc(point, cast.Ability.Radius, nearby, ~0, QueryTriggerInteraction.Ignore);
+                for (int i = 0; i < count; i++)
+                {
+                    var victim = nearby[i].GetComponentInParent<Health>();
+                    if (!IsFoe(victim) || struck.Contains(victim) || !Visible(point + Vector3.up * 0.4f, victim)) continue;
+                    Hurt(victim, cast, victim.transform.position + Vector3.up); struck.Add(victim);
+                }
+                Ring(point, cast.Ability.Radius, EffectColor(cast.Ability.Effect));
+                yield return new WaitForSeconds(0.5f);
+            }
+        }
+        IEnumerator Rush(Cast cast)
+        {
+            Vector3 direction = Vector3.ProjectOnPlane(aimOrigin.forward, Vector3.up).normalized;
+            float duration = cast.Ability.Delivery == AbilityDelivery.Leap ? 0.4f : 0.3f;
+            float previousArc = 0f;
+            for (float t = 0f; t < duration && Valid(cast); t += Time.deltaTime)
+            {
+                float next = Mathf.Min(duration, t + Time.deltaTime);
+                float arc = cast.Ability.Delivery == AbilityDelivery.Leap ? Mathf.Sin(next / duration * Mathf.PI) * 1.15f : 0f;
+                if (capsule != null && capsule.enabled) capsule.Move(direction * (cast.Ability.Range / duration * (next - t)) + Vector3.up * (arc - previousArc));
+                previousArc = arc;
+                yield return null;
+            }
+            if (Valid(cast)) { Area(cast, transform.position, cast.Ability.Radius, null); Ring(transform.position, cast.Ability.Radius, EffectColor(cast.Ability.Effect)); }
+        }
+        float Hurt(Health victim, Cast cast, Vector3 point)
+        {
+            if (!Valid(cast) || !IsFoe(victim) || Random.value > cast.Tier.Accuracy) return 0f;
+            var r = cast.Tier; bool magic = cast.Ability.Kind != AbilityKind.Physical;
+            float stat = cast.Ability.IsRecipe ? 0f : magic ? growth.Magic : growth.Attack;
+            float amount = status.ModifyOutgoing(r.Power + cast.Bonus + stat, magic) * cast.Factor;
+            var passive = GetComponent<PlayerPassives>();
+            if (r.CriticalChance > 0f && Random.value < r.CriticalChance) amount *= passive != null ? passive.CriticalMultiplier : AbilityBook.CriticalMultiplier;
+            var foe = victim.GetComponent<EnemyAI>();
+            if (r.Holy && foe != null && foe.Definition.Undead) amount *= 1.5f;
+            bool execute = r.ExecuteThreshold > 0f && victim.Normalized <= r.ExecuteThreshold;
+            if (execute) amount = victim.Current;
+            float dealt = victim.ApplyDamage(new DamageInfo(amount, point, point - aimOrigin.position, gameObject, execute));
+            if (dealt <= 0f) return 0f;
+            combat.ReportAbilityHit(victim, dealt);
+            if (r.Lifesteal > 0f) health.Heal(dealt * r.Lifesteal);
+            var condition = victim.GetComponent<StatusEffects>();
+            if (condition != null && victim.IsAlive)
+            {
+                if (r.PoisonPerTurn > 0f) condition.ApplyTurnPoison(r.PoisonPerTurn * cast.Factor, r.PoisonTurns, gameObject);
+                if (r.AttackReduction > 0f) condition.ApplyAttackReduction(r.AttackReduction * cast.Factor, r.AttackReductionTurns * AbilityBook.TurnSeconds);
+                if (r.StunChance > 0f && Random.value < r.StunChance) condition.ApplyStun(AbilityBook.DefaultStunTurns * AbilityBook.TurnSeconds);
+                if (r.StealFraction > 0f) condition.ApplyStatDrain(foe != null && foe.Definition.Rank >= EnemyRank.Guardian ? r.StealBossFraction : r.StealFraction, r.StealTurns * AbilityBook.TurnSeconds);
+                if (r.ConvertChance > 0f && Random.value < r.ConvertChance && foe != null && foe.Definition.Rank < EnemyRank.Guardian) condition.ApplyCharm(3f * AbilityBook.TurnSeconds, gameObject);
+            }
+            if (cast.Ability.IsRecipe && cast.Ability.Delivery != AbilityDelivery.Self && r.HealFlat > 0f) health.Heal(r.HealFlat * cast.Factor);
+            Burst(point, EffectColor(cast.Ability.Effect), 0.2f); return dealt;
+        }
+        void Area(Cast cast, Vector3 point, float radius, Health skip)
+        {
+            unique.Clear(); int count = Physics.OverlapSphereNonAlloc(point, Mathf.Max(1f, radius), nearby, ~0, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < count; i++)
+            {
+                var victim = nearby[i].GetComponentInParent<Health>();
+                if (victim == skip || !IsFoe(victim) || !unique.Add(victim) || !Visible(point + Vector3.up * 0.5f, victim)) continue;
+                Hurt(victim, cast, victim.transform.position + Vector3.up);
+            }
+        }
+        Health Trace(Vector3 direction, float range, float radius)
+        {
+            int count = Physics.SphereCastNonAlloc(aimOrigin.position, radius, direction, traces, Mathf.Max(1f, range), ~0, QueryTriggerInteraction.Ignore);
+            Health closest = null; float distance = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                if (traces[i].collider.transform.IsChildOf(transform) || traces[i].distance >= distance) continue;
+                distance = traces[i].distance; var candidate = traces[i].collider.GetComponentInParent<Health>(); closest = IsFoe(candidate) ? candidate : null;
+            }
+            return closest;
+        }
+        Health Nearest(Vector3 point, float radius, HashSet<Health> excluded)
+        {
+            int count = Physics.OverlapSphereNonAlloc(point, radius, nearby, ~0, QueryTriggerInteraction.Ignore);
+            Health closest = null; float distance = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                var candidate = nearby[i].GetComponentInParent<Health>();
+                if (!IsFoe(candidate) || excluded.Contains(candidate) || !Visible(point, candidate)) continue;
+                float next = (candidate.transform.position - point).sqrMagnitude; if (next < distance) { closest = candidate; distance = next; }
+            }
+            return closest;
+        }
+        EnemyAI FindCorpse()
+        {
+            EnemyAI closest = null; float distance = 12f * 12f;
+            foreach (var body in FindObjectsByType<EnemyAI>())
+            {
+                if (!body.gameObject.activeInHierarchy || body.Health == null || body.Health.IsAlive) continue;
+                Vector3 towards = body.transform.position + Vector3.up * 0.3f - aimOrigin.position;
+                if (towards.sqrMagnitude >= distance || Vector3.Angle(aimOrigin.forward, towards) > 55f || !Visible(aimOrigin.position, body.Health)) continue;
+                closest = body; distance = towards.sqrMagnitude;
+            }
+            return closest;
+        }
+        bool IsFoe(Health victim) => victim != null && victim != health && victim.IsAlive && victim.gameObject.activeInHierarchy &&
+            (victim.GetComponent<EnemyAI>() != null || victim.GetComponent<CursedKnightAI>() != null) &&
+            !(victim.GetComponent<StatusEffects>() is StatusEffects condition && condition.Charmed && condition.CharmSource == gameObject);
+        bool Visible(Vector3 point, Health victim) => !Physics.Linecast(point, victim.transform.position + Vector3.up, out RaycastHit hit, ~0, QueryTriggerInteraction.Ignore) ||
+            hit.collider.transform.IsChildOf(victim.transform) || hit.collider.transform.IsChildOf(transform);
+        Vector3 GroundAim(float range)
+        {
+            Vector3 point = aimOrigin.position + Vector3.ProjectOnPlane(aimOrigin.forward, Vector3.up).normalized * Mathf.Clamp(range * 0.45f, 2f, 6f);
+            Vector3 travel = point - aimOrigin.position;
+            int count = Physics.RaycastNonAlloc(aimOrigin.position, travel.normalized, traces, travel.magnitude, ~0, QueryTriggerInteraction.Ignore);
+            float wallDistance = travel.magnitude;
+            for (int i = 0; i < count; i++)
+                if (traces[i].collider.GetComponentInParent<Health>() == null && traces[i].distance < wallDistance)
+                    wallDistance = Mathf.Max(0.3f, traces[i].distance - 0.35f);
+            point = aimOrigin.position + travel.normalized * wallDistance;
+            count = Physics.RaycastNonAlloc(point + Vector3.up * 3f, Vector3.down, traces, 8f, ~0, QueryTriggerInteraction.Ignore);
+            Vector3 floor = transform.position;
+            float nearest = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                if (traces[i].collider.GetComponentInParent<Health>() != null || traces[i].collider is CharacterController ||
+                    traces[i].normal.y < 0.4f || traces[i].distance >= nearest) continue;
+                nearest = traces[i].distance; floor = traces[i].point;
+            }
+            return floor + Vector3.up * 0.04f;
+        }
+        static BoltKind Bolt(AbilityDefinition a) => a.Tier(1).Holy ? BoltKind.Holy : a.Owner == CharacterClass.Necromancer ? BoltKind.Shadow : a.IsRecipe || a.Owner == CharacterClass.Gravethief ? BoltKind.Venom : BoltKind.Fire;
+        void Burst(Vector3 point, Color color, float radius) { if (visualEffects != null) visualEffects.EmitAbility(point, color, radius); }
+        void Ring(Vector3 point, float radius, Color color)
+        {
+            for (int i = 0; i < 12; i++) { float a = i * Mathf.PI / 6f; Burst(point + new Vector3(Mathf.Cos(a) * radius, 0.12f, Mathf.Sin(a) * radius), color, 0.13f); }
+        }
         public static Color EffectColor(AbilityEffect effect)
         {
-            switch (effect)
-            {
-                case AbilityEffect.FrostLance: return new Color(0.45f, 0.85f, 1f);
-                case AbilityEffect.ChainLightning: return new Color(0.65f, 0.5f, 1f);
-                case AbilityEffect.Caltrops: case AbilityEffect.PoisonBlade: case AbilityEffect.AcidFlask: return new Color(0.4f, 0.85f, 0.35f);
-                case AbilityEffect.BoneNova: case AbilityEffect.SoulHarvest: case AbilityEffect.BoneSpear: case AbilityEffect.BoneArmor: return new Color(0.7f, 0.55f, 1f);
-                case AbilityEffect.FireBomb: return new Color(1f, 0.4f, 0.12f);
-                case AbilityEffect.FlashPowder: return new Color(1f, 0.87f, 0.62f);
-                default: return new Color(1f, 0.74f, 0.35f);
-            }
+            AbilityDefinition a = null; foreach (var entry in AbilityBook.AllDefinitions) if (entry.Effect == effect) { a = entry; break; }
+            if (a == null) return new Color(0.75f, 0.55f, 0.95f);
+            string id = a.Id;
+            if (id.Contains("frost") || id.Contains("frozen") || id.Contains("glacial") || id.Contains("blizzard")) return new Color(0.38f, 0.85f, 1f);
+            if (id.Contains("lightning") || id.Contains("static")) return new Color(0.75f, 0.7f, 1f);
+            if (a.Tier(1).Holy || a.Owner == CharacterClass.Warden) return new Color(1f, 0.82f, 0.36f);
+            if (a.Owner == CharacterClass.Necromancer) return new Color(0.65f, 0.4f, 1f);
+            if (a.Owner == CharacterClass.Gravethief || a.IsRecipe) return new Color(0.55f, 0.95f, 0.27f);
+            return a.Owner == CharacterClass.Witch ? new Color(1f, 0.34f, 0.16f) : new Color(1f, 0.72f, 0.27f);
         }
-
-        Health Trace(Vector3 direction, float range, out Vector3 point)
-        {
-            point = aimOrigin.position + direction * range;
-            int count = Physics.SphereCastNonAlloc(aimOrigin.position, 0.17f, direction, traces, range, ~(1 << 2), QueryTriggerInteraction.Ignore);
-            float distance = float.MaxValue;
-            Health found = null;
-            for (int i = 0; i < count; i++)
-            {
-                Health candidate = traces[i].collider.GetComponentInParent<Health>();
-                if (candidate == health || traces[i].distance >= distance) continue;
-                distance = traces[i].distance;
-                point = traces[i].point;
-                found = IsFoe(candidate) ? candidate : null;
-            }
-            return found;
-        }
-
-        bool IsFoe(Health candidate) => candidate != null && candidate != health && candidate.IsAlive &&
-            (candidate.GetComponent<EnemyAI>() != null || candidate.GetComponent<CursedKnightAI>() != null);
-
-        bool Visible(Vector3 from, Health victim)
-        {
-            Vector3 to = victim.transform.position + Vector3.up - from;
-            int count = Physics.RaycastNonAlloc(from, to.normalized, traces, to.magnitude, ~(1 << 2), QueryTriggerInteraction.Ignore);
-            float nearest = float.MaxValue;
-            Health first = victim;
-            for (int i = 0; i < count; i++)
-            {
-                Health body = traces[i].collider.GetComponentInParent<Health>();
-                if (body == health || traces[i].distance >= nearest) continue;
-                nearest = traces[i].distance;
-                first = body;
-            }
-            return first == victim;
-        }
-
-        float Hurt(Health victim, float amount, float stun, float weaken)
-        {
-            if (!IsFoe(victim)) return 0f;
-            float dealt = victim.ApplyDamage(new DamageInfo(amount, victim.transform.position + Vector3.up,
-                victim.transform.position - transform.position, gameObject));
-            if (victim.TryGetComponent(out StatusEffects conditions))
-            {
-                if (stun > 0f) conditions.ApplyStun(stun);
-                if (weaken > 0f) conditions.ApplyWeaken(weaken);
-            }
-            return dealt;
-        }
-
-        float Area(Vector3 centre, float radius, float amount, float cone, float stun, float weaken, bool undeadBonus, bool poison = false)
-        {
-            int count = Physics.OverlapSphereNonAlloc(centre + Vector3.up * 0.8f, radius, nearby, ~0, QueryTriggerInteraction.Ignore);
-            hitOnce.Clear();
-            float dealt = 0f;
-            for (int i = 0; i < count; i++)
-            {
-                Health victim = nearby[i].GetComponentInParent<Health>();
-                if (!IsFoe(victim) || !hitOnce.Add(victim)) continue;
-                Vector3 direction = victim.transform.position - transform.position;
-                direction.y = 0f;
-                Vector3 facing = aimOrigin.forward; facing.y = 0f;
-                if (cone < 360f && Vector3.Angle(facing, direction) > cone * 0.5f) continue;
-                if (!Visible(centre + Vector3.up, victim)) continue;
-                bool undead = victim.TryGetComponent(out EnemyAI ai) && ai.Definition.Undead;
-                dealt += Hurt(victim, amount * (undeadBonus && undead ? 1.7f : 1f), stun, weaken);
-                if (poison && victim.TryGetComponent(out StatusEffects conditions)) conditions.ApplyPoison(amount * 0.6f, 3f);
-            }
-            return dealt;
-        }
-
-        Vector3 GroundTarget(float range)
-        {
-            Trace(aimOrigin.forward, range, out Vector3 point);
-            point -= aimOrigin.forward * 0.35f;
-            if (Physics.Raycast(point + Vector3.up * 1.8f, Vector3.down, out RaycastHit ground, 8f, ~0, QueryTriggerInteraction.Ignore))
-                return ground.point + Vector3.up * 0.06f;
-            return transform.position + transform.forward * Mathf.Min(range, 4f);
-        }
-
-        void Ring(Vector3 centre, float radius, Color color) => visualEffects?.EmitAbility(centre + Vector3.up * 0.15f, color, radius);
-
-        IEnumerator Field(Vector3 centre, float radius, float seconds, float power, AbilityEffect effect, bool healing)
-        {
-            Zone startedIn = zones.Current;
-            ClassDefinition startedAs = definition;
-            for (float elapsed = 0f; elapsed < seconds; elapsed += 1f)
-            {
-                if (!health.IsAlive || zones.Current != startedIn || definition != startedAs) yield break;
-                Ring(centre, radius, EffectColor(effect));
-                if (healing)
-                {
-                    if ((transform.position - centre).sqrMagnitude <= radius * radius)
-                    {
-                        health.Heal(power);
-                        status.ApplyWard(1.2f);
-                    }
-                }
-                else
-                    Area(centre, radius, power, 360f, effect == AbilityEffect.Caltrops ? 0.28f : 0f,
-                        effect == AbilityEffect.Consecration ? 1.2f : 0f, effect == AbilityEffect.Consecration, effect == AbilityEffect.Caltrops);
-                yield return new WaitForSeconds(1f);
-            }
-        }
-
-        IEnumerator Chain(Health first, int jumps, float power, ClassDefinition startedAs, Zone startedIn)
-        {
-            var struck = new HashSet<Health>();
-            Health current = first;
-            Vector3 from = aimOrigin.position;
-            for (int i = 0; i < jumps && current != null; i++)
-            {
-                if (!health.IsAlive || zones.Current != startedIn || definition != startedAs) yield break;
-                Vector3 to = current.transform.position + Vector3.up;
-                visualEffects?.EmitAbilityRay(from, to, EffectColor(AbilityEffect.ChainLightning));
-                Hurt(current, power * Mathf.Pow(0.85f, i), 0.2f, 0f);
-                struck.Add(current);
-                from = to;
-                int count = Physics.OverlapSphereNonAlloc(to, 5.5f, nearby, ~0, QueryTriggerInteraction.Ignore);
-                Health next = null;
-                float nearest = float.MaxValue;
-                for (int n = 0; n < count; n++)
-                {
-                    Health candidate = nearby[n].GetComponentInParent<Health>();
-                    if (!IsFoe(candidate) || struck.Contains(candidate) || !Visible(to, candidate)) continue;
-                    float distance = (candidate.transform.position - to).sqrMagnitude;
-                    if (distance < nearest) { nearest = distance; next = candidate; }
-                }
-                current = next;
-                yield return new WaitForSeconds(0.12f);
-            }
-        }
-
-        float Power(float amount) => amount * combat.AbilityMultiplier * (1f + (activeTier - 1) * 0.5f);
-
         public void DrinkPotion()
         {
-            GameSession session = GameSession.Instance;
-            if (session == null) return;
-            if (session.Potions <= 0)
-            {
-                GameMessages.Notify(GameText.NoPotion);
-                return;
-            }
-            if (health.Normalized >= 1f)
-            {
-                GameMessages.Notify(GameText.FullHealth);
-                return;
-            }
-            session.AddPotions(-1);
-            health.Heal(GameSession.PotionHeal);
-        }
-
-        GameObject FoeInReach(float reach)
-        {
-            if (!Physics.SphereCast(aimOrigin.position, 0.5f, aimOrigin.forward, out RaycastHit hit, reach, ~0, QueryTriggerInteraction.Ignore)) return null;
-            var enemy = hit.collider.GetComponentInParent<EnemyAI>();
-            return enemy != null ? enemy.gameObject : null;
-        }
-
-        /// <summary>True when the foe under the crosshair has its back to the player, or has not noticed yet.</summary>
-        bool FoeFacingAway()
-        {
-            GameObject foe = FoeInReach(3f);
-            if (foe == null) return false;
-            Vector3 toPlayer = transform.position - foe.transform.position;
-            toPlayer.y = 0f;
-            return Vector3.Angle(foe.transform.forward, toPlayer) > 110f;
+            var session = GameSession.Instance;
+            if (session == null || !health.IsAlive) return;
+            if (session.Potions <= 0) { GameMessages.Notify(GameText.NoPotion); return; }
+            if (health.Normalized >= 1f) { GameMessages.Notify(GameText.FullHealth); return; }
+            session.AddPotions(-1); health.Heal(GameSession.PotionHeal);
         }
     }
 }

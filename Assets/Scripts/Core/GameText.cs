@@ -29,6 +29,18 @@ namespace AshenRealm.Core
         public const string TavernTokenLore = "A falra szegezett úti jelvényeket senki sem váltja már vissza. Aggie minden este letörli róluk a port, aztán eggyel több poharat készít ki.";
         public const string ForgePlanLore = "A kohó falán régi páncél javítási rajza függ. Minden repedést kijelöltek rajta; a szív fölötti lyukat tinta fedi.";
         public const string ChapelVotiveLore = "A kis oltárnál a gyertyák alatt üres névtáblák állnak. Itt azokért ég a fény, akiknek még a nevét is elvitte a mélység.";
+        // Discoveries in the north land.
+        public const string TollLedgerLore = "A vámos könyve nyitva maradt a pulton. Az utolsó lapokon minden név át van húzva, egyetlen vonallal, ugyanazzal a tintával. Csak a legalsó sor üres: oda még senkit sem írtak be.";
+        public const string BurnedFarmLore = "A kémény az egyetlen, ami állva maradt. A varjak minden reggel visszaszállnak a megszenesedett gerendákra, pedig itt már nincs mit elvinni. Az ajtó a hamuban fekszik, a retesz még mindig keresztben rajta: belülről zárták el.";
+        public const string GibbetLore = "A ketrec üres, de a lánc fényes ott, ahol súly húzta. A tábla, amely a bűnt hirdette, lehullott, és senki sem akasztotta vissza. Az arra járók köszönnek a ketrecnek, mert nem tudják, kinek szólt az ítélet.";
+        public const string OvergrownSoldierLore = "A boltív alatt egy katona ül, háttal a kőnek. A páncélját régen benőtte a moha, a sisakjából páfrány hajt ki. A kardját nem ejtette el: a gyökerek úgy nőtték körül a markolatot, mintha még mindig őrségben állna.";
+        public const string LamplighterLore = "Az út menti póznán lámpás ég, pedig errefelé senki sem lakik. Az olaj mindig friss, a kanóc mindig levágva. A pózna tövében a mohán egy bot nyoma kering, ahogy valaki tapogatózva járja körbe.";
+        public const string WolfDenLore = "A kövek közti üregből meleg, állatszagú levegő árad. A bejáratnál lerágott csontok fekszenek, köztük egy rézcsat, amilyet a favágók viselnek. Bentről nem morgás hallatszik, hanem kölykök vékony nyüszítése.";
+        public const string JettyLore = "A stég végén a cölöpre csomós kötelek tekerednek, minden csomó egy ember, akit a tó elvitt. Szélcsendben a víz alól harangszó hallatszik a sziget felől, ahol a templom tornya félig kiáll a vízből. A legfelső csomó még nedves.";
+        public const string WatchtowerTallyLore = "A torony ajtaja mellé rovásokat vágtak, ötösével kötegelve. Minden köteg mellé egy szót is karcoltak: erdő, tó, hamu, erdő, erdő. Az őr minden este hozzávág egyet, ha valaki nem jön vissza az útról.";
+        public const string AshFieldLore = "A kőrakásokat a Hamvas Eskü lovagjai rakták, sorban, ahogy a csatarendben álltak. A legnagyobbra a megtört napot tűzték. Alattuk nincs csont: a hamuban csak a markolatok maradtak meg, a pengéket valaki elvitte.";
+        public const string HarvestShrineLore = "A fülkében álló szent arcát lekoptatták a kezek. Előtte kalászkoszorú és egy pár gyerekcipő, a talpuk még sáros. Az aratók szerint a cipőt minden ősszel kicserélik, de senki sem látta, ki hozza.";
+        public const string NorthShrineLore = "Ebben a fülkében nincs szobor, csak üres talapzat és rajta kezek nyoma. Valaki krétával odaírta: Üregkapu felé ne nézz vissza. Az írást minden eső lemossa, és reggelre valaki újra odaírja.";
         public static readonly string[] DepthLandmarkLore =
         {
             "A sírfülkékbe nem rangot, hanem mesterséget véstek. Kovács, molnár, szövő: egy egész város alszik a másik alatt.",
@@ -86,12 +98,15 @@ namespace AshenRealm.Core
         public const string EnterTavern = "BE A KOCSMÁBA";
         public const string EnterForge = "BE A KOHÓBA";
         public const string EnterChapel = "BE A KÁPOLNÁBA";
+        public const string Mount = "FELÜLÉS";
+        public const string Dismount = "LESZÁLLÁS";
         public const string LeaveHouse = "KI AZ UTCÁRA";
         public const string BrowseRack = "A FEGYVERÁLLVÁNY";
         public const string BrowseRelics = "AZ EREKLYÉK";
         public const string InspectGallows = "AZ AKASZTÓFA";
         public const string GallowsLore = "Két sor stand, semmi rajtuk, és egy akasztófa, amit senki nem bontott le, mert a lebontása döntés lenne, és itt már senki nem hoz döntéseket.";
         public const string WeaponsDown = "A fegyvereidet az ajtónál hagyod.";
+        public const string WeaponsSheathed = "Üregkapu utcáin a fegyver a hüvelyben marad.";
         public const string StairUp = "FEL A LÉPCSŐN";
         public const string GateBarred = "Az Átkozott Lovag még áll. Az út csak akkor nyílik meg, ha elesett.";
         public const string StairBarred = "A lépcső nem enged, amíg az őrzője él.";
@@ -128,6 +143,10 @@ namespace AshenRealm.Core
         public const string AbsolutionDone = "Valaki megint kimondja a nevedet.";
         public const string HealDone = "A sebeid összeforrtak.";
         public const string PotionDone = "Egy fiolával nehezebb a csomagod.";
+        public const string BuyHorseOption = "Lovat veszel ({0} arany)";
+        public const string HorseBought = "Hilda felnyergeli a szürke kancát, és a korláthoz köti az istálló előtt. Ott vár rád.";
+        public const string ThrownFromSaddle = "Az ütéstől kiesel a nyeregből.";
+        public const string NoRoomToDismount = "Itt nincs hely leszállni.";
 
         // Abilities
         public const string NoFocus = "Nincs elég fókuszod.";

@@ -24,6 +24,8 @@ namespace AshenRealm.Story
         const int AbsolutionCost = 25;
         const int AbsolutionHonor = 15;
         const int PotionCost = 18;
+        /// <summary>The chest (48) and the knight (25) less a potion: beat the knight, buy the horse, ride north.</summary>
+        public const int HorsePrice = 60;
         const float WhisperMin = 45f, WhisperMax = 90f;
         const int KnightBlessingHonor = 6;
         const int ThiefBlessingHonor = 4;
@@ -144,6 +146,11 @@ namespace AshenRealm.Story
                 case NpcService.Market:
                     Add(string.Format(GameText.PotionOption, PotionCost), () => BuyPotion(npc));
                     Add(string.Format(GameText.HealOption, HealCost), () => Mend(npc));
+                    break;
+                case NpcService.Stable:
+                    // One horse a soul; RidingHorse sees the flag and stands saddled at the stable's rail.
+                    if (!session.HasFlag(RidingHorse.OwnedFlag))
+                        Add(string.Format(GameText.BuyHorseOption, HorsePrice), () => Paid(npc, HorsePrice, () => session.SetFlag(RidingHorse.OwnedFlag), GameText.HorseBought));
                     break;
             }
             Add(GameText.Leave, null);
@@ -361,6 +368,7 @@ namespace AshenRealm.Story
         {
             UpdateObjective();
             if (zone.Indoors) GameMessages.Notify(GameText.WeaponsDown);
+            else if (zones.WeaponsAway(zone)) GameMessages.Notify(GameText.WeaponsSheathed);
         }
 
         void OnSoulLoaded()

@@ -73,7 +73,21 @@ namespace AshenRealm.Combat
         /// <summary>False under a roof: the weapons stay at the door, and nothing swings, blocks or casts.</summary>
         public bool Armed { get; private set; } = true;
         public bool IsAttacking => Time.time < attackStartTime + attackDuration;
-        public float Damage => damage;
+        public float Damage
+        {
+            get
+            {
+                float basicBonus = 0f;
+                var growth = GetComponent<PlayerProgression>();
+                if (!ranged && growth != null)
+                {
+                    int tier = growth.SkillTier("strike");
+                    var strike = AbilityBook.Find("strike");
+                    if (tier > 0 && strike != null) basicBonus = strike.Tier(tier).Power - strike.Tier(1).Power;
+                }
+                return Mathf.Max(1f, damage + basicBonus + (!ranged && status != null ? status.AttackBonus - status.AttackReduction : 0f));
+            }
+        }
         /// <summary>Sharper weapons from the forge and whatever fury or weakness the player is under.</summary>
         public float OutgoingMultiplier => (1f + 0.12f * (GameSession.Instance != null ? GameSession.Instance.WeaponLevel : 0)) * (status != null ? status.DamageMultiplier : 1f);
         public float Range => range;
@@ -94,7 +108,7 @@ namespace AshenRealm.Combat
             IsBlocking = false;
             hitPending = false;
             if (weapons != null) weapons.SetBlocking(false);
-            if (controller != null) controller.SpeedMultiplier = 1f;
+            if (controller != null) { controller.SpeedMultiplier = 1f; controller.SprintBlocked = false; }
         }
 
         void Update()
@@ -104,14 +118,18 @@ namespace AshenRealm.Combat
             {
                 input.ConsumeAttack();
                 controller.SpeedMultiplier = moveMultiplier * gearSpeed;
+                controller.SprintBlocked = status != null && status.Stunned;
                 return;
             }
 
             bool attacking = IsAttacking;
+            bool stunned = status != null && status.Stunned;
             IsBlocking = input.BlockHeld && !attacking && stamina.Current > 0f;
             weapons.SetBlocking(IsBlocking);
             float stance = IsBlocking ? blockMoveSpeedMultiplier : attacking ? attackMoveSpeedMultiplier : 1f;
-            controller.SpeedMultiplier = stance * moveMultiplier * gearSpeed * (status != null && status.Stunned ? 0.35f : 1f);
+            controller.SpeedMultiplier = stance * moveMultiplier * gearSpeed * (stunned ? 0.35f : 1f);
+            // The class pace is not a stance: only blocking, swinging and a stun stop the run.
+            controller.SprintBlocked = IsBlocking || attacking || stunned;
 
             if (!IsBlocking && Time.time >= nextAttackTime && stamina.Current > 0f)
             {
@@ -204,11 +222,25 @@ namespace AshenRealm.Combat
             if (projectiles == null) return;
             CharacterClass id = GameSession.Instance.Class.Id;
             bool flaskInLeft = id == CharacterClass.Alchemist && GameSession.Instance.Weapon == null &&
-                (PlayerTorch.Instance == null || !PlayerTorch.Instance.Equipped);
+                (PlayerTorch.Instance == null || !PlayerTorch.Instance.InHand);
             Vector3 origin = aimOrigin.position + aimOrigin.forward * 0.8f + aimOrigin.right * (flaskInLeft ? -0.15f : 0.15f) - aimOrigin.up * 0.1f;
             BoltKind kind = id == CharacterClass.Necromancer ? BoltKind.Shadow : id == CharacterClass.Alchemist ? BoltKind.Venom : BoltKind.Fire;
             EnemyMove effect = id == CharacterClass.Alchemist ? new EnemyMove { PoisonDps = 3f, PoisonTime = 4f } : null;
-            projectiles.Launch(kind, origin, AimPoint() - origin, damage * OutgoingMultiplier, gameObject, true, effect, Drink);
+            float amount = Damage * OutgoingMultiplier;
+            var passive = GetComponent<PlayerPassives>();
+            if (passive != null) amount = passive.ModifyBasicDamage(amount);
+            projectiles.Launch(kind, origin, AimPoint() - origin, amount, gameObject, true, effect, Drink);
+        }
+
+        public Projectile LaunchAbilityBolt(BoltKind kind, Vector3 origin, Vector3 direction, Func<Health, Vector3, float> resolve)
+            => projectiles == null ? null : projectiles.Launch(kind, origin, direction, 0f, gameObject, true, null, null, resolve);
+
+        public void ReportAbilityHit(Health target, float dealt)
+        {
+            if (target == null || dealt <= 0f) return;
+            HitLanded?.Invoke(target, dealt);
+            Drink(dealt);
+            if (impactEffects != null) impactEffects.Emit(target.transform.position + Vector3.up, -aimOrigin.forward, ImpactEffects.Kind.Flesh);
         }
 
         /// <summary>The Bloodstone's share of a blow that landed.</summary>
@@ -225,7 +257,7 @@ namespace AshenRealm.Combat
                 ? hit.point : aimOrigin.position + aimOrigin.forward * far;
         }
 
-        void PerformHit() => Strike(damage, range, hitRadius);
+        void PerformHit() => Strike(Damage, range, hitRadius);
 
         /// <summary>
         /// Sphere-casts along the camera forward. The nearest valid collider wins: a damageable takes damage,
@@ -243,6 +275,7 @@ namespace AshenRealm.Combat
             {
                 var hit = hitBuffer[i];
                 if (hit.collider.transform.IsChildOf(transform)) continue;
+                if (IsCharmedAlly(hit.collider)) continue;
                 if (hit.distance < bestDistance)
                 {
                     bestDistance = hit.distance;
@@ -252,6 +285,7 @@ namespace AshenRealm.Combat
             if (best < 0) return null;
 
             RaycastHit target = hitBuffer[best];
+            if (IsCharmedAlly(target.collider)) return null;
             // Colliders already overlapping the sphere at the cast origin report distance 0 and no point.
             Vector3 point = target.distance <= 0f ? target.collider.ClosestPoint(origin) : target.point;
             Vector3 normal = target.distance <= 0f ? -direction : target.normal;
@@ -259,7 +293,10 @@ namespace AshenRealm.Combat
             var damageable = target.collider.GetComponentInParent<IDamageable>();
             if (damageable != null && damageable.IsAlive)
             {
-                float applied = damageable.ApplyDamage(new DamageInfo(amount * OutgoingMultiplier, point, direction, gameObject));
+                float outgoing = amount * OutgoingMultiplier;
+                var passive = GetComponent<PlayerPassives>();
+                if (passive != null) outgoing = passive.ModifyBasicDamage(outgoing);
+                float applied = damageable.ApplyDamage(new DamageInfo(outgoing, point, direction, gameObject));
                 weapons.PlayHitImpact();
                 if (cameraEffects != null) cameraEffects.AddTrauma(0.18f);
                 if (impactEffects != null) impactEffects.Emit(point, normal, ImpactEffects.Kind.Flesh);
@@ -267,7 +304,7 @@ namespace AshenRealm.Combat
                 Drink(applied);
 
                 var struck = ((Component)damageable).gameObject;
-                if (Time.time < poisonUntil && struck.TryGetComponent(out StatusEffects venom)) venom.ApplyPoison(5f, 5f);
+                if (Time.time < poisonUntil && struck.TryGetComponent(out StatusEffects venom)) venom.ApplyPoison(5f, 5f, gameObject);
                 return struck;
             }
             if (damageable == null)
@@ -277,6 +314,12 @@ namespace AshenRealm.Combat
                 if (impactEffects != null) impactEffects.Emit(point, normal, ImpactEffects.Kind.Stone);
             }
             return null;
+        }
+
+        bool IsCharmedAlly(Collider collider)
+        {
+            var condition = collider.GetComponentInParent<StatusEffects>();
+            return condition != null && condition.Charmed && condition.CharmSource == gameObject;
         }
 
         public float FilterDamage(in DamageInfo info, float amount)

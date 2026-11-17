@@ -67,6 +67,21 @@ namespace AshenRealm.EditorTools
                 Save(camera, showHud ? hud : null, composite, Path.Combine(OutputFolder, name + ".png"));
             }
 
+            // Someone from the front, or from the nearest angle where nothing stands between the camera and them.
+            void Portrait(string name, Component person)
+            {
+                Transform t = person.transform;
+                Collider body = person.GetComponent<Collider>();
+                Vector3 chest = t.position + Vector3.up * 1.1f, from = chest;
+                foreach (float angle in new[] { 0f, 35f, -35f, 70f, -70f })
+                {
+                    from = t.position + Quaternion.Euler(0f, angle, 0f) * t.forward * 2.6f + Vector3.up * 1.6f;
+                    if (Physics.Linecast(from, chest, out RaycastHit hit, ~0, QueryTriggerInteraction.Ignore) && hit.collider == body &&
+                        !Physics.CheckSphere(from, 0.2f, ~0, QueryTriggerInteraction.Ignore)) break;
+                }
+                Shot(name + "_" + person.name.Replace(" ", "_"), from, chest, false, false);
+            }
+
             void Vistas(Zone zone, string prefix)
             {
                 foreach (Transform group in zone.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Vistas"))
@@ -103,6 +118,23 @@ namespace AshenRealm.EditorTools
             Shot("08_ruins_interior", Ground(-5f, 23f) + Vector3.up * 1.7f, Ground(2f, 42f) + Vector3.up * 1.5f, false, false);
             Shot("09_hamlet", Ground(14f, -15f) + Vector3.up * 1.7f, Ground(36f, -14f) + Vector3.up * 2.5f, true, false);
             Shot("10_windmill_fields", Ground(34f, -30f) + Vector3.up * 1.7f, Ground(54f, 8f) + Vector3.up * 5f, false, false);
+
+            // The north land: overview, the pass from both sides, the road, the city gate, the ridge seam and the instanced cover.
+            Shot("07n_north_overview", new Vector3(110f, 55f, 150f), new Vector3(-20f, 0f, 260f), false, false);
+            Shot("07n_north_overview_west", new Vector3(-30f, 60f, 260f), new Vector3(-150f, 0f, 380f), false, false);
+            Shot("07n_toll_gate_from_valley", Ground(0f, 70f) + Vector3.up * 1.7f, Ground(0f, 92f) + Vector3.up * 4f, false, false);
+            Shot("07n_toll_gate_from_north", Ground(4f, 120f) + Vector3.up * 1.7f, Ground(0f, 92f) + Vector3.up * 3f, false, false);
+            Shot("07n_road_north", Ground(-3f, 128f) + Vector3.up * 1.7f, Ground(5f, 190f) + Vector3.up * 2f, false, false);
+            Shot("07n_road_north_far", Ground(0f, 300f) + Vector3.up * 1.7f, Ground(8f, 380f) + Vector3.up * 2f, false, false);
+            Shot("07n_city_gate_approach", Ground(2f, 530f) + Vector3.up * 1.7f, Ground(0f, 590f) + Vector3.up * 5f, false, false);
+            Shot("07n_ridge_from_valley", Ground(40f, 55f) + Vector3.up * 1.7f, Ground(40f, 97f) + Vector3.up * 4f, false, false);
+            Shot("07n_scatter_forest_trees", Ground(-62f, 300f) + Vector3.up * 1.7f, Ground(-100f, 296f) + Vector3.up * 3f, false, false);
+            Shot("07n_scatter_wheat_fields", Ground(28f, 150f) + Vector3.up * 1.7f, Ground(55f, 175f) + Vector3.up * 0.5f, false, false);
+            Shot("07n_scatter_grass_close", Ground(8f, -62f) + Vector3.up * 1.7f, Ground(16f, -50f), false, false);
+            foreach (NpcIdleAnimator person in valley.GetComponentsInChildren<NpcIdleAnimator>(true).Where(p => p.transform.position.z > 90f))
+                Portrait("07p", person);
+            Shot("07p_wolf_den_mouth", Ground(-196.5f, 231.5f) + Vector3.up * 1.5f, Ground(-200.1f, 230f) + Vector3.up * 0.5f, false, false);
+            CaptureHorse(Find<RidingHorse>(), Shot, camera, hud, composite);
 
             // Every class's weapons in hand: the scene only has the knight's enabled.
             var classRig = Find<PlayerClassRig>();
@@ -240,8 +272,17 @@ namespace AshenRealm.EditorTools
                         Shot(prefix + "_b_gallows", o + new Vector3(4f, 1.7f, -22f), o + new Vector3(0f, 3.2f, -3f), false, false);
                         Shot(prefix + "_b_forge_door", o + new Vector3(19f, 1.7f, 5f), o + new Vector3(28f, 2.2f, 6f), false, false);
                         Shot(prefix + "_b_chapel_door", o + new Vector3(-15f, 1.7f, 5f), o + new Vector3(-25f, 3.4f, 6f), false, false);
+                        // The keep on its crag from every corner a player can reach, and once from above the walls.
+                        Vector3 keep = o + new Vector3(0f, 60f, 197f);
+                        foreach (var (where, from) in new[] { ("gate", new Vector3(0f, 1.7f, -60f)), ("well", new Vector3(-9f, 1.7f, 11f)),
+                            ("court", new Vector3(8f, 1.7f, 12f)), ("tavern_street", new Vector3(0f, 1.7f, 30f)), ("southwest", new Vector3(-48f, 1.7f, -50f)),
+                            ("southeast", new Vector3(48f, 1.7f, -50f)), ("northwest", new Vector3(-48f, 1.7f, 50f)), ("northeast", new Vector3(48f, 1.7f, 50f)),
+                            ("high_overview", new Vector3(90f, 45f, -40f)) })
+                            Shot(prefix + "_keep_from_" + where, o + from, keep, false, false);
                         foreach (NpcActor standing in zone.GetComponentsInChildren<NpcActor>(true))
                             Shot($"{prefix}_c_{standing.NpcId}", standing.transform.position + standing.transform.forward * 2.8f + Vector3.up * 1.7f, standing.transform.position + Vector3.up * 1.1f, false, false);
+                        foreach (NpcIdleAnimator ambient in zone.GetComponentsInChildren<NpcIdleAnimator>(true).Where(p => p.GetComponent<NpcActor>() == null))
+                            Portrait(prefix + "_p", ambient);
                     }
                     var person = zone.GetComponentInChildren<NpcActor>(true);
                     if (person != null)
@@ -262,6 +303,63 @@ namespace AshenRealm.EditorTools
             return Path.GetFullPath(OutputFolder);
         }
 
+        /// <summary>
+        /// The paddock, the bought mare at the city-gate post, the view from her saddle looking north with the HUD (16:9 and a
+        /// phone's 19.5:9), and her gallop from outside, posed by hand since edit mode does not animate.
+        /// </summary>
+        static void CaptureHorse(RidingHorse horse, System.Action<string, Vector3, Vector3, bool, bool> shot, Camera camera, Canvas hud, Material composite)
+        {
+            if (horse == null) return;
+            Transform t = horse.transform, model = t.Find("Model");
+            Transform Part(string path) => model.Find(path);
+            Vector3 restPosition = t.position;
+            Quaternion restRotation = t.rotation;
+            model.gameObject.SetActive(true);
+            try
+            {
+                shot("07h_paddock_horses", Ground(36f, 110f) + Vector3.up * 1.7f, Ground(47f, 119f) + Vector3.up * 1f, false, false);
+
+                Transform post = t.parent.GetComponentsInChildren<Transform>(true).First(p => p.name == "Horse Post 1").Find("Standing Spot");
+                t.SetPositionAndRotation(post.position, post.rotation);
+                Physics.SyncTransforms();
+                shot("07h_horse_at_city_gate_post", post.position + post.right * 4.2f - post.forward * 1.5f + Vector3.up * 1.7f, post.position + Vector3.up * 1.2f, false, false);
+
+                // In the saddle the horse rides under the player with its head forward; the eye is 2.45 m above the hooves.
+                Vector3 road = Ground(0f, 500f);
+                t.SetPositionAndRotation(road, Quaternion.identity);
+                Physics.SyncTransforms();
+                var fighting = Object.FindObjectsByType<AshenRealm.UI.TouchButton>(FindObjectsInactive.Include)
+                    .Where(b => b.Button == AshenRealm.Input.PlayerButton.Attack || b.Button == AshenRealm.Input.PlayerButton.Block ||
+                        b.Button == AshenRealm.Input.PlayerButton.Ability1 || b.Button == AshenRealm.Input.PlayerButton.Ability2)
+                    .Select(b => b.GetComponent<CanvasGroup>()).Where(g => g != null).ToArray();
+                float[] alphas = fighting.Select(g => g.alpha).ToArray();
+                foreach (CanvasGroup g in fighting) g.alpha = 0f;
+                Transform eye = camera.transform;
+                eye.SetPositionAndRotation(road + Vector3.up * 2.45f, Quaternion.identity);
+                var weapons = Object.FindAnyObjectByType<FirstPersonWeaponAnimator>(FindObjectsInactive.Include);
+                if (weapons != null) weapons.gameObject.SetActive(false);
+                Save(camera, hud, composite, Path.Combine(OutputFolder, "07h_mounted_view_north_16x9.png"));
+                Save(camera, hud, composite, Path.Combine(OutputFolder, "07h_mounted_view_north_phone.png"), 19.5f / 9f);
+                for (int i = 0; i < fighting.Length; i++) fighting[i].alpha = alphas[i];
+
+                // Mid-gallop: the hind legs reach under, the front pair stretches out, the body lifted and the tail streaming.
+                Transform frame = Part("Body");
+                frame.localPosition = Vector3.up * 0.06f;
+                frame.localRotation = Quaternion.Euler(2.5f, 0f, 0f);
+                foreach (var (leg, angle) in new[] { ("Leg Front Left", 32f), ("Leg Front Right", 20f), ("Leg Hind Left", -30f), ("Leg Hind Right", -16f) })
+                    Part("Body/" + leg).localRotation = Quaternion.Euler(angle, 0f, 0f);
+                Part("Body/Neck").localRotation = Quaternion.Euler(6f, 0f, 0f);
+                Part("Body/Tail").localRotation = Quaternion.Euler(-32f, 0f, 0f);
+                shot("07h_horse_gallop_side", road + Vector3.right * 6.5f + Vector3.forward * 0.6f + Vector3.up * 1.6f, road + Vector3.up * 1.1f, false, false);
+                shot("07h_horse_gallop_front", road + Vector3.forward * 5.5f + Vector3.right * 2.5f + Vector3.up * 1.9f, road + Vector3.up * 1.3f, false, false);
+            }
+            finally
+            {
+                model.gameObject.SetActive(false);
+                t.SetPositionAndRotation(restPosition, restRotation);
+            }
+        }
+
         static Vector3 Ground(float x, float z)
         {
             return Physics.Raycast(new Vector3(x, 300f, z), Vector3.down, out RaycastHit info, 600f, ~0, QueryTriggerInteraction.Ignore)
@@ -269,9 +367,9 @@ namespace AshenRealm.EditorTools
                 : new Vector3(x, 0f, z);
         }
 
-        static void Save(Camera camera, Canvas hud, Material composite, string path)
+        static void Save(Camera camera, Canvas hud, Material composite, string path, float aspect = 16f / 9f)
         {
-            int lowWidth = Mathf.RoundToInt(LowHeight * 16f / 9f);
+            int lowWidth = Mathf.RoundToInt(LowHeight * aspect);
             Color[] world = RenderCamera(camera, lowWidth, LowHeight, false);
             Posterise(world, lowWidth, LowHeight, composite);
 

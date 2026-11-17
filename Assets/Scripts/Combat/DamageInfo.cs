@@ -11,13 +11,15 @@ namespace AshenRealm.Combat
         public readonly Vector3 Point;
         public readonly Vector3 Direction;
         public readonly GameObject Source;
+        public readonly bool BypassMitigation;
 
-        public DamageInfo(float amount, Vector3 point, Vector3 direction, GameObject source)
+        public DamageInfo(float amount, Vector3 point, Vector3 direction, GameObject source, bool bypassMitigation = false)
         {
             Amount = amount;
             Point = point;
             Direction = direction.sqrMagnitude > 0f ? direction.normalized : Vector3.forward;
             Source = source;
+            BypassMitigation = bypassMitigation;
         }
     }
 

@@ -130,6 +130,64 @@ namespace AshenRealm.Story
                 Intro = "Minden lépcsőfordulónál ott áll, és soha senki nem látta jönni. Az áruja mindig pont annyiba kerül, amennyid még van.",
                 Fallback = "»Friss a készlet. A tulajdonosai már nem tartanak rá igényt.«",
             },
+
+            // The north land and the city gate (stage A3 of the bigger world).
+            new NpcDefinition
+            {
+                Id = "stablemaster", Name = "Patkós Hilda, a lovász", Service = NpcService.Stable,
+                Intro = "Három lovat tart a karám mögött, és mindegyiknek tudja a nevét. A tiédet is megkérdezi, aztán elfelejti, mert a lovakét fontosabbnak tartja.",
+                Marked = "»A lovak érzik, mi tapad a kezedhez. Kifizetheted, de ne várd, hogy szeressen.«",
+                Hallowed = "»A szürke kanca odajött hozzád. Hozzám három évig nem jött oda.«",
+                Fallback = "»Az út innen Üregkapuig hosszabb, mint amilyennek a dombról látszik. Gyalog estére érsz oda. Lóháton még alkonyat előtt.«",
+            },
+            new NpcDefinition
+            {
+                Id = "farmer", Name = "Kévés Ábel, a tanyagazda",
+                Intro = "Az ásója nyelére dől, és a földeket nézi, ahol a kalász már a földig hajlik. Negyven ősze aratja ugyanazt a dűlőt, és minden ősszel kevesebben segítenek neki.",
+                Marked = "»A kutyám nem ugat rád. Az rosszabb, mintha ugatna. Mondd, mit akarsz, és menj tovább, mielőtt az asszony kijön.«",
+                Hallowed = "»Aratáskor gyere vissza. Kenyér, sajt, hely a szénában. Ritkán mondom ezt idegennek, és még ritkábban gondolom komolyan.«",
+                Fallback = "»Minden ősszel kevesebb kéz jön aratni. Az erdő felől nem jön vissza senki, aki egyszer arra ment fáért.«",
+            },
+            new NpcDefinition
+            {
+                Id = "fisher", Name = "Csend, a halász",
+                Intro = "A stég végén ül, a zsinórja mozdulatlanul lóg a vízbe, és sosem húzza ki. A nevét a falu adta neki: senki sem hallotta még, hogy ő szólaljon meg elsőnek.",
+                Marked = "»Ne állj a víz fölé. A tó szereti az olyanokat, akiket senki nem keres.«",
+                Hallowed = "»Ma reggel hallgatott a harang. Először, amióta itt ülök. Talán miattad. Talán valaki más ért haza.«",
+                Fallback = "»A tó alatt harang van. Szélcsendben hallani. Én nem fogok ki semmit, ami harangoz.«",
+            },
+            new NpcDefinition
+            {
+                Id = "watchman", Name = "Öreg Barta, a toronyőr",
+                Intro = "A torony ajtaja előtt áll, kezében a lappal, amelyre a napi rovásokat írja át. Harminc éve nem mászott fel a lépcsőn, a tűz odafent mégis minden este ég.",
+                Marked = "»Egy rovás nem kerül semmibe. Neked már kinéztem a helyét.«",
+                Hallowed = "»Szólj, ha visszafelé erre jössz. Szeretnék egy estét, amikor nem kell rovást vágnom.«",
+                Fallback = "»Északon a város, nyugaton a Feketefenyves. Ha a fenyők között lámpást látsz égni, ne menj oda. Vagy menj, de akkor ne panaszkodj.«",
+            },
+            new NpcDefinition
+            {
+                Id = "woodcutter", Name = "Gyanta, a favágó",
+                Intro = "Széles, gyantaszagú ember. A fejszéje a tőkében áll, ő maga háttal dolgozik a fenyvesnek, és nem fordul meg, amikor a fák közül zaj jön.",
+                Marked = "»Tőlem nem kapsz fát, és tüzet se rakj a közelben. Az erdő megjegyzi, ki gyújtott benne.«",
+                Hallowed = "»Az odú felé ne menj fegyverrel. Kölykök vannak bent. Te megérted, a többiek nem szokták.«",
+                Fallback = "»Itt a fák nem nőnek. Várnak. Csak a szélét vágom, és azt is csak nappal.«",
+            },
+            new NpcDefinition
+            {
+                Id = "gateguard", Name = "Rozsdás Kel, a kapuőr",
+                Intro = "A sisakja rozsdás, a lándzsája hegye fényes. Mindenkit végigmér, aki a kapun bejön, és fejben már tudja, kit visz majd ki a halottaskocsi.",
+                Marked = "»Láttam a neved a táblán. Bemehetsz. A falon belül nem rántunk kardot, és ez most neked jó.«",
+                Hallowed = "»Menj csak. A falon belül nem kell kard, és te úgy jársz, mint aki ezt magától is tudja.«",
+                Fallback = "»Lovat a falon belülre nem engedünk. A piac szűk, a halottaskocsinak kell a hely. Kint hagyhatod a kantárfánál.«",
+            },
+            new NpcDefinition
+            {
+                Id = "citylamplighter", Name = "Nell, a lámpagyújtó",
+                Intro = "Hosszú rúddal jár lámpától lámpáig. Minden este ő gyújtja meg Üregkapu lámpásait, egyenként, mindig ugyanabban a sorrendben, és egyet sem hagy ki.",
+                Marked = "»Lépj ki a fényből. Nem a lámpa miatt mondom.«",
+                Hallowed = "»Fogd meg a rudat egy percre. Látod? Így nem remeg a kanóc. Ezt csak annak mutatom meg, akire egyszer rábíznám.«",
+                Fallback = "»A Feketefenyvesben az út mellett ég egy lámpás, amit nem én gyújtok. Az olaja mindig friss. A pózna körül egy bot nyoma kering a mohában, mint aki vakon keresi a lámpát. Ha arra jársz, ne lépj a körbe.«",
+            },
         };
 
         public static NpcDefinition Npc(string id) => Npcs.FirstOrDefault(n => n.Id == id);

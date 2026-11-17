@@ -89,44 +89,83 @@ namespace AshenRealm.EditorTools
 
             RectTransform abilityPage = MenuBuilder.Box("Abilities Page", panel, 26f, 152f, 1388f, 535f);
             RectTransform skills = Frame("Class Abilities", abilityPage, 0f, 0f, 720f, 535f, art);
-            Text("Skills Heading", skills, 25f, 8f, 670f, 48f, InventoryText.Abilities, 36, art, TextAnchor.MiddleCenter, true);
-            var abilityLabels = new Text[AbilityBook.KnownCount];
-            var abilityDescriptions = new Text[AbilityBook.KnownCount];
-            var upgradeLabels = new Text[AbilityBook.KnownCount];
-            var upgradeButtons = new Button[AbilityBook.KnownCount];
-            var abilityIcons = new Image[AbilityBook.KnownCount];
-            var equipQ = new Button[AbilityBook.KnownCount];
-            var equipR = new Button[AbilityBook.KnownCount];
-            var equipQLabels = new Text[AbilityBook.KnownCount];
-            var equipRLabels = new Text[AbilityBook.KnownCount];
+            Button nativeFilter = MenuBuilder.GoldButton("Native Skills", skills, 22f, 12f, 204f, 38f, SkillText.NativeSkills, 20, art,
+                new UnityAction(inventory.ShowNativeSkills), out _);
+            Button foreignFilter = MenuBuilder.GoldButton("Foreign Skills", skills, 238f, 12f, 204f, 38f, SkillText.ForeignSkills, 20, art,
+                new UnityAction(inventory.ShowForeignSkills), out _);
+            Button previous = MenuBuilder.GoldButton("Previous Page", skills, 454f, 12f, 44f, 38f, SkillText.PreviousPage, 23, art,
+                new UnityAction(inventory.PreviousPage), out _);
+            Text pageLabel = Text("Page", skills, 503f, 12f, 122f, 38f, "", 21, art, TextAnchor.MiddleCenter);
+            Button next = MenuBuilder.GoldButton("Next Page", skills, 638f, 12f, 44f, 38f, SkillText.NextPage, 23, art,
+                new UnityAction(inventory.NextPage), out _);
+            const int rows = 4;
+            var abilityLabels = new Text[rows];
+            var abilityDescriptions = new Text[rows];
+            var upgradeLabels = new Text[rows];
+            var upgradeButtons = new Button[rows];
+            var abilityIcons = new Image[rows];
+            var equipQ = new Button[rows];
+            var equipR = new Button[rows];
+            var equipQLabels = new Text[rows];
+            var equipRLabels = new Text[rows];
             Sprite[] skillIcons = AbilityIconBuilder.Create();
-            for (int i = 0; i < AbilityBook.KnownCount; i++)
+            AbilityEffect[] effects = AbilityIconBuilder.Effects();
+            for (int i = 0; i < rows; i++)
             {
-                RectTransform row = Frame("Ability " + i, skills, 22f, 65f + i * 116f, 676f, 110f, art);
-                abilityIcons[i] = HudBuilder.Img(MenuBuilder.Box("Icon", row, 15f, 18f, 64f, 64f).gameObject,
-                    skillIcons[(int)AbilityBook.At(Catalog.Classes[0], i).Effect], Color.white);
-                abilityLabels[i] = Text("Name", row, 94f, 0f, 560f, 27f, "", 23, art, heading: true);
-                abilityDescriptions[i] = Text("Description", row, 94f, 27f, 558f, 38f, "", 16, art, TextAnchor.UpperLeft);
-                equipQ[i] = MenuBuilder.GoldButton("Equip Q", row, 94f, 67f, 106f, 40f, InventoryText.EquipQ, 19, art, null, out equipQLabels[i]);
-                equipR[i] = MenuBuilder.GoldButton("Equip R", row, 216f, 67f, 106f, 40f, InventoryText.EquipR, 19, art, null, out equipRLabels[i]);
-                upgradeButtons[i] = MenuBuilder.GoldButton("Upgrade", row, 340f, 67f, 312f, 40f, "", 19, art, null, out upgradeLabels[i]);
+                RectTransform row = Frame("Ability " + i, skills, 22f, 54f + i * 119f, 676f, 116f, art);
+                AbilityDefinition sample = AbilityBook.At(Catalog.Classes[0], i);
+                int iconIndex = sample != null ? System.Array.IndexOf(effects, sample.Effect) : 0;
+                abilityIcons[i] = HudBuilder.Img(MenuBuilder.Box("Icon", row, 10f, 23f, 64f, 64f).gameObject,
+                    skillIcons[Mathf.Max(0, iconIndex)], Color.white);
+                abilityIcons[i].preserveAspect = true;
+                abilityLabels[i] = Text("Name", row, 84f, 2f, 568f, 24f, "", 22, art, heading: true);
+                abilityLabels[i].resizeTextForBestFit = true;
+                abilityLabels[i].resizeTextMinSize = 17;
+                abilityLabels[i].resizeTextMaxSize = 22;
+                abilityLabels[i].verticalOverflow = VerticalWrapMode.Truncate;
+                abilityDescriptions[i] = Text("Description", row, 84f, 27f, 568f, 42f, "", 16, art, TextAnchor.UpperLeft);
+                abilityDescriptions[i].resizeTextForBestFit = true;
+                abilityDescriptions[i].resizeTextMinSize = 13;
+                abilityDescriptions[i].resizeTextMaxSize = 16;
+                abilityDescriptions[i].verticalOverflow = VerticalWrapMode.Truncate;
+                equipQ[i] = MenuBuilder.GoldButton("Equip Q", row, 84f, 72f, 106f, 40f, InventoryText.EquipQ, 18, art, null, out equipQLabels[i]);
+                equipR[i] = MenuBuilder.GoldButton("Equip R", row, 206f, 72f, 106f, 40f, InventoryText.EquipR, 18, art, null, out equipRLabels[i]);
+                upgradeButtons[i] = MenuBuilder.GoldButton("Upgrade or Brew", row, 330f, 72f, 322f, 40f, "", 18, art, null, out upgradeLabels[i]);
+                upgradeLabels[i].resizeTextForBestFit = true;
+                upgradeLabels[i].resizeTextMinSize = 14;
+                upgradeLabels[i].resizeTextMaxSize = 18;
+                upgradeLabels[i].verticalOverflow = VerticalWrapMode.Truncate;
                 UnityEventTools.AddIntPersistentListener(upgradeButtons[i].onClick, inventory.UpgradeKnownAbility, i);
                 UnityEventTools.AddIntPersistentListener(equipQ[i].onClick, inventory.EquipQ, i);
                 UnityEventTools.AddIntPersistentListener(equipR[i].onClick, inventory.EquipR, i);
             }
             RectTransform properties = Frame("Properties", abilityPage, 734f, 0f, 654f, 535f, art);
-            Text("Properties Heading", properties, 20f, 15f, 614f, 56f, InventoryText.Properties, 36, art, TextAnchor.MiddleCenter, true);
+            Text("Properties Heading", properties, 20f, 9f, 614f, 42f, InventoryText.Properties, 32, art, TextAnchor.MiddleCenter, true);
+            Text passiveName = Text("Passive Name", properties, 30f, 54f, 594f, 30f, "", 23, art, heading: true);
+            Text passiveDescription = Text("Passive Description", properties, 30f, 86f, 594f, 52f, "", 18, art, TextAnchor.UpperLeft);
+            passiveDescription.resizeTextForBestFit = true;
+            passiveDescription.resizeTextMinSize = 15;
+            passiveDescription.resizeTextMaxSize = 18;
+            passiveDescription.verticalOverflow = VerticalWrapMode.Truncate;
             string[] statNames = { InventoryText.RaiseHealth, InventoryText.RaiseFocus, InventoryText.RaiseAttack,
                 InventoryText.RaiseDefense, InventoryText.RaiseMagic, InventoryText.RaiseSpeed };
             var statButtons = new Button[statNames.Length];
             for (int i = 0; i < statNames.Length; i++)
             {
-                statButtons[i] = MenuBuilder.GoldButton("Raise Stat " + i, properties, 30f + i % 2 * 302f, 90f + i / 2 * 91f,
-                    290f, 73f, statNames[i], 29, art, null, out _);
+                statButtons[i] = MenuBuilder.GoldButton("Raise Stat " + i, properties, 30f + i % 2 * 302f, 147f + i / 2 * 61f,
+                    290f, 52f, statNames[i], 25, art, null, out _);
                 UnityEventTools.AddIntPersistentListener(statButtons[i].onClick, inventory.RaiseStat, i);
             }
-            Text levelCost = Text("Level Cost", properties, 32f, 371f, 590f, 48f, "", 26, art, heading: true);
-            Text("Guide", properties, 32f, 429f, 590f, 86f, InventoryText.AbilityGuide, 20, art, TextAnchor.UpperLeft);
+            Text levelCost = Text("Level Cost", properties, 30f, 329f, 594f, 32f, "", 22, art, heading: true);
+            Text necroPathLabel = Text("Necromancer Path", properties, 30f, 369f, 594f, 30f, "", 19, art);
+            Button necroAttack = MenuBuilder.GoldButton("Attack Path", properties, 30f, 405f, 284f, 42f, SkillText.AttackPath, 22, art,
+                new UnityAction(inventory.ChooseAttackPath), out _);
+            Button necroDefense = MenuBuilder.GoldButton("Defense Path", properties, 326f, 405f, 298f, 42f, SkillText.DefensePath, 22, art,
+                new UnityAction(inventory.ChooseDefensePath), out _);
+            Text herbStock = Text("Herb Stock", properties, 30f, 367f, 594f, 56f, "", 19, art, TextAnchor.UpperLeft);
+            Button buyHerbs = MenuBuilder.GoldButton("Buy Herbs", properties, 30f, 429f, 594f, 42f, SkillText.BuyHerbs, 21, art,
+                new UnityAction(inventory.BuyHerbs), out _);
+            Text("Guide", properties, 30f, 481f, 594f, 40f, SkillText.AbilityGuide, 16, art, TextAnchor.UpperLeft);
             Text message = Text("Message", panel, 44f, 690f, 1352f, 37f, "", 23, art, TextAnchor.MiddleCenter);
             Button close = MenuBuilder.GoldButton("Close Inventory", panel, 45f, 734f, 1350f, 54f, InventoryText.Close, 33, art,
                 new UnityAction(inventory.Close), out _);
@@ -154,10 +193,27 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(inventory, "upgradeButtons", upgradeButtons);
             SceneWiring.Set(inventory, "abilityIcons", abilityIcons);
             SceneWiring.Set(inventory, "skillIcons", skillIcons);
+            var inventorySettings = new UnityEditor.SerializedObject(inventory);
+            var iconEffects = inventorySettings.FindProperty("skillIconEffects");
+            iconEffects.arraySize = effects.Length;
+            for (int i = 0; i < effects.Length; i++) iconEffects.GetArrayElementAtIndex(i).intValue = (int)effects[i];
+            inventorySettings.ApplyModifiedPropertiesWithoutUndo();
             SceneWiring.Set(inventory, "equipQButtons", equipQ);
             SceneWiring.Set(inventory, "equipRButtons", equipR);
             SceneWiring.Set(inventory, "equipQLabels", equipQLabels);
             SceneWiring.Set(inventory, "equipRLabels", equipRLabels);
+            SceneWiring.Set(inventory, "pagePrevious", previous);
+            SceneWiring.Set(inventory, "pageNext", next);
+            SceneWiring.Set(inventory, "pageLabel", pageLabel);
+            SceneWiring.Set(inventory, "nativeFilterButton", nativeFilter);
+            SceneWiring.Set(inventory, "foreignFilterButton", foreignFilter);
+            SceneWiring.Set(inventory, "passiveName", passiveName);
+            SceneWiring.Set(inventory, "passiveDescription", passiveDescription);
+            SceneWiring.Set(inventory, "necroPathLabel", necroPathLabel);
+            SceneWiring.Set(inventory, "necroAttackButton", necroAttack);
+            SceneWiring.Set(inventory, "necroDefenseButton", necroDefense);
+            SceneWiring.Set(inventory, "herbStockLabel", herbStock);
+            SceneWiring.Set(inventory, "herbBuyButton", buyHerbs);
             SceneWiring.Set(inventory, "statButtons", statButtons);
             SceneWiring.Set(inventory, "levelCost", levelCost);
             SceneWiring.Set(inventory, "message", message);

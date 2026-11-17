@@ -13,6 +13,7 @@ namespace AshenRealm.AI
     {
         public enum State { Idle, Patrol, Chase, Attack, Dead }
         const float BoltRange = 20f, ConfrontRange = 11f;
+        const float CharmTargetRadius = 12f, CharmScanInterval = 0.4f;
         [SerializeField] string enemyId;
         [SerializeField] string saveKey = "";
         [SerializeField] Health health;
@@ -36,6 +37,7 @@ namespace AshenRealm.AI
         [SerializeField] float idleDuration = 2.2f;
 
         readonly Collider[] overlaps = new Collider[24];
+        readonly Collider[] charmOverlaps = new Collider[48];
         readonly Dictionary<EnemyMove, float> nextMoves = new Dictionary<EnemyMove, float>();
         EnemyDefinition definition;
         ICreatureAnimator animator;
@@ -50,6 +52,10 @@ namespace AshenRealm.AI
         EnemyMove currentMove, previousMove;
         bool confronted, aimLocked, attackResolved, contactHit, counterTriggered, relocated, burrowArrived;
         int shots, patrolIndex;
+        EnemyAI charmTarget;
+        EnemyMove charmMeleeMove;
+        bool wasCharmed;
+        float nextCharmScan, nextCharmHit;
 
         public static event Action<EnemyAI> ConfrontationRequested;
         public static event Action<EnemyAI> Slain;
@@ -59,7 +65,8 @@ namespace AshenRealm.AI
         public State CurrentState => state;
         public Health Health => health;
         public string DisplayName => definition != null ? definition.Name : enemyId;
-        public bool IsEngaged => state == State.Chase || state == State.Attack;
+        public bool IsEngaged => (status == null || !status.Charmed) && (state == State.Chase || state == State.Attack);
+        public GameObject LastDamageSource { get; private set; }
         public EnemyMove CurrentMove => currentMove;
         public EnemyMove LastResolvedMove { get; private set; }
         public int ResolvedMoves { get; private set; }
@@ -78,6 +85,13 @@ namespace AshenRealm.AI
             controller = GetComponent<CharacterController>();
             if (target != null) targetDamageable = target.GetComponentInParent<IDamageable>();
             health.SetMax(definition.Health, true);
+            foreach (EnemyMove move in definition.Moves)
+            {
+                if (move.Damage <= 0f) continue;
+                if (charmMeleeMove == null) charmMeleeMove = move;
+                if (move.Kind == MoveKind.Melee || move.Kind == MoveKind.Sweep || move.Kind == MoveKind.Counter)
+                { charmMeleeMove = move; break; }
+            }
             lastPosition = home = transform.position;
         }
         void OnEnable() { health.Damaged += OnDamaged; health.Died += OnDied; }
@@ -91,7 +105,7 @@ namespace AshenRealm.AI
         {
             if (state == next) return;
             state = next; stateTime = 0f;
-            if (next == State.Chase) CombatFocus.Set(this);
+            if (next == State.Chase && !status.Charmed) CombatFocus.Set(this);
         }
         public void ApplyCleared() => gameObject.SetActive(false);
         public void Engage() { confronted = true; if (state != State.Dead) SetState(State.Chase); }
@@ -101,6 +115,13 @@ namespace AshenRealm.AI
             float dt = Time.deltaTime;
             stateTime += dt;
             if (state == State.Dead) { animator.SetLocomotion(0f); return; }
+            if (status.Charmed)
+            {
+                if (!wasCharmed) BeginCharm();
+                UpdateCharmed(dt);
+                return;
+            }
+            if (wasCharmed) EndCharm();
             Vector3 velocity = Vector3.zero, look = transform.forward;
             bool held = Time.time < staggerUntil || status.Stunned;
             if (status.Stunned && state == State.Attack && definition.Rank < EnemyRank.Guardian && !attackResolved) CancelAttack();
@@ -152,6 +173,102 @@ namespace AshenRealm.AI
             }
             if (held) velocity = Vector3.zero;
             Move(velocity, look, dt);
+        }
+
+        void ClearCommittedAttack()
+        {
+            CancelVisuals();
+            currentMove = null;
+            aimLocked = attackResolved = contactHit = counterTriggered = relocated = burrowArrived = false;
+            shots = 0;
+            knockback = Vector3.zero;
+        }
+
+        void BeginCharm()
+        {
+            wasCharmed = true;
+            charmTarget = null;
+            nextCharmScan = 0f;
+            nextCharmHit = Time.time + 0.35f;
+            ClearCommittedAttack();
+            SetState(State.Chase);
+            if (ReferenceEquals(CombatFocus.Current, this)) CombatFocus.Set(null);
+        }
+
+        void EndCharm()
+        {
+            wasCharmed = false;
+            charmTarget = null;
+            ClearCommittedAttack();
+            nextAttackTime = Mathf.Max(nextAttackTime, Time.time + 0.8f);
+            // Leave the original player target intact throughout conversion; no allied target leaks into normal moves.
+            SetState(State.Idle);
+            if (target != null && targetDamageable != null && targetDamageable.IsAlive &&
+                Flat(target.position - transform.position).sqrMagnitude <= loseTargetRadius * loseTargetRadius) BeginChase();
+            else RecoverAfterTargetLost();
+        }
+
+        void UpdateCharmed(float dt)
+        {
+            if (Time.time >= nextCharmScan)
+            {
+                nextCharmScan = Time.time + CharmScanInterval;
+                charmTarget = FindCharmTarget();
+            }
+            Vector3 velocity = Vector3.zero, look = transform.forward;
+            bool held = Time.time < staggerUntil || status.Stunned;
+            if (ValidCharmTarget(charmTarget))
+            {
+                Vector3 towards = Flat(charmTarget.transform.position - transform.position);
+                float reach = MeleeReach + charmTarget.controller.radius;
+                look = towards;
+                if (!held && towards.magnitude > reach * 0.85f) velocity = towards.normalized * definition.Speed;
+                else if (!held && Time.time >= nextCharmHit && FacingTarget(towards, 45f) && CharmLineOfSight(charmTarget))
+                {
+                    nextCharmHit = Time.time + Mathf.Max(1f, definition.AttackInterval);
+                    animator.PlayAttack(0.2f, 0.45f);
+                    if (charmMeleeMove != null)
+                    {
+                        float damage = status.ModifyOutgoing(charmMeleeMove.Damage);
+                        Vector3 point = charmTarget.transform.position + Vector3.up;
+                        GameObject source = status.CharmSource;
+                        float applied = charmTarget.health.ApplyDamage(new DamageInfo(damage, point, towards, source));
+                        if (applied > 0f) impactEffects?.Emit(point, -towards, ImpactEffects.Kind.Flesh);
+                    }
+                }
+            }
+            else charmTarget = null;
+            Move(velocity, look, dt);
+        }
+
+        bool ValidCharmTarget(EnemyAI candidate) => candidate != null && candidate != this && candidate.isActiveAndEnabled &&
+            candidate.health != null && candidate.health.IsAlive && candidate.state != State.Dead &&
+            (candidate.status == null || !candidate.status.Charmed) &&
+            Flat(candidate.transform.position - transform.position).sqrMagnitude <= CharmTargetRadius * CharmTargetRadius;
+
+        EnemyAI FindCharmTarget()
+        {
+            int count = Physics.OverlapSphereNonAlloc(transform.position, CharmTargetRadius, charmOverlaps, ~0, QueryTriggerInteraction.Ignore);
+            EnemyAI nearest = null;
+            float nearestSquared = float.MaxValue;
+            for (int i = 0; i < count; i++)
+            {
+                EnemyAI candidate = charmOverlaps[i].GetComponentInParent<EnemyAI>();
+                if (!ValidCharmTarget(candidate)) continue;
+                float squared = Flat(candidate.transform.position - transform.position).sqrMagnitude;
+                if (squared >= nearestSquared || !CharmLineOfSight(candidate)) continue;
+                nearest = candidate;
+                nearestSquared = squared;
+            }
+            return nearest;
+        }
+
+        bool CharmLineOfSight(EnemyAI candidate)
+        {
+            if (Physics.Linecast(transform.position + Vector3.up * eyeHeight,
+                candidate.transform.position + Vector3.up * candidate.eyeHeight, out RaycastHit hit, ~0, QueryTriggerInteraction.Ignore))
+                return hit.collider.transform.IsChildOf(transform) || hit.collider.transform.IsChildOf(candidate.transform);
+            return true;
         }
 
         void BeginChase()
@@ -325,8 +442,9 @@ namespace AshenRealm.AI
         }
         void Deal(EnemyMove move, Vector3 centre)
         {
+            if (status.Charmed) return;
             if (targetDamageable == null || !targetDamageable.IsAlive) return;
-            float damage = move.Damage * status.DamageMultiplier;
+            float damage = status.ModifyOutgoing(move.Damage, move.Bolt != BoltKind.Arrow);
             Vector3 direction = Flat(target.position - centre);
             if (direction.sqrMagnitude < 0.001f) direction = lockedDirection;
             float applied = targetDamageable.ApplyDamage(new DamageInfo(damage, target.position + Vector3.up, direction, gameObject));
@@ -339,19 +457,20 @@ namespace AshenRealm.AI
             else
             {
                 impactEffects?.Emit(target.position + Vector3.up, -direction, ImpactEffects.Kind.Flesh);
-                EnemyMoveEffects.Apply(move, target.GetComponentInParent<StatusEffects>());
+                EnemyMoveEffects.Apply(move, target.GetComponentInParent<StatusEffects>(), gameObject);
             }
             if (move.Lifesteal > 0f) health.Heal(applied * move.Lifesteal);
         }
         void Launch(EnemyMove move, int shot)
         {
-            if (target == null) return;
+            if (target == null || status.Charmed) return;
             Vector3 origin = transform.position + Vector3.up * (controller.height * 0.7f) + transform.forward * (controller.radius + 0.3f);
             Vector3 aim = lockedAimPoint + Vector3.up * 1.2f - origin;
             // A volley brackets the committed target point; individual bolts remain physically dodgeable.
             float spread = move.Kind == MoveKind.Volley ? (shot - (move.Hits - 1) * 0.5f) * 6f : (shot - (move.Hits - 1) * 0.5f) * 8f;
             Action<float> drain = move.Lifesteal > 0f ? applied => { if (health.IsAlive) health.Heal(applied * move.Lifesteal); } : (Action<float>)null;
-            projectiles.Launch(move.Bolt, origin, Quaternion.Euler(0f, spread, 0f) * aim, move.Damage * status.DamageMultiplier, gameObject, false, move, drain);
+            projectiles.Launch(move.Bolt, origin, Quaternion.Euler(0f, spread, 0f) * aim,
+                status.ModifyOutgoing(move.Damage, move.Bolt != BoltKind.Arrow), gameObject, false, move, drain);
         }
         bool Relocate(Vector3 destination)
         {
@@ -413,8 +532,9 @@ namespace AshenRealm.AI
         bool FacingTarget(Vector3 towards, float tolerance) => towards.sqrMagnitude < 0.01f || Vector3.Angle(transform.forward, towards) <= tolerance;
         void OnDamaged(DamageInfo info, float amount)
         {
+            LastDamageSource = info.Source;
             if (state == State.Dead) return;
-            CombatFocus.Set(this);
+            if (!status.Charmed) CombatFocus.Set(this);
             if (info.Source == null) return;
             animator.PlayHit(info.Direction);
             bool heavy = definition.Rank >= EnemyRank.Guardian;

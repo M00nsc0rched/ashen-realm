@@ -17,6 +17,7 @@ namespace AshenRealm.AI
 
         [Header("References")]
         [SerializeField] Health health;
+        [SerializeField] StatusEffects status;
         [SerializeField] KnightAnimator animator;
         [SerializeField] Transform target;
         [SerializeField, Optional] ImpactEffects impactEffects;
@@ -76,6 +77,7 @@ namespace AshenRealm.AI
 
         public State CurrentState => state;
         public Health Health => health;
+        public GameObject LastDamageSource { get; private set; }
         public MoveKind CurrentPattern => currentPattern;
         /// <summary>True while the knight is actively fighting the player.</summary>
         public bool IsEngaged => state == State.Chase || state == State.Attack;
@@ -86,6 +88,7 @@ namespace AshenRealm.AI
 
         /// <summary>The road to Hollowgate opens when the knight falls.</summary>
         public static event Action Slain;
+        public static event Action<CursedKnightAI> SlainWithSource;
 
         public event Action<State> StateChanged;
 
@@ -125,6 +128,18 @@ namespace AshenRealm.AI
             if (state == State.Dead)
             {
                 animator.SetLocomotion(0f);
+                return;
+            }
+
+            if (status.Stunned)
+            {
+                if (state == State.Attack && !attackResolved)
+                {
+                    attackResolved = true;
+                    animator.PlayRecoil();
+                    SetState(State.Chase);
+                }
+                Move(Vector3.zero, transform.forward, true, dt);
                 return;
             }
 
@@ -182,6 +197,7 @@ namespace AshenRealm.AI
         {
             // The knight forgets the fight and recovers, so the player can retry after respawning.
             health.ResetHealth();
+            status.Clear();
             attackSequence = 0;
             SetState(patrolPoints.Length > 0 ? State.Patrol : State.Idle);
         }
@@ -221,6 +237,9 @@ namespace AshenRealm.AI
         /// <summary>Overlap sphere in front of the knight at the moment the blade comes down.</summary>
         void ResolveAttackHit()
         {
+            if (status.Stunned) return;
+            float damage = status.ModifyOutgoing(attackDamage);
+            if (damage <= 0f) return;
             bool sweeping = currentPattern == MoveKind.Sweep;
             Vector3 center = transform.position + transform.forward * (sweeping ? 0.35f : attackReach * 0.65f) + Vector3.up * 1.2f;
             int count = Physics.OverlapSphereNonAlloc(center, sweeping ? 2f : attackHitRadius, overlapBuffer, ~0, QueryTriggerInteraction.Ignore);
@@ -233,8 +252,8 @@ namespace AshenRealm.AI
                 if (damageable == null || !damageable.IsAlive) continue;
 
                 Vector3 point = c.ClosestPoint(center);
-                float applied = damageable.ApplyDamage(new DamageInfo(attackDamage, point, transform.forward, gameObject));
-                if (applied < attackDamage * 0.5f)
+                float applied = damageable.ApplyDamage(new DamageInfo(damage, point, transform.forward, gameObject));
+                if (applied < damage * 0.5f)
                 {
                     // Blocked: the blade glances off the shield and the knight reels.
                     staggerUntil = Time.time + blockedRecoil;
@@ -314,6 +333,7 @@ namespace AshenRealm.AI
 
         void OnDamaged(DamageInfo info, float amount)
         {
+            LastDamageSource = info.Source;
             if (state == State.Dead) return;
             CombatFocus.Set(this);
             animator.PlayHit(info.Direction);
@@ -331,6 +351,7 @@ namespace AshenRealm.AI
             animator.PlayDeath();
             GameMessages.Notify(GameText.KnightDefeated);
             Slain?.Invoke();
+            SlainWithSource?.Invoke(this);
         }
 
         static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0f, v.z);

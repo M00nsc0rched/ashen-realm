@@ -38,6 +38,7 @@ namespace AshenRealm.Story
         public int Souls, Descents, Deepest;
         public List<string> Codex = new List<string>();
         public List<int> UnlockedClasses = new List<int>();
+        public List<string> SkillMigrationRefunds = new List<string>();
     }
 
     [Serializable]
@@ -49,5 +50,30 @@ namespace AshenRealm.Story
         public int[] AbilityTiers;
         public int[] EquippedAbilities;
         public bool TorchEquipped;
+        public int SkillSchemaVersion;
+        public List<SkillProgressRecord> Skills;
+        public string[] EquippedSkillIds;
+        public NecromancerPath NecromancerPath;
+        public int Herbs, PendingSkillRefund;
+        public PassiveProgressRecord Passive;
+    }
+
+    [Serializable]
+    public sealed class SkillProgressRecord
+    {
+        public string Id;
+        public int Tier, Stock;
+        public float PowerBonus;
+    }
+
+    [Serializable]
+    public sealed class PassiveProgressRecord
+    {
+        public int DescentId;
+        public int HealthBonus, FocusBonus, AttackBonus, DefenseBonus, MagicBonus, SpeedBonus;
+        public int RogueLuck;
+        public bool VigilUsed, VigilActive;
+        public float VigilRemaining;
+        public string VigilTarget;
     }
 }

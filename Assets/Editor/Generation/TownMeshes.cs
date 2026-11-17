@@ -457,6 +457,52 @@ namespace AshenRealm.EditorTools
             }
         }
 
+        /// <summary>
+        /// The rock the keep stands on: a broad crag whose flat top is wider than every tower, so from any side the keep
+        /// sits on stone instead of hanging past a narrow peak. Origin at the middle of the top, which drops by depth to its foot.
+        /// </summary>
+        public static void KeepCrag(MeshBuilder b, System.Random rng, Vector2 topHalf, Vector2 footHalf, float depth, float frontShift)
+        {
+            const int columns = 8;
+            Vector3 interior = new Vector3(0f, -depth * 0.5f, 0f);
+            Vector3 Corner(int side, float t, bool top)
+            {
+                // Walk the rectangle's edge: side 0 front (-Z), 1 right, 2 back, 3 left.
+                Vector2 half = top ? topHalf : footHalf;
+                Vector3 a, c;
+                switch (side)
+                {
+                    case 0: a = new Vector3(-half.x, 0f, -half.y); c = new Vector3(half.x, 0f, -half.y); break;
+                    case 1: a = new Vector3(half.x, 0f, -half.y); c = new Vector3(half.x, 0f, half.y); break;
+                    case 2: a = new Vector3(half.x, 0f, half.y); c = new Vector3(-half.x, 0f, half.y); break;
+                    default: a = new Vector3(-half.x, 0f, half.y); c = new Vector3(-half.x, 0f, -half.y); break;
+                }
+                Vector3 p = Vector3.Lerp(a, c, t);
+                if (!top) p += new Vector3(0f, -depth, -frontShift);
+                return p;
+            }
+            var jitter = new float[4, columns + 1];
+            for (int side = 0; side < 4; side++)
+            for (int i = 0; i <= columns; i++)
+                jitter[side, i] = i == 0 || i == columns ? 0f : MeshBuilder.Lerp(rng, -2.2f, 2.2f);
+            for (int side = 0; side < 4; side++)
+            for (int i = 0; i < columns; i++)
+            {
+                float t0 = i / (float)columns, t1 = (i + 1) / (float)columns;
+                // A ledge halfway down breaks each face into two rough steps of rock.
+                Vector3 top0 = Corner(side, t0, true), top1 = Corner(side, t1, true);
+                Vector3 foot0 = Corner(side, t0, false), foot1 = Corner(side, t1, false);
+                Vector3 ledge0 = Vector3.Lerp(top0, foot0, 0.45f) + Vector3.Scale(foot0 - top0, new Vector3(0.12f, 0f, 0.12f)) + Vector3.up * jitter[side, i];
+                Vector3 ledge1 = Vector3.Lerp(top1, foot1, 0.45f) + Vector3.Scale(foot1 - top1, new Vector3(0.12f, 0f, 0.12f)) + Vector3.up * jitter[side, (i + 1)];
+                b.SetColor(Pal.Mountain, MeshBuilder.Lerp(rng, 0.26f, 0.42f));
+                b.QuadOutward(top0, top1, ledge1, ledge0, interior);
+                b.SetColor(Pal.Mountain, MeshBuilder.Lerp(rng, 0.3f, 0.5f));
+                b.QuadOutward(ledge0, ledge1, foot1, foot0, interior);
+            }
+            b.SetColor(Pal.Mountain, 0.3f);
+            b.QuadOutward(Corner(0, 0f, true), Corner(0, 1f, true), Corner(2, 0f, true), Corner(2, 1f, true), interior);
+        }
+
         /// <summary>The keep on the hill behind the city, seen through the haze. Origin on the hilltop.</summary>
         public static void Keep(MeshBuilder b, System.Random rng)
         {

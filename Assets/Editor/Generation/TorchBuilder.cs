@@ -19,7 +19,10 @@ namespace AshenRealm.EditorTools
 
             var mount = new GameObject("Carried Torch").transform;
             mount.SetParent(camera, false);
-            mount.localPosition = new Vector3(-0.43f, -0.28f, 0.78f);
+            // Low in the left corner, like the class kits, leaning slightly in.
+            mount.localPosition = new Vector3(-0.52f, -0.46f, 0.8f);
+            mount.localRotation = Quaternion.Euler(0f, 0f, 8f);
+            mount.localScale = Vector3.one * 0.7f;
             var card = new MeshBuilder();
             card.Card(new Vector3(-0.205f, -0.36f, 0f), new Vector3(0.205f, -0.36f, 0f),
                 new Vector3(0.205f, 0.735f, 0f), new Vector3(-0.205f, 0.735f, 0f), Vector3.back, 0f, false);

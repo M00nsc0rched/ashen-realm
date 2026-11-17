@@ -23,9 +23,12 @@ namespace AshenRealm.Combat
         bool fromPlayer;
         EnemyMove move;
         Action<float> onHit;
+        Func<Health, Vector3, float> resolveHit;
+        StatusEffects ownerStatus;
         float expires;
 
-        public void Launch(Vector3 aim, float amount, GameObject source, bool playerBolt, EnemyMove effects, Action<float> hitCallback)
+        public void Launch(Vector3 aim, float amount, GameObject source, bool playerBolt, EnemyMove effects, Action<float> hitCallback,
+            Func<Health, Vector3, float> resolveHit = null)
         {
             direction = aim.normalized;
             damage = amount;
@@ -33,13 +36,16 @@ namespace AshenRealm.Combat
             fromPlayer = playerBolt;
             move = effects;
             onHit = hitCallback;
+            this.resolveHit = resolveHit;
+            ownerStatus = source != null ? source.GetComponentInParent<StatusEffects>() : null;
             expires = Time.time + lifetime;
             transform.rotation = Quaternion.LookRotation(direction);
         }
 
         void Update()
         {
-            if (Time.time >= expires)
+            // Conversion also disarms bolts already in flight, before they can hit the player this frame.
+            if (Time.time >= expires || (!fromPlayer && ownerStatus != null && ownerStatus.Charmed))
             {
                 Destroy(gameObject);
                 return;
@@ -54,6 +60,7 @@ namespace AshenRealm.Combat
                 Collider c = hits[i].collider;
                 if (owner != null && c.transform.IsChildOf(owner.transform)) continue;
                 if (!fromPlayer && c.GetComponentInParent<EnemyAI>() != null) continue;
+                if (IsCharmedAlly(c)) continue;
                 if (hits[i].distance < bestDistance)
                 {
                     bestDistance = hits[i].distance;
@@ -72,13 +79,30 @@ namespace AshenRealm.Combat
 
         void Strike(in RaycastHit hit)
         {
+            if (IsCharmedAlly(hit.collider)) return;
             var damageable = hit.collider.GetComponentInParent<IDamageable>();
             if (damageable == null || !damageable.IsAlive) return;
 
             Vector3 point = hit.distance <= 0f ? transform.position : hit.point;
+            if (resolveHit != null)
+            {
+                Health hitHealth = hit.collider.GetComponentInParent<Health>();
+                if (hitHealth != null && hitHealth.IsAlive)
+                {
+                    float appliedByResolver = resolveHit(hitHealth, point);
+                    onHit?.Invoke(appliedByResolver);
+                }
+                return;
+            }
             float applied = damageable.ApplyDamage(new DamageInfo(damage, point, direction, owner));
             onHit?.Invoke(applied);
-            if (move != null && applied > 0f) EnemyMoveEffects.Apply(move, hit.collider.GetComponentInParent<StatusEffects>());
+            if (move != null && applied > 0f) EnemyMoveEffects.Apply(move, hit.collider.GetComponentInParent<StatusEffects>(), owner);
+        }
+
+        bool IsCharmedAlly(Collider collider)
+        {
+            var condition = collider.GetComponentInParent<StatusEffects>();
+            return fromPlayer && owner != null && condition != null && condition.Charmed && condition.CharmSource == owner;
         }
     }
 }

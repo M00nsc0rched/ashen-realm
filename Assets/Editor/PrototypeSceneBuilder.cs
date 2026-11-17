@@ -145,8 +145,12 @@ namespace AshenRealm.EditorTools
                 CreateArrivalLore(layout.Arrival, valley.transform);
                 foreach (var person in layout.Arrival.People)
                     ActorFactory.CreateAmbientNpc(person.name, person.position, person.yaw, person.figure, valley.transform, materials);
+                foreach (var person in layout.People)
+                    ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.figure, valley.transform, director, materials);
+                foreach (var person in layout.Ambient)
+                    ActorFactory.CreateAmbientNpc(person.name, person.position, person.yaw, person.figure, valley.transform, materials, person.look);
                 ActorFactory.CreatePortal("Gate To Hollowgate", layout.GatePosition, 0f, new Vector3(6f, 9f, 1f), valley.transform, zoneManager, ZoneNumbers.City, false,
-                    GameText.GateToCity, StoryDirector.DeadFlag("knight"), GameText.GateBarred);
+                    GameText.GateToCity, "", "");
 
                 Progress("Hollowgate", 0.62f);
                 Vector3 cityOrigin = ZoneOrigin(ZoneNumbers.City);
@@ -159,6 +163,8 @@ namespace AshenRealm.EditorTools
                 var cityObjective = Marker("City Objective", city.transform, cityLayout.TavernDoor, 0f);
                 foreach (var person in cityLayout.People)
                     ActorFactory.CreateNpc(person.id, person.position, person.yaw, person.figure, city.transform, director, materials);
+                foreach (var person in cityLayout.Ambient)
+                    ActorFactory.CreateAmbientNpc(person.name, person.position, person.yaw, person.figure, city.transform, materials);
                 CityActivitiesGenerator.Build(city.transform, cityOrigin, materials);
                 ActorFactory.CreatePortal("Gate To Valley", cityLayout.Gate, 0f, new Vector3(9f, 7f, 1f), city.transform, zoneManager, 0, true,
                     GameText.GateToValley, "", "");
@@ -187,7 +193,11 @@ namespace AshenRealm.EditorTools
                 Progress("The Grey Chapel", 0.65f);
                 zones.Add(BuildChapel(materials, zoneManager, director, chapelArrival));
 
-                ConfigureZone(valley, 0, false, new Color(0.6f, 0.58f, 0.64f), horizon, 30f, 320f, spawn, gateArrival, gateObjective);
+                ConfigureZone(valley, 0, false, new Color(0.6f, 0.58f, 0.64f), horizon, 40f, 300f, spawn, gateArrival, gateObjective);
+                // Evening spreads over the whole walk, from the spawn to the city gate.
+                var atmosphere = Object.FindAnyObjectByType<AtmosphereController>();
+                SceneWiring.Set(atmosphere, "eveningStartZ", layout.PlayerSpawn.z);
+                SceneWiring.Set(atmosphere, "eveningEndZ", layout.GatePosition.z);
 
                 var enemies = new EnemyFactory(materials);
                 BiomeStyle[] biomes = Biomes();
@@ -213,6 +223,21 @@ namespace AshenRealm.EditorTools
                 SceneWiring.Set(zoneManager, "player", player.Controller);
                 SceneWiring.Set(zoneManager, "lifecycle", player.Lifecycle);
                 SceneWiring.Set(zoneManager, "combat", player.Combat);
+
+                // The horse lives in the valley and waits at its posts; the rail by the stable is where Hilda saddles it.
+                var horse = ActorFactory.CreateRidingHorse(valley.transform, materials);
+                Transform postRoot = valley.GetComponentsInChildren<Transform>(true).First(t => t.name == "Horse Posts");
+                Transform[] standingSpots = Enumerable.Range(1, 4).Select(i => postRoot.Find($"Horse Post {i}/Standing Spot")).ToArray();
+                horse.transform.SetPositionAndRotation(standingSpots[2].position, standingSpots[2].rotation);
+                SceneWiring.Set(horse, "rider", player.Controller);
+                SceneWiring.Set(horse, "combat", player.Combat);
+                SceneWiring.Set(horse, "health", player.Health);
+                SceneWiring.Set(horse, "lifecycle", player.Lifecycle);
+                SceneWiring.Set(horse, "zones", zoneManager);
+                SceneWiring.Set(horse, "posts", standingSpots);
+                SceneWiring.Set(horse, "rail", standingSpots[2]);
+                SceneWiring.Set(zoneManager, "horse", horse);
+                SceneWiring.Set(player.Interactor, "fallback", horse);
                 SceneWiring.Set(zoneManager, "atmosphere", Object.FindAnyObjectByType<AtmosphereController>());
                 SceneWiring.Set(zoneManager, "sun", RenderSettings.sun);
                 SceneWiring.Set(zoneManager, "worldCamera", player.CameraEffects.GetComponent<Camera>());
@@ -723,8 +748,8 @@ namespace AshenRealm.EditorTools
             var atmosphere = atmosphereGo.AddComponent<AtmosphereController>();
             SceneWiring.Set(atmosphere, "ambientColor", new Color(0.49f, 0.4f, 0.43f));
             SceneWiring.Set(atmosphere, "fogColor", new Color(0.56f, 0.34f, 0.3f));
-            SceneWiring.Set(atmosphere, "fogStart", 30f);
-            SceneWiring.Set(atmosphere, "fogEnd", 320f);
+            SceneWiring.Set(atmosphere, "fogStart", 40f);
+            SceneWiring.Set(atmosphere, "fogEnd", 300f);
             atmosphere.Apply();
 
             var volume = atmosphereGo.AddComponent<Volume>();

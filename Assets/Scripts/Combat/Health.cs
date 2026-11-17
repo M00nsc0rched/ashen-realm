@@ -49,7 +49,7 @@ namespace AshenRealm.Combat
             if (current <= 0f || info.Amount <= 0f) return 0f;
 
             float amount = info.Amount;
-            for (int i = 0; i < filters.Length; i++)
+            for (int i = 0; !info.BypassMitigation && i < filters.Length; i++)
             {
                 var filter = filters[i];
                 if (filter is Behaviour b && !b.enabled) continue;

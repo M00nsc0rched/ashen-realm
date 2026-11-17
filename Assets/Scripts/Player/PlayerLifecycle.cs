@@ -21,6 +21,8 @@ namespace AshenRealm.Player
 
         public event Action Died;
         public event Action Respawned;
+        /// <summary>Raised after every return to the spawn point: a respawn or a fall through the world.</summary>
+        public event Action ReturnedToSpawn;
 
         public bool IsDead { get; private set; }
 
@@ -68,7 +70,9 @@ namespace AshenRealm.Player
 
         void ReturnToSpawn()
         {
-            if (spawnPoint != null) controller.Teleport(spawnPoint.position, spawnPoint.eulerAngles.y);
+            if (spawnPoint == null) return;
+            controller.Teleport(spawnPoint.position, spawnPoint.eulerAngles.y);
+            ReturnedToSpawn?.Invoke();
         }
     }
 }

@@ -44,6 +44,7 @@ namespace AshenRealm.UI
         [SerializeField] Image ability1Icon;
         [SerializeField] Image ability2Icon;
         [SerializeField] Sprite[] skillIcons;
+        [SerializeField] AbilityEffect[] skillIconEffects;
         [SerializeField] Image weaponEmblem;
         [SerializeField] Sprite[] classWeaponIcons;
         [SerializeField] Sprite[] goodsWeaponIcons;
@@ -78,7 +79,7 @@ namespace AshenRealm.UI
         float enemyBarTimer;
         int focusRevision;
         float crosshairScale = 1f;
-        int firstSkill = -1, secondSkill = -1;
+        System.Collections.Generic.Dictionary<AbilityEffect, Sprite> skillIconLookup;
 
         void OnEnable()
         {
@@ -175,19 +176,25 @@ namespace AshenRealm.UI
 
         void RefreshSkills()
         {
-            AbilityDefinition first = abilities.ActiveAbility(0), second = abilities.ActiveAbility(1);
-            if (first != null && firstSkill != (int)first.Effect)
+            if (skillIconLookup == null)
             {
-                firstSkill = (int)first.Effect;
-                ability1Label.text = first.Name;
-                ability1Icon.sprite = skillIcons[firstSkill];
+                skillIconLookup = new System.Collections.Generic.Dictionary<AbilityEffect, Sprite>();
+                for (int i = 0; i < Mathf.Min(skillIcons.Length, skillIconEffects.Length); i++)
+                    skillIconLookup[skillIconEffects[i]] = skillIcons[i];
             }
-            if (second != null && secondSkill != (int)second.Effect)
-            {
-                secondSkill = (int)second.Effect;
-                ability2Label.text = second.Name;
-                ability2Icon.sprite = skillIcons[secondSkill];
-            }
+            RefreshSkill(abilities.ActiveAbility(0), ability1Label, ability1Icon);
+            RefreshSkill(abilities.ActiveAbility(1), ability2Label, ability2Icon);
+        }
+
+        void RefreshSkill(AbilityDefinition ability, Text label, Image icon)
+        {
+            string caption = ability != null ? ability.Name : InventoryText.Empty;
+            if (label.text != caption) label.text = caption;
+            Sprite sprite = null;
+            if (ability != null) skillIconLookup.TryGetValue(ability.Effect, out sprite);
+            if (icon.sprite != sprite) icon.sprite = sprite;
+            bool visible = sprite != null;
+            if (icon.enabled != visible) icon.enabled = visible;
         }
 
         void UpdateCenter(float dt)

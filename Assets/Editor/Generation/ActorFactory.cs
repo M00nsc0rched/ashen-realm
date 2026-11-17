@@ -78,6 +78,7 @@ namespace AshenRealm.EditorTools
                 Abilities = root.AddComponent<PlayerAbilities>(),
             };
             root.AddComponent<PlayerProgression>();
+            root.AddComponent<PlayerPassives>();
 
             var pivot = Child("Camera Pivot", root.transform, new Vector3(0f, 1.62f, 0f), Quaternion.identity);
             var cameraGo = Child("Main Camera", pivot, Vector3.zero, Quaternion.identity).gameObject;
@@ -99,8 +100,12 @@ namespace AshenRealm.EditorTools
             // Weapon pivots are the attachment points for future animated models.
             var weaponRig = Child("Weapon Rig", cameraGo.transform, Vector3.zero, Quaternion.identity);
             var weapons = weaponRig.gameObject.AddComponent<FirstPersonWeaponAnimator>();
-            var swordPivot = Child("Sword Pivot (Right Hand)", weaponRig, new Vector3(0.36f, -0.4f, 0.55f), Quaternion.Euler(38f, -10f, 2f));
-            var shieldPivot = Child("Shield Pivot (Left Hand)", weaponRig, new Vector3(-0.48f, -0.44f, 0.6f), Quaternion.Euler(8f, -40f, 8f));
+            // At rest the kits sit low in the bottom corners, scaled down, leaning outwards: the crosshair and the middle stay
+            // clear (HandCoveragePlaytestChecks measures it). A swing still crosses the centre for a moment.
+            var swordPivot = Child("Sword Pivot (Right Hand)", weaponRig, new Vector3(0.62f, -0.54f, 0.62f), Quaternion.Euler(42f, -15f, -20f));
+            var shieldPivot = Child("Shield Pivot (Left Hand)", weaponRig, new Vector3(-0.56f, -0.5f, 0.62f), Quaternion.Euler(20f, -35f, 10f));
+            swordPivot.localScale = Vector3.one * 0.7f;
+            shieldPivot.localScale = Vector3.one * 0.65f;
 
             var swordBuilder = new MeshBuilder();
             PlayerWeaponMeshes.CrescentPolearm(swordBuilder);
@@ -206,7 +211,6 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(classRig, "torchFlask", torchFlask);
             rig.ClassRig = classRig;
             TorchBuilder.Build(root, cameraGo.transform, torch, classRig, rig.Controller, materials.World);
-
             // Internal wiring (prefab-safe).
             SceneWiring.Set(rig.Controller, "inputSource", rig.Input);
             SceneWiring.Set(rig.Controller, "cameraPivot", pivot);
@@ -255,6 +259,7 @@ namespace AshenRealm.EditorTools
             cc.skinWidth = 0.04f;
 
             var health = root.AddComponent<Health>();
+            var status = root.AddComponent<StatusEffects>();
             var animator = root.AddComponent<KnightAnimator>();
             var ai = root.AddComponent<CursedKnightAI>();
             var flash = root.AddComponent<HitFlash>();
@@ -313,7 +318,9 @@ namespace AshenRealm.EditorTools
             SceneWiring.Set(animator, "eyes", eyes);
 
             SceneWiring.Set(ai, "health", health);
+            SceneWiring.Set(ai, "status", status);
             SceneWiring.Set(ai, "animator", animator);
+            SceneWiring.Set(status, "health", health);
 
             SceneWiring.Set(flash, "health", health);
             SceneWiring.Set(flash, "renderers", renderers);
@@ -400,9 +407,12 @@ namespace AshenRealm.EditorTools
                 director, materials, "Person_Merchant_" + biome.Name, outfit, light);
         }
 
-        /// <summary>A waiting traveller, with the same living pose as the people who can be spoken to.</summary>
+        /// <summary>
+        /// A waiting traveller, with the same living pose as the people who can be spoken to. People who look alike pass the
+        /// same <paramref name="assetKey"/> and share one saved mesh.
+        /// </summary>
         public static GameObject CreateAmbientNpc(string name, Vector3 position, float yaw, System.Action<MeshBuilder> figure,
-            Transform parent, GeneratedMaterials materials)
+            Transform parent, GeneratedMaterials materials, string assetKey = null)
         {
             var root = new GameObject(name);
             root.transform.SetParent(parent, true);
@@ -413,7 +423,7 @@ namespace AshenRealm.EditorTools
             capsule.center = new Vector3(0f, 0.95f, 0f);
             var body = new MeshBuilder();
             figure(body);
-            string assetName = "Person_Ambient_" + name.Replace(" ", "");
+            string assetName = "Person_Ambient_" + (assetKey ?? name).Replace(" ", "");
             GameObject model = MeshChild("Figure", root.transform, GeneratedAssets.SaveMesh(body, assetName), materials.World);
             AddIdleAnimation(root, model.transform, name, materials);
             return root;
@@ -427,9 +437,11 @@ namespace AshenRealm.EditorTools
             float phase = 0f;
             foreach (char letter in id) phase += letter * 0.13f;
             SceneWiring.Set(idle, "phase", phase);
-            NpcRoutine routine = id == "merchant" ? NpcRoutine.Trading : id == "crier" ? NpcRoutine.Reading :
-                id == "widow" || id == "monk" ? NpcRoutine.Praying : id == "sergeant" || id == "wanderer" ? NpcRoutine.Seated :
-                id.Contains("Guard") || id == "gravedigger" ? NpcRoutine.Watching : NpcRoutine.Attentive;
+            NpcRoutine routine = id == "merchant" ? NpcRoutine.Trading : id == "crier" || id == "Net Mender" ? NpcRoutine.Reading :
+                id == "widow" || id == "monk" || id.StartsWith("Pilgrim") || id == "Mourner" ? NpcRoutine.Praying :
+                id == "sergeant" || id == "wanderer" || id == "fisher" || id == "Beggar" || id == "Drunk" ? NpcRoutine.Seated :
+                id.Contains("Guard") || id == "gravedigger" || id == "gateguard" || id == "farmer" || id == "watchman" ? NpcRoutine.Watching :
+                id.StartsWith("Reaper") ? NpcRoutine.Reaping : NpcRoutine.Attentive;
             SceneWiring.Set(idle, "routine", routine);
             if (id == "merchant")
             {
@@ -617,6 +629,56 @@ namespace AshenRealm.EditorTools
         }
 
         // ---- Helpers ----------------------------------------------------------------------------------------
+
+        // ---- The riding horse ------------------------------------------------------------------------------
+
+        /// <summary>
+        /// The grey mare a soul can buy: its root faces +Z like the player, so riding it is parenting it under the player; the
+        /// model inside is the -Z recipe turned round. Hidden until bought; the scene builder wires the rider, zones and posts.
+        /// </summary>
+        public static RidingHorse CreateRidingHorse(Transform parent, GeneratedMaterials materials)
+        {
+            const Pal Coat = Pal.FurGrey, Mane = Pal.FurDark;
+            var root = new GameObject("Riding Horse");
+            root.transform.SetParent(parent, false);
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, 1.15f, 0.3f);
+            box.size = new Vector3(0.7f, 1.7f, 2.7f);
+            box.enabled = false;
+            var horse = root.AddComponent<RidingHorse>();
+            var animator = root.AddComponent<HorseAnimator>();
+
+            var model = Child("Model", root.transform, Vector3.zero, Quaternion.Euler(0f, 180f, 0f));
+            GameObject Part(string name, Transform under, Vector3 pivot, System.Action<MeshBuilder> build)
+            {
+                var builder = new MeshBuilder();
+                build(builder);
+                return MeshChild(name, under, GeneratedAssets.SaveMesh(builder, "Horse_" + name.Replace(" ", "")), materials.World,
+                    pivot, Quaternion.identity, Vector3.one);
+            }
+            Transform frame = Part("Body", model, Vector3.zero, b => HorseMeshes.Body(b, Coat, true)).transform;
+            Transform neck = Part("Neck", frame, HorseMeshes.NeckPivot, b => HorseMeshes.Neck(b, Coat, Mane, true)).transform;
+            Transform ears = Part("Ears", neck, HorseMeshes.EarsPivot, b => HorseMeshes.Ears(b, Coat)).transform;
+            Transform tail = Part("Tail", frame, HorseMeshes.TailPivot, b => HorseMeshes.Tail(b, Mane)).transform;
+            string[] legNames = { "Leg Front Left", "Leg Front Right", "Leg Hind Left", "Leg Hind Right" };
+            var legs = new Transform[4];
+            for (int i = 0; i < 4; i++)
+            {
+                bool hind = i >= 2;
+                legs[i] = Part(legNames[i], frame, HorseMeshes.LegPivots[i], b => HorseMeshes.Leg(b, Coat, hind)).transform;
+            }
+            model.gameObject.SetActive(false);
+
+            SceneWiring.Set(horse, "model", model.gameObject);
+            SceneWiring.Set(horse, "body", box);
+            SceneWiring.Set(animator, "horse", horse);
+            SceneWiring.Set(animator, "frame", frame);
+            SceneWiring.Set(animator, "neck", neck);
+            SceneWiring.Set(animator, "ears", ears);
+            SceneWiring.Set(animator, "tail", tail);
+            SceneWiring.Set(animator, "legs", legs);
+            return horse;
+        }
 
         static Transform Child(string name, Transform parent, Vector3 localPosition, Quaternion localRotation)
         {

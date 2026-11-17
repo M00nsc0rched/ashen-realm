@@ -13,7 +13,7 @@ namespace AshenRealm.World
     /// <summary>
     /// Moves the player between zones behind a fade: activates the target zone, switches sun, fog and ambient, moves the
     /// respawn point and shows the zone's title card. Underground there is no sun; the player's torch is the light.
-    /// Weapons stay at the door of every house: under a roof the player goes empty-handed.
+    /// Weapons stay at the door of every house and away on the city's streets; the torch waits at house doors only.
     /// </summary>
     public sealed class ZoneManager : MonoBehaviour
     {
@@ -24,6 +24,7 @@ namespace AshenRealm.World
         [SerializeField] FirstPersonController player;
         [SerializeField] PlayerLifecycle lifecycle;
         [SerializeField] PlayerCombat combat;
+        [SerializeField] RidingHorse horse;
         [SerializeField] AtmosphereController atmosphere;
         [SerializeField] Light sun;
         [SerializeField] Camera worldCamera;
@@ -71,6 +72,7 @@ namespace AshenRealm.World
         public void Place(int index, Vector3 position, float yaw, bool exactSpot)
         {
             Zone target = zones[Mathf.Clamp(index, 0, zones.Length - 1)];
+            horse.Release();
             if (target != Current)
             {
                 Current.gameObject.SetActive(false);
@@ -102,6 +104,8 @@ namespace AshenRealm.World
             }
             fade.alpha = 1f;
 
+            // The horse stays in the valley: through a door the rider goes on foot.
+            horse.Release();
             Current.gameObject.SetActive(false);
             target.gameObject.SetActive(true);
             player.Teleport(arrival.position, arrival.eulerAngles.y);
@@ -130,11 +134,18 @@ namespace AshenRealm.World
             atmosphere.ApplyZone(zone, player.transform, session != null && session.HasFlag("world_evening"));
             PlayerTorch.Instance?.SetZone(zone);
             if (CurrentIndex == ZoneNumbers.City) PlayerProgression.Instance?.OfferTorchAtDusk();
-            combat.SetArmed(!zone.Indoors);
+            combat.SetArmed(!WeaponsAway(zone));
+            if (CurrentIndex == ZoneNumbers.Valley) horse.ArriveInValley();
             worldCamera.clearFlags = zone.OutOfTheSun ? CameraClearFlags.SolidColor : CameraClearFlags.Skybox;
             worldCamera.backgroundColor = zone.Fog;
             RefreshObjective();
         }
+
+        /// <summary>
+        /// Under a roof, and on Hollowgate's peaceful streets, nobody fights: the weapons go away. The city keeps its sky,
+        /// so unlike a house it keeps the torch; nothing there needs a blade (its services and contracts are interactions).
+        /// </summary>
+        public bool WeaponsAway(Zone zone) => zone != null && (zone.Indoors || Array.IndexOf(zones, zone) == ZoneNumbers.City);
 
         public void RefreshObjective()
         {

@@ -31,7 +31,7 @@ namespace AshenRealm.EditorTools
         const string ResultKey = "AshenRealm.Playtest.Result";
         const string BatchKey = "AshenRealm.Playtest.Batch";
         const string LogPrefix = "[AshenRealm][Playtest]";
-        const double TimeoutSeconds = 540.0;
+        const double TimeoutSeconds = 2400.0;
 
         static IEnumerator routine;
         static float waitUntil;
@@ -305,6 +305,26 @@ namespace AshenRealm.EditorTools
             settings.editorInputBehaviorInPlayMode = focusBehaviour;
             settings.backgroundBehavior = backgroundBehaviour;
 
+            // The Old Toll Gate, the only pass north, is shut and solid while the knight stands.
+            var tollGate = Object.FindAnyObjectByType<TollGate>();
+            var gateInteractor = controller.GetComponent<PlayerInteractor>();
+            if (!Check(tollGate != null, "The ridge has its Old Toll Gate")) yield break;
+            controller.Teleport(WorldPlaytestChecks.Ground(0f, 89.5f) + Vector3.up * 0.1f, 0f, 0f);
+            yield return 0.3f;
+            string gateMessage = null;
+            System.Action<string> onGateMessage = m => gateMessage = m;
+            GameMessages.Notification += onGateMessage;
+            bool aimed = ReferenceEquals(gateInteractor.Current, tollGate) && gateInteractor.CurrentPrompt == GameText.Barred;
+            tollGate.Interact(controller.gameObject);
+            GameMessages.Notification -= onGateMessage;
+            Check(!tollGate.IsOpen && aimed && gateMessage == GameText.GateBarred, $"Before the knight falls the toll gate is barred, with its message ('{gateMessage}')");
+            controller.Teleport(WorldPlaytestChecks.Ground(0f, 87f) + Vector3.up * 0.1f, 0f, 0f);
+            yield return 0.2f;
+            input.SetTouchMove(Vector2.up);
+            yield return 2f;
+            input.SetTouchMove(Vector2.zero);
+            Check(player.position.z < 92.2f, $"The shut doors stop the player (z {player.position.z:F1})");
+
             // Block a Cursed Knight attack.
             stamina.Refill();
             int blocks = 0;
@@ -338,6 +358,16 @@ namespace AshenRealm.EditorTools
             Check(!knight.Health.IsAlive && knight.CurrentState == CursedKnightAI.State.Dead, $"Knight defeated (health {knight.Health.Current:F0}, state {knight.CurrentState})");
             Check(health.IsAlive, $"Player survives the duel ({health.Current:F0} HP)");
             Check(health.Current < health.Max || blocks > 0, "Player took damage or blocked during combat");
+
+            // With the knight dead the toll gate stands open, and the road north goes through it.
+            yield return 0.1f;
+            Check(tollGate.IsOpen && string.IsNullOrEmpty(tollGate.InteractionPrompt), "The knight's death opens the Old Toll Gate");
+            controller.Teleport(WorldPlaytestChecks.Ground(0f, 87f) + Vector3.up * 0.1f, 0f, 0f);
+            yield return 0.2f;
+            input.SetTouchMove(Vector2.up);
+            yield return 2.5f;
+            input.SetTouchMove(Vector2.zero);
+            Check(player.position.z > 95f, $"The player walks through the open toll gate (z {player.position.z:F1})");
 
             // Open the chest.
             string notification = null;
@@ -408,7 +438,7 @@ namespace AshenRealm.EditorTools
             if (!Check(shop != null, "The shop panel exists")) yield break;
             ZonePortal forgeDoor = Door(ZoneNumbers.Forge);
             if (!Check(forgeDoor != null && forgeDoor.InteractionPrompt == GameText.EnterForge, "The forge has a door on the street")) yield break;
-            Check(combat.Armed && swordPivot.gameObject.activeSelf && attackGroup.alpha > 0f, "Outdoors the weapons are in hand");
+            Check(!combat.Armed && !swordPivot.gameObject.activeSelf && attackGroup.alpha == 0f, "Hollowgate's streets keep the weapons and fighting buttons away");
             forgeDoor.Interact(controller.gameObject);
             yield return 1.8f;
             Check(zones.CurrentIndex == ZoneNumbers.Forge && zones.Current.Indoors, $"The door leads into the forge (zone {zones.CurrentIndex})");
@@ -500,8 +530,8 @@ namespace AshenRealm.EditorTools
             Check(ReferenceEquals(interactor.Current, forgeOut), $"The door out can be aimed at ({interactor.CurrentPrompt})");
             forgeOut.Interact(controller.gameObject);
             yield return 1.8f;
-            Check(zones.CurrentIndex == ZoneNumbers.City && combat.Armed, "The weapons are taken up again on the street");
-            Check(swordPivot.gameObject.activeSelf && attackGroup.alpha > 0f, "The weapons and the buttons come back");
+            Check(zones.CurrentIndex == ZoneNumbers.City && !combat.Armed, "The street outside the forge stays peaceful");
+            Check(!swordPivot.gameObject.activeSelf && attackGroup.alpha == 0f, "No weapon and no fighting button come back on the street");
             Check(Vector3.Distance(player.position, forgeDoor.transform.position) < 5f, $"The street door lets out by the forge ({player.position})");
             controller.Teleport(player.position, 90f);
             Physics.SyncTransforms();
@@ -594,7 +624,8 @@ namespace AshenRealm.EditorTools
             yield return 1.8f;
             Check(zones.CurrentIndex == ZoneNumbers.Tavern && zones.Current.Indoors && !zones.Current.Underground, $"The door leads into the tavern (zone {zones.CurrentIndex})");
             Check(RenderSettings.sun != null && !RenderSettings.sun.enabled, "No sun under the tavern's roof");
-            Check(torch != null && torch.enabled == PlayerProgression.Instance.TorchEquipped, "The tavern keeps the player's deliberate torch choice");
+            Check(torch != null && !torch.enabled && PlayerTorch.Instance.Equipped == PlayerProgression.Instance.TorchEquipped,
+                "The tavern puts the torch light away and keeps the player's saved torch choice");
             Check(!combat.Armed, "The weapons stay at the tavern's door");
             NpcActor[] regulars = Object.FindObjectsByType<NpcActor>();
             Check(regulars.Length == 3, $"Three people sit in the tavern ({regulars.Length})");
@@ -659,8 +690,11 @@ namespace AshenRealm.EditorTools
                 bool used;
                 try { used = abilities.TryUse(0); }
                 finally { combat.HitLanded -= RecordBash; }
-                Check(used && abilities.Focus < focusNow, "Shield Bash spends focus");
-                Check(bashed != null && bashDamage > 0f && bashed.GetComponent<StatusEffects>().Stunned, "Shield Bash hurts and stuns");
+                // A bash that fells the foe earns its one focus straight back (EnemyAI.Slain), so count that refund.
+                float refund = next.Health.IsAlive ? 0f : 1f;
+                Check(used && abilities.Focus <= focusNow - AbilityBook.Find("shieldbash").Cost + refund + 0.01f && abilities.CooldownFraction(0) > 0f,
+                    $"Shield Bash spends focus ({focusNow:F1} to {abilities.Focus:F1}, foe {(refund > 0f ? "slain" : "alive")})");
+                Check(bashed != null && bashDamage > 0f, "Shield Bash damages the actual target; its workbook stun chance is probabilistic");
                 Check(health.Current > 40f, $"The Bloodstone drinks from the blow ({health.Current})");
             }
 
@@ -697,12 +731,20 @@ namespace AshenRealm.EditorTools
             Check(zones.CurrentIndex == 1, "The ending returns to Hollowgate");
             Check(RenderSettings.fogEndDistance > 100f, "Surface fog restored");
 
-            // The witch throws fire instead of swinging.
+            // The witch throws fire instead of swinging: on the valley road, since the city keeps the weapons away.
+            input.SetTouchButton(PlayerButton.Attack, true);
+            input.SetTouchButton(PlayerButton.Attack, false);
+            yield return 0.4f;
+            Check(!combat.Armed && !combat.IsAttacking, "Nothing is swung on Hollowgate's peaceful streets");
+            zones.Place(ZoneNumbers.Valley, Vector3.zero, 0f, false);
+            yield return 0.2f;
             combat.ApplyClass(Catalog.ClassOf(CharacterClass.Witch));
             input.SetTouchButton(PlayerButton.Attack, true);
             input.SetTouchButton(PlayerButton.Attack, false);
             yield return 0.4f;
             Check(Object.FindAnyObjectByType<Projectile>() != null, "A ranged class throws a bolt");
+            zones.Place(ZoneNumbers.City, Vector3.zero, 0f, false);
+            yield return 0.2f;
 
             // Each class holds its own weapons, in both hands, and nobody else's.
             bool Held(string hand, string weapon)
@@ -820,6 +862,10 @@ namespace AshenRealm.EditorTools
             Check(!Object.FindObjectsByType<CursedKnightAI>(FindObjectsInactive.Include)[0].gameObject.activeSelf, "The slain knight stays gone after loading");
             EnemyAI morr = System.Array.Find(Object.FindObjectsByType<EnemyAI>(FindObjectsInactive.Include), e => e.EnemyId == "morr");
             Check(morr != null && !morr.gameObject.activeSelf, "The slain guardian stays gone after loading");
+            zones.Place(ZoneNumbers.Valley, Vector3.zero, 0f, false);
+            yield return 0.1f;
+            var loadedGate = Object.FindAnyObjectByType<TollGate>();
+            Check(loadedGate != null && loadedGate.IsOpen && !loadedGate.GetComponent<BoxCollider>().enabled, "A loaded soul that slew the knight finds the toll gate open");
             foreach (var button in Object.FindObjectsByType<TouchButton>())
                 if (button.Button == PlayerButton.Attack) Check(Vector2.Distance(((RectTransform)button.transform).anchoredPosition, attackMoved) < 1f, "The moved button stays moved after a reload");
             Check(Mathf.Approximately(Object.FindAnyObjectByType<HudAppearance>().GetComponent<CanvasGroup>().alpha, 0.4f), "The HUD opacity survives a reload");
@@ -1159,8 +1205,16 @@ namespace AshenRealm.EditorTools
                     $"Depth {depth + 1}: the return aisle can be walked");
             }
 
+            foreach (float pauseFor in WorldPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in OwnerReportPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in HandCoveragePlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
             foreach (float pauseFor in EnemyCombatPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
             foreach (float pauseFor in AbilityPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in CatalogSkillPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in SkillSweepPlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in PassivePlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in PeoplePlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
+            foreach (float pauseFor in HorsePlaytestChecks.Run((condition, details) => Check(condition, details))) yield return pauseFor;
             foreach (float pauseFor in RunCityNpcScenario()) yield return pauseFor;
             ClearOwnSaveData();
         }
