@@ -18,6 +18,24 @@ html, body {
   background: #0b0a0c;
 }
 
+/* A home-screen app with viewport-fit=cover can leave a strip under fixed and percentage layouts (WebKit 237961, 254868);
+   100vh is the whole screen there. In a browser with bars it would be too tall, so it is limited to standalone. */
+body.standalone #game {
+  height: 100vh;
+}
+
+/* Script cannot read env() directly; the computed padding of this empty element is the insets in CSS pixels. */
+#safe-area-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #unity-canvas {
   display: block;
   width: 100%;
@@ -35,6 +53,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 14px;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: radial-gradient(ellipse at center, #2a2119 0%, #0b0a0c 70%);
   transition: opacity 0.6s ease;
 }
@@ -88,6 +107,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   z-index: 5;
 }
 
@@ -116,13 +136,15 @@ html, body {
   opacity: 1;
 }
 
-body.mobile #fullscreen {
+/* iPhone Safari has no element fullscreen, and a home-screen app is full screen already. */
+body.mobile #fullscreen,
+body.standalone #fullscreen {
   display: none;
 }
 
 #banner {
   position: absolute;
-  top: 10px;
+  top: calc(10px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;

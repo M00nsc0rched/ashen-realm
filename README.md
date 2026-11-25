@@ -3,7 +3,7 @@
 **Játék a böngészőben (play in the browser): https://m00nsc0rched.github.io/ashen-realm/**
 
 An original first-person dark fantasy action RPG with a pixel-art painterly look, playable in the web browser
-(desktop and mobile) and prepared for iPhone. Four classes start unlocked; the Necromancer and Alchemist become playable
+(desktop and mobile) and on iPhone as a home-screen web app. Four classes start unlocked; the Necromancer and Alchemist become playable
 when unlocked. Cross the sunset valley past the Cursed Knight,
 reach Hollowgate (Üregkapu), the last city above the Deep Dark, and go down five depths to the Gloamlord's throne. The
 world, story and bestiary come from the author's game Graveborne ([docs/GRAVEBORNE.md](docs/GRAVEBORNE.md)).
@@ -11,7 +11,8 @@ World art (meshes, pixel textures, sky, HUD sprites) is generated procedurally i
 author's design sketches. The one third-party asset is the Spectral font (SIL Open Font License, `Assets/Art/Fonts`).
 
 - Engine: Unity **6000.6.8f1** · URP 17.6 (custom `AshenRealm/PixelLit` shader) · Input System 1.20 · uGUI
-- Targets: **WebGL** (see [docs/BUILD_WEBGL.md](docs/BUILD_WEBGL.md)), iPhone (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md))
+- Targets: **WebGL** (see [docs/BUILD_WEBGL.md](docs/BUILD_WEBGL.md)), which iPhone plays from the home screen. A native iPhone
+  build ([docs/BUILD_IOS.md](docs/BUILD_IOS.md)) is kept but not pursued; it needs a Mac.
 
 ## Open and generate
 1. Open the `AshenRealm` folder with Unity Hub (Editor 6000.6.8f1).
@@ -30,7 +31,8 @@ author's design sketches. The one third-party asset is the Spectral font (SIL Op
    - **Ashen Realm > Capture Preview Shots** — renders reference images to `Screenshots/`
    - **Ashen Realm > Capture Menu Shots** — renders the menu screens to `Screenshots/`
 5. For the browser: **Ashen Realm > Build WebGL**, then run `tools/serve-webgl.ps1` and open http://localhost:8080.
-6. For iPhone: **Ashen Realm > Apply iOS Player Settings** (see [docs/BUILD_IOS.md](docs/BUILD_IOS.md)).
+6. iPhone needs no separate build: open the published site in Safari and add it to the home screen
+   ([docs/BUILD_WEBGL.md](docs/BUILD_WEBGL.md#iphone-home-screen-app)).
 7. Press **Play**. (In edit mode the Game view shows the full-resolution camera; the pixel look appears in Play mode.)
 
 > If you change anything under `Assets/Editor/`, regenerate. Do not hand-edit the generated scene.
@@ -116,5 +118,6 @@ It edits the current soul and can permanently unlock the Necromancer and Alchemi
 ## Documentation
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — systems, data flow, generation pipeline
 - [docs/PROGRESS.md](docs/PROGRESS.md) — checkpoints, what is verified, what is not
-- [docs/BUILD_IOS.md](docs/BUILD_IOS.md) — iPhone build and deployment workflow
+- [docs/BUILD_WEBGL.md](docs/BUILD_WEBGL.md) — web build, publishing, the iPhone home-screen app
+- [docs/BUILD_IOS.md](docs/BUILD_IOS.md) — native iPhone build (kept, not pursued; needs a Mac)
 - [CLAUDE.md](CLAUDE.md) — rules for AI-assisted development sessions

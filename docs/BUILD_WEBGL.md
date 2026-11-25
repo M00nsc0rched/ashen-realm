@@ -7,7 +7,7 @@ with the **Web Build Support** module (installed on the development PC).
 1. Open the project, run **Ashen Realm > Generate Prototype** (once, or after generator changes).
 2. **Ashen Realm > Build WebGL**. It applies the web player settings and builds `Prototype_Valley` into `Builds/WebGL`:
    - page template `Assets/WebGLTemplates/AshenRealm` (full-window canvas, themed loading screen, "turn your device"
-     notice on phones held upright, fullscreen button on desktop)
+     notice on phones held upright, fullscreen button on desktop, home-screen manifest and icons)
    - Gzip compression **with decompression fallback**, so the build works on any static host without special headers
    - product name "Ashen Realm", data caching on
    The first build switches assets to the Web platform and takes several minutes (IL2CPP + WebAssembly).
@@ -47,8 +47,8 @@ Pushing the source branch (`menus-and-houses` during Checkpoint L) does not upda
 - Desktop: click the game to capture the mouse (pointer lock). Esc releases it and opens the pause menu
   with inventory and abilities, Codex, save, settings, fullscreen and main-menu controls. WASD, Shift, Space, left/right mouse, E.
 - When the touch buttons are showing (touchscreen laptops, F1), the mouse only turns the view; attack with **TÁMADÁS**.
-- Phones/tablets: touch controls appear automatically. Hold the device in landscape. Use the browser's
-  "Add to Home Screen" for a fullscreen-like experience on iOS (Safari does not allow page fullscreen on iPhone).
+- Phones/tablets: touch controls appear automatically. Hold the device in landscape. On iPhone, play full screen from
+  the home screen (below): Safari does not allow page fullscreen there.
 - The inventory draws or puts away the torch. A continuous five-second press on the top-right HUD menu button opens the
   developer stat editor and permanent class unlocks; a short press opens the normal descent menu.
 
@@ -58,6 +58,35 @@ one device and one address, and clearing site data erases them. `PlayerPrefs.Sav
 must survive may skip it (`SaveStore` and `GameSettings.Flush` do it).
 The soul includes level, stat upgrades, ability tiers, food, torch choice and the `world_evening` flag. Unlocked classes belong
 to the meta record. World version 4 preserves zone ids and moves older saved positions to the matching zone's safe entry.
+
+## iPhone home-screen app
+iPhone plays the published build as a web app; there is no separate iPhone build. On the phone:
+1. Open https://m00nsc0rched.github.io/ashen-realm/ in Safari. Its loading screen says how: *Megosztás, majd Főképernyőhöz adás*.
+2. Tap Share (Megosztás), then Add to Home Screen (Főképernyőhöz adás), keep the name "Ashen Realm" and add it.
+3. Start the game from the castle icon. It runs full screen without Safari's bars; hold the phone in landscape.
+
+The template carries what this needs: `manifest.webmanifest` (name, full screen, landscape, dark colours, 192 and 512 px
+icons) and the iOS tags in `index.html` (180 px `apple-touch-icon`, `black-translucent` status bar, `viewport-fit=cover`).
+Unity copies them into the build unchanged, so publishing a build publishes them. The icons are a crop of the castle and its
+lit gate from `Assets/Art/Menu/MenuBackground.jpg`. In the app the fullscreen button and the install hint are hidden.
+- **Separate saves.** The home-screen app has its own site data, apart from Safari's: a soul started in Safari is not in
+  the app and the other way round, and removing the icon deletes the app's souls. Safari may erase a site's data after a week
+  of browsing without a visit; WebKit counts a home-screen app's own use instead, so the app is the safer place for a long soul.
+- **Upright.** iOS does not lock a home-screen app's orientation (it ignores the manifest's `landscape`), so a phone held
+  upright shows the same "Fordítsd el a készüléket" notice as Safari.
+- **Not supported:** offline play (each launch loads from the site; Unity's data cache makes later launches faster, and a
+  new publish reaches the app on its next launch); launch splash images (iOS shows a plain screen until the loading screen);
+  the pause menu's *Teljes képernyő* does nothing on iPhone, the app is already full screen.
+- **Notch and rounded corners.** `viewport-fit=cover` lets the world fill the whole screen, under the notch or Dynamic Island
+  too, while the HUD, the touch controls and the menus stay clear of it. Unity's web runtime reports the whole canvas as
+  `Screen.safeArea`, so the page supplies the insets: the empty `#safe-area-probe` in `index.html` is padded by
+  `env(safe-area-inset-*)` (`TemplateData/style.css`), and `Assets/Plugins/WebGL/SafeArea.jslib` reads its computed padding and
+  scales it to the canvas's backing pixels (`canvas.width` over its CSS width, since the page caps the pixel ratio). In a web build
+  `SafeAreaFitter` uses those insets instead of `Screen.safeArea`, re-reading them on a resize and four times a second (Safari can
+  change them on rotation without a resize). Elsewhere it still uses `Screen.safeArea`. The touch buttons, the layout editor's
+  saved places and the pause button are kept relative to that fitted area, so they move with it. Desktop browsers report zero
+  insets; to try it there, set the probe's padding from the console, for example
+  `document.getElementById("safe-area-probe").style.padding = "0 47px 21px 47px"`.
 
 ## Performance notes
 - The world renders at a fixed 360 px height (`PixelCamera.targetHeight`) and is upscaled with hard pixels, so cost

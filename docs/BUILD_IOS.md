@@ -1,5 +1,7 @@
 # Building Ashen Realm for iPhone
 
+> iPhone players use the web build from the home screen ([BUILD_WEBGL.md](BUILD_WEBGL.md#iphone-home-screen-app)). This native route is kept but not pursued; it needs a Mac.
+
 Building an iOS app requires **macOS with Xcode**. On Windows, Unity can export the Xcode project (with the iOS Build
 Support module installed), but compiling, signing and installing must happen on a Mac.
 

@@ -11,6 +11,7 @@ $types = @{
     ".html" = "text/html; charset=utf-8"; ".css" = "text/css"; ".js" = "application/javascript"
     ".wasm" = "application/wasm"; ".data" = "application/octet-stream"; ".json" = "application/json"
     ".png" = "image/png"; ".ico" = "image/x-icon"; ".symbols.json" = "application/json"
+    ".webmanifest" = "application/manifest+json"
 }
 
 $listener = New-Object System.Net.HttpListener

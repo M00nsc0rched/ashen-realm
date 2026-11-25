@@ -1,7 +1,8 @@
 # ASHEN REALM — project rules for Claude Code
 
-Original first-person dark fantasy RPG. Primary target: **web browser (WebGL)**, desktop and mobile; iPhone native
-remains supported. Unity **6000.6.8f1**, URP 17.6, Input System 1.20, uGUI 2.6.
+Original first-person dark fantasy RPG. Primary target: **web browser (WebGL)**, desktop and mobile. iPhone plays the live
+build as a home-screen web app (`docs/BUILD_WEBGL.md`); the native path in `docs/BUILD_IOS.md` is kept but not pursued, it needs a Mac.
+Unity **6000.6.8f1**, URP 17.6, Input System 1.20, uGUI 2.6.
 Current milestone: Checkpoint O, the north land beyond the Old Toll Gate, its people and a horse to buy and ride, on top of Checkpoint N, all in
 `Assets/Scenes/Prototype_Valley.unity`. See `docs/PROGRESS.md` for validation status and `docs/GRAVEBORNE.md` for the port's scope.
 Do not expand scope beyond that plan (multiplayer, weather) unless asked.
@@ -77,6 +78,8 @@ Long thin bars and a compass at the top centre, round emblem top-left, pause top
 - URP render scale must stay 1 (PixelCamera owns resolution; the validator checks it).
 - WebGL build: `Ashen Realm > Build WebGL` or `BatchTasks.GenerateValidateAndBuildWebGL` with `-buildTarget WebGL`.
   Test via `tools/serve-webgl.ps1` (http://localhost:8080). See `docs/BUILD_WEBGL.md`.
+  On the web `SafeAreaFitter` gets the notch insets from the template's `#safe-area-probe` (`Plugins/WebGL/SafeArea.jslib`), not from
+  `Screen.safeArea`: keep the probe, and put HUD or menu parts that touch a screen edge under a fitted `Safe Area`.
 - The game opens on `UI/MainMenu`, a canvas over the paused world in the same scene. Menus follow the sketches in the folder
   above the project (`Vázlat_*.jpg`, and `Vázlat_Kártyák` for the class cards): `MenuBuilder` uses their coordinates,
   `tools/prepare-menu-art.ps1` cuts their art into `Assets/Art/Menu` (committed, not generated). `BatchTasks.GenerateAndCaptureMenus`

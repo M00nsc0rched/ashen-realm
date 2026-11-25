@@ -7,10 +7,16 @@
     <meta name="theme-color" content="#0b0a0c">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Ashen Realm">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>{{{ PRODUCT_NAME }}}</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" sizes="180x180" href="TemplateData/icon-180.png">
     <link rel="stylesheet" href="TemplateData/style.css">
   </head>
   <body>
+    <!-- Its padding is the screen's safe-area insets; SafeAreaFitter reads it through Plugins/WebGL/SafeArea.jslib. -->
+    <div id="safe-area-probe"></div>
     <div id="game">
       <canvas id="unity-canvas" tabindex="-1"></canvas>
 
@@ -19,6 +25,7 @@
         <div class="subtitle">sötét fantasy kaland</div>
         <div class="bar"><div class="fill" id="progress"></div></div>
         <div class="hint" id="loading-hint">A völgy betöltése…</div>
+        <div class="hint" id="install-hint" hidden>Teljes képernyős játékhoz: Megosztás, majd Főképernyőhöz adás.</div>
       </div>
 
       <div id="rotate">
@@ -33,6 +40,9 @@
     <script>
       var canvas = document.querySelector("#unity-canvas");
       var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      // Launched from the home screen there are no browser bars; on iPhone that is the only way to play full screen.
+      var isStandalone = navigator.standalone === true ||
+        window.matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches;
 
       function unityShowBanner(msg, type) {
         var banner = document.querySelector("#banner");
@@ -71,6 +81,8 @@
       };
 
       if (isMobile) document.body.classList.add("mobile");
+      if (isStandalone) document.body.classList.add("standalone");
+      else if (/iPhone|iPod/.test(navigator.userAgent)) document.querySelector("#install-hint").hidden = false;
 
       var script = document.createElement("script");
       script.src = loaderUrl;

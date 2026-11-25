@@ -812,6 +812,17 @@ namespace AshenRealm.EditorTools
             panel.OnSensitivityChanged(0.75f);
             Check(Mathf.Approximately(input.LookSensitivity, 2f), $"The slider sets the look speed ({input.LookSensitivity:F2})");
 
+            // The web safe area: SafeArea.jslib reads the page's insets in backing pixels, here a landscape iPhone's notch and home bar.
+            Rect notched = SafeAreaFitter.FromInsets(2532f, 1170f, 0f, 141f, 63f, 141f);
+            Check(notched == new Rect(141f, 63f, 2250f, 1107f), $"Web insets keep the HUD clear of a landscape notch ({notched})");
+            Check(SafeAreaFitter.FromInsets(2532f, 1170f, 0f, 0f, 0f, 0f) == new Rect(0f, 0f, 2532f, 1170f), "Without insets the safe area is the whole screen");
+            Rect negative = SafeAreaFitter.FromInsets(2532f, 1170f, -20f, -20f, -20f, -20f), oversize = SafeAreaFitter.FromInsets(2532f, 1170f, 900f, 5000f, 400f, 3000f);
+            Check(negative == new Rect(0f, 0f, 2532f, 1170f) && oversize.width >= 0f && oversize.height >= 0f && oversize.xMax <= 2532f && oversize.yMax <= 1170f,
+                $"Negative or oversize insets are clamped to the screen ({negative}, {oversize})");
+            SafeAreaFitter hudSafe = controls.GetComponentInParent<SafeAreaFitter>();
+            Check(hudSafe != null && System.Array.TrueForAll(Object.FindObjectsByType<TouchButton>(), b => b.transform.IsChildOf(hudSafe.transform)) &&
+                Object.FindAnyObjectByType<TouchJoystick>().transform.IsChildOf(hudSafe.transform), "The touch controls sit in the HUD's safe area and move with it");
+
             // Moving a button: the ring moves the control, and the place outlives a reload (checked below).
             RectTransform attackRect = null;
             foreach (var button in Object.FindObjectsByType<TouchButton>())
